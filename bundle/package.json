@@ -1,5 +1,5 @@
 {
-  "name": "implfuture",
+  "name": "thockflow",
   "version": "0.1.0",
   "dependencies": {
     "prismjs": "^1.28.0"

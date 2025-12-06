@@ -190,10 +190,11 @@ fn Counter() -> Html {
     }
 }
 
-pub fn typing_home() -> Html {
+#[function_component]
+pub fn TypingHome() -> Html {
+  typing_style!();
   mdx! {r#"
-    ## Typing
-    Well, this is how you type.
-  "#
-  }
+## Typing
+Well, this is how you type.
+  "#}
 }

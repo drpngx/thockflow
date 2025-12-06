@@ -71,7 +71,7 @@ fn Home() -> Html {
 
 fn switch(route: Route) -> Html {
     html! {
-        <main class="font-body flex items-center px-2">
+        <main class="font-body flex flex-col items-start px-2 bg-white dark:bg-gray-900 text-black dark:text-white min-h-screen">
             <Navbar />
             {
                 match route {
@@ -80,9 +80,8 @@ fn switch(route: Route) -> Html {
                         <div class="w-full font-body text-3xl my-10 flex justify-evenly px-2 flex-wrap">
                             <div class="max-w-md">
                                 <div>
-                                    <strong class="font-extrabold">{"im·pl"}</strong>
+                                    <strong class="font-extrabold">{"ThockFLow"}</strong>
                                 </div>
-                                <div>{"ThockFlow"}</div>
                                 <div class="">
                                     {"Satisfying typing practice"}
                                 </div>
@@ -102,7 +101,7 @@ fn switch(route: Route) -> Html {
                     Route::Typing => html! {
                         <div class="w-full font-body flex px-2 flex-col items-center place-content-around">
                             <div class="flex flex-col">
-                                {typing::typing_home()}
+                                <typing::TypingHome />
                             </div>
                         </div>
                     },
