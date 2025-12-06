@@ -1,0 +1,125 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary", "js_run_devserver", "js_test")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+load("@rules_rust_wasm_bindgen//:defs.bzl", "rust_wasm_bindgen")
+load("//emsdk:emsdk.bzl", "wasmopt")
+
+package(
+    default_visibility = ["//:__subpackages__"],
+)
+
+config_setting(
+    name = "debug",
+    values = {
+        "compilation_mode": "dbg",
+    },
+)
+
+config_setting(
+    name = "fastbuild",
+    values = {
+        "compilation_mode": "fastbuild",
+    },
+)
+
+bool_flag(
+    name = "show_drafts",
+    build_setting_default = False,
+)
+
+rust_binary(
+    name = "app",
+    srcs = ["src/bin/app.rs"],
+    aliases = aliases(),
+    edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+    ),
+    rustc_flags = select({
+        ":debug": [
+            "-Copt-level=0",
+        ],
+        ":fastbuild": [],
+        "//conditions:default": [
+            "-Ccodegen-units=1",
+            "-Cpanic=abort",
+            "-Copt-level=z",
+        ],
+    }),
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        ":thockflow",
+    ],
+)
+
+rust_library(
+    name = "thockflow",
+    srcs = glob(
+        include = [
+            "src/**/*.rs",
+        ],
+        exclude = ["src/bin/**"],
+    ),
+    aliases = aliases(),
+    compile_data = glob(["src/**/*.mdx"]),
+    edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+    ),
+    rustc_env = select({
+        ":show_drafts_config": {
+            "SHOW_UNPUBLISHED": "1",
+        },
+        "//conditions:default": {},
+    }),
+    deps = all_crate_deps(
+        normal = True,
+    ),
+)
+
+config_setting(
+    name = "show_drafts_config",
+    flag_values = {
+        "//:show_drafts": "1",
+    },
+)
+
+rust_wasm_bindgen(
+    name = "app_wasm",
+    target = "web",
+    wasm_file = ":app",
+)
+
+filegroup(
+    name = "static_files",
+    srcs = glob(["static/**"]) + [
+        ":tailwind",
+        "//bundle",
+    ],
+)
+
+wasmopt(
+    name = "app_wasm_opt",
+    src = ":app_wasm",
+    out = "app_wasm/app_wasm_bg_opt.wasm",
+)
+
+genrule(
+    name = "app_wasm_opt_br",
+    srcs = [":app_wasm_opt"],
+    outs = ["app_wasm/app_wasm_bg_opt.wasm.br"],
+    cmd = "$(execpath @brotli) -9 $<",
+    tools = ["@brotli"],
+)
+
+js_run_binary(
+    name = "tailwind",
+    srcs = glob(["src/**/*.rs"]) + [
+        "tailwind.config.js",
+    ],
+    args = ["--output=static/css/tailwind.css"],
+    out_dirs = ["static/css"],
+    tool = "//bundle:tailwindcss",
+)

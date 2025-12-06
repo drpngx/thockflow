@@ -1,0 +1,14 @@
+# JVM options for Bazel server stability
+startup --host_jvm_args=-Xmx4g
+startup --host_jvm_args=-Xms1g
+
+build --incompatible_enable_cc_toolchain_resolution=1
+common --enable_bzlmod
+
+# passes an argument `--skipLibCheck` to *every* spawn of the TypeScript compiler, tsc
+common --@aspect_rules_ts//ts:skipLibCheck=always
+
+common:windows --enable_runfiles
+
+# Reduce parallelism to avoid memory issues
+build --jobs=8
