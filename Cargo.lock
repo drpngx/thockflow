@@ -1399,6 +1399,7 @@ dependencies = [
 name = "thockflow"
 version = "0.0.1"
 dependencies = [
+ "js-sys",
  "lazy_static",
  "log",
  "stylist",
