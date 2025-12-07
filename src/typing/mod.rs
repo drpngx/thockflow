@@ -208,6 +208,7 @@ pub fn TypingHome() -> Html {
     let keystroke_times = use_state(|| Vec::<f64>::new()); // Timestamp for each keystroke
     let error_positions = use_state(|| Vec::<usize>::new()); // Positions where errors occurred
     let total_typed_chars = use_state(|| 0usize); // Total characters typed (including errors)
+    let key_log = use_state(|| String::new()); // Log of all keys pressed
     let div_ref = use_node_ref();
 
     // Auto-focus on mount
@@ -234,6 +235,7 @@ pub fn TypingHome() -> Html {
         let keystroke_times = keystroke_times.clone();
         let error_positions = error_positions.clone();
         let total_typed_chars = total_typed_chars.clone();
+        let key_log = key_log.clone();
         let div_ref = div_ref.clone();
 
         Callback::from(move |_| {
@@ -250,6 +252,7 @@ pub fn TypingHome() -> Html {
             keystroke_times.set(Vec::new());
             error_positions.set(Vec::new());
             total_typed_chars.set(0);
+            key_log.set(String::new());
 
             // Re-focus after reset
             if let Some(element) = div_ref.cast::<web_sys::HtmlElement>() {
@@ -270,6 +273,7 @@ pub fn TypingHome() -> Html {
         let keystroke_times = keystroke_times.clone();
         let error_positions = error_positions.clone();
         let total_typed_chars = total_typed_chars.clone();
+        let key_log = key_log.clone();
         let reset = reset.clone();
 
         Callback::from(move |e: web_sys::KeyboardEvent| {
@@ -303,6 +307,16 @@ pub fn TypingHome() -> Html {
             // Handle backspace
             if key == "Backspace" {
                 e.prevent_default();
+                
+                // Log backspace
+                let mut log = (*key_log).clone();
+                if e.ctrl_key() {
+                    log.push_str("[Ctrl+BS]");
+                } else {
+                    log.push_str("[BS]");
+                }
+                key_log.set(log);
+
                 if *current_position > 0 {
                     let mut current = (*user_input).clone();
 
@@ -349,6 +363,11 @@ pub fn TypingHome() -> Html {
 
             e.prevent_default();
 
+            // Log key
+            let mut log = (*key_log).clone();
+            log.push_str(&key);
+            key_log.set(log);
+
             let now = js_sys::Date::now();
 
             if !*started {
@@ -362,31 +381,49 @@ pub fn TypingHome() -> Html {
             // Record keystroke time
             let mut times = (*keystroke_times).clone();
             times.push(now);
-            keystroke_times.set(times);
+            keystroke_times.set(times.clone());
 
             let mut current = (*user_input).clone();
             current.push_str(&key);
 
-            // Check if this character is incorrect
-            let quote_chars: Vec<char> = current_quote.chars().collect();
-            if let Some(&expected_char) = quote_chars.get(*current_position) {
-                if key.chars().next() != Some(expected_char) {
-                    error_count.set(*error_count + 1);
-                    // Record error position
-                    let mut errors = (*error_positions).clone();
-                    errors.push(*current_position);
-                    error_positions.set(errors);
+            user_input.set(current.clone());
+
+            // Run alignment to check for errors and completion
+            // We use the dynamic alignment to determine if the LAST typed char was an error.
+            // This handles skips correctly (skipping text doesn't make subsequent correct typing an error).
+            let alignment = align_incremental(&current_quote, &current);
+
+            // Find the operation corresponding to the last input character
+            // We iterate backwards through alignment until we find an op that consumed an input char
+            let mut found_last_input = false;
+            let mut is_error = false;
+            
+            for (op, _, input_char) in alignment.iter().rev() {
+                if input_char.is_some() {
+                    // This is the last input character typed
+                    match op {
+                        EditOp::Match => is_error = false,
+                        EditOp::Substitute => is_error = true,
+                        EditOp::Insert => is_error = true,
+                    }
+                    found_last_input = true;
+                    break;
                 }
             }
 
-            user_input.set(current.clone());
+            if found_last_input && is_error {
+                error_count.set(*error_count + 1);
+                // Record error position (index in keystroke_times)
+                let mut errors = (*error_positions).clone();
+                errors.push(times.len() - 1); // Index of the key just added
+                error_positions.set(errors);
+            }
 
-            // Calculate new position
-            let new_position = *current_position + 1;
+            // Calculate new position (just length of input)
+            let new_position = current.chars().count();
             current_position.set(new_position);
 
             // Check if finished - based on alignment consuming all quote characters
-            let alignment = align_incremental(&current_quote, &current);
             let consumed_quote_chars = alignment.iter()
                 .filter(|(op, _, _)| *op != EditOp::Insert)
                 .count();
@@ -811,7 +848,16 @@ pub fn TypingHome() -> Html {
                         </div>
                     </div>
 
-                    <div class="text-center text-gray-500 dark:text-gray-400 text-sm">
+                    // Debug Window
+                    <div class="mt-8 p-4 bg-gray-200 dark:bg-gray-900 rounded text-xs font-mono overflow-auto max-h-40 whitespace-pre-wrap">
+                        <div class="font-bold mb-2 border-b border-gray-400 pb-1">{"Debug Info"}</div>
+                        <div class="mb-2"><span class="font-bold text-gray-600 dark:text-gray-400">{"Quote:  "}</span>{(*current_quote).clone()}</div>
+                        <div class="mb-2"><span class="font-bold text-gray-600 dark:text-gray-400">{"Input:  "}</span>{(*user_input).clone()}</div>
+                        <div class="mb-2"><span class="font-bold text-gray-600 dark:text-gray-400">{"KeyLog: "}</span>{(*key_log).clone()}</div>
+                        <div><span class="font-bold text-gray-600 dark:text-gray-400">{"Errors: "}</span>{*error_count}</div>
+                    </div>
+
+                    <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-4">
                         {"Press "}<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">{"ESC"}</kbd>{" or "}<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">{"TAB"}</kbd>{" for next quote"}
                     </div>
                 </div>

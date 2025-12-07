@@ -188,4 +188,86 @@ mod tests {
         let expected_matches: Vec<char> = "the brown".chars().collect();
         assert_eq!(matches, expected_matches, "Should match 'the brown' correctly");
     }
+
+    #[test]
+    fn test_user_log_repro() {
+        let quote = "True freedom is a concept far more complex and demanding than the mere absence of external constraint; it is intrinsically linked to the development of internal discipline, the conscious mastery of one's own impulses, and the ethical responsibility for the consequences of one's choices. Unregulated liberty often devolves into self-destructive license, undermining the very foundation of the autonomy it seeks to celebrate, whereas genuine liberation is found in the capacity to choose the highest path, even when that choice is difficult and runs counter to immediate desire. This profound self-governance allows the individual to act not from a place of reactive compulsion but from a position of considered intention, thereby maximizing the potential for meaningful contribution to the world and establishing a self-respect that is unshakeable by external circumstances. The deepest form of independence is found in the inner commitment to moral and intellectual rigor.";
+        
+        // Construct the sequence of inputs as they happened
+        // "True freedom is a oncept far more complex and demandign than the mere absence of external constraint; it is instri"
+        // [Ctrl+BS] (removes "instri")
+        // "intrinsically linked to the development of internal sd"
+        
+        let part1 = "True freedom is a oncept far more complex and demandign than the mere absence of external constraint; it is instri";
+        let part2 = "intrinsically linked to the development of internal sd";
+        
+        let mut current_input = String::new();
+        let mut error_count = 0;
+        
+        // Simulating Part 1
+        for c in part1.chars() {
+            current_input.push(c);
+            let alignment = align_incremental(quote, &current_input);
+            
+            // Logic from mod.rs
+            let mut found_last_input = false;
+            let mut is_error = false;
+            
+            for (op, _, input_char) in alignment.iter().rev() {
+                if input_char.is_some() {
+                    match op {
+                        EditOp::Match => is_error = false,
+                        EditOp::Substitute => is_error = true,
+                        EditOp::Insert => is_error = true,
+                    }
+                    found_last_input = true;
+                    break;
+                }
+            }
+
+            if found_last_input && is_error {
+                error_count += 1;
+                // println!("Error at '{}': input='{}'", c, current_input);
+            }
+        }
+        
+        println!("Errors after part 1: {}", error_count);
+
+        // Simulating Ctrl+BS (remove "instri")
+        // "instri" is 6 chars.
+        for _ in 0..6 {
+            current_input.pop();
+        }
+        // Ctrl+BS doesn't trigger error check in on_keydown logic for NEW errors, 
+        // but it modifies the state. We don't increment error_count here.
+
+        // Simulating Part 2
+        for c in part2.chars() {
+            current_input.push(c);
+            let alignment = align_incremental(quote, &current_input);
+            
+            let mut found_last_input = false;
+            let mut is_error = false;
+            
+            for (op, _, input_char) in alignment.iter().rev() {
+                if input_char.is_some() {
+                    match op {
+                        EditOp::Match => is_error = false,
+                        EditOp::Substitute => is_error = true,
+                        EditOp::Insert => is_error = true,
+                    }
+                    found_last_input = true;
+                    break;
+                }
+            }
+
+            if found_last_input && is_error {
+                error_count += 1;
+                // println!("Error at '{}': input='{}'", c, current_input);
+            }
+        }
+        
+        println!("Total Errors: {}", error_count);
+        println!("Final Input: {}", current_input);
+    }
 }
