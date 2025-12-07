@@ -414,8 +414,13 @@ pub fn TypingHome() -> Html {
             let new_position = *current_position + 1;
             current_position.set(new_position);
 
-            // Check if finished - when we've reached the end of the quote
-            if new_position >= quote_chars.len() {
+            // Check if finished - based on alignment consuming all quote characters
+            let alignment = align_incremental(&current_quote, &current);
+            let consumed_quote_chars = alignment.iter()
+                .filter(|(op, _, _)| *op != EditOp::Insert)
+                .count();
+
+            if consumed_quote_chars >= quote_chars.len() {
                 finished.set(true);
                 end_time.set(Some(js_sys::Date::now()));
             }
