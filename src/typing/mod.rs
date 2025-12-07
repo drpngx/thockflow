@@ -194,7 +194,10 @@ fn Counter() -> Html {
 #[function_component]
 pub fn TypingHome() -> Html {
     let current_quote = use_state(|| {
+        #[cfg(target_arch = "wasm32")]
         let idx = (js_sys::Math::random() * quotes::QUOTES.len() as f64) as usize;
+        #[cfg(not(target_arch = "wasm32"))]
+        let idx = 0;
         quotes::QUOTES[idx].to_string()
     });
     let user_input = use_state(|| String::new());
