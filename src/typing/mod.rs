@@ -393,30 +393,40 @@ pub fn TypingHome() -> Html {
             // This handles skips correctly (skipping text doesn't make subsequent correct typing an error).
             let alignment = align_incremental(&current_quote, &current);
 
-            // Find the operation corresponding to the last input character
-            // We iterate backwards through alignment until we find an op that consumed an input char
-            let mut found_last_input = false;
-            let mut is_error = false;
-            
-            for (op, _, input_char) in alignment.iter().rev() {
+            // Find the index of the operation corresponding to the last input character
+            let mut last_input_idx = None;
+            for (i, (_, _, input_char)) in alignment.iter().enumerate().rev() {
                 if input_char.is_some() {
-                    // This is the last input character typed
-                    match op {
-                        EditOp::Match => is_error = false,
-                        EditOp::Substitute => is_error = true,
-                        EditOp::Insert => is_error = true,
-                    }
-                    found_last_input = true;
+                    last_input_idx = Some(i);
                     break;
                 }
             }
 
-            if found_last_input && is_error {
-                error_count.set(*error_count + 1);
-                // Record error position (index in keystroke_times)
-                let mut errors = (*error_positions).clone();
-                errors.push(times.len() - 1); // Index of the key just added
-                error_positions.set(errors);
+            if let Some(idx) = last_input_idx {
+                let (op, _, _) = alignment[idx];
+                let is_error = match op {
+                    EditOp::Match => {
+                        // Even if it's a match, it's an error if we skipped something to get here
+                        // Check if the immediately preceding op was a Skip (Substitute with None input)
+                        if idx > 0 {
+                            let (prev_op, _, prev_input) = alignment[idx - 1];
+                            // If previous op was a Substitute and it didn't consume input, it's a Skip
+                            matches!(prev_op, EditOp::Substitute) && prev_input.is_none()
+                        } else {
+                            false
+                        }
+                    },
+                    EditOp::Substitute => true,
+                    EditOp::Insert => true,
+                };
+
+                if is_error {
+                    error_count.set(*error_count + 1);
+                    // Record error position (index in keystroke_times)
+                    let mut errors = (*error_positions).clone();
+                    errors.push(times.len() - 1); // Index of the key just added
+                    error_positions.set(errors);
+                }
             }
 
             // Calculate new position (just length of input)
