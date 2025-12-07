@@ -793,7 +793,7 @@ pub fn TypingHome() -> Html {
                     <div class="mb-4">
                         <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">{"Speed Timeline"}</div>
                         
-                        <div class="flex flex-row items-stretch h-32 select-none">
+                        <div class="flex flex-row items-stretch h-32 select-none mb-1">
                             // Left Axis (WPM)
                             <div class="w-8 relative mr-1">
                                 {y_ticks.iter().map(|(wpm_val, _)| {
@@ -808,17 +808,6 @@ pub fn TypingHome() -> Html {
 
                             // Chart Area
                             <div class="flex-grow relative bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                                // Error bar at bottom
-                                <div class="absolute bottom-0 left-0 right-0 h-2 flex">
-                                    {timeline_data.iter().map(|(_, _, _, is_error)| {
-                                        let width_pct = 100.0 / timeline_data.len() as f64;
-                                        let color = if *is_error { "bg-red-500" } else { "bg-transparent" };
-                                        html! {
-                                            <div class={color} style={format!("width: {}%;", width_pct)}></div>
-                                        }
-                                    }).collect::<Html>()}
-                                </div>
-
                                 // Chart lines
                                 <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                                     // Grid lines
@@ -873,6 +862,21 @@ pub fn TypingHome() -> Html {
                                     }
                                 }).collect::<Html>()}
                             </div>
+                        </div>
+
+                        // Error Bar
+                        <div class="flex flex-row h-2 select-none">
+                            <div class="w-8 mr-1"></div>
+                            <div class="flex-grow flex bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                {timeline_data.iter().map(|(_, _, _, is_error)| {
+                                    let width_pct = 100.0 / timeline_data.len() as f64;
+                                    let color = if *is_error { "bg-red-500" } else { "bg-transparent" };
+                                    html! {
+                                        <div class={color} style={format!("width: {}%;", width_pct)}></div>
+                                    }
+                                }).collect::<Html>()}
+                            </div>
+                            <div class="w-8 ml-1"></div>
                         </div>
                     </div>
 
