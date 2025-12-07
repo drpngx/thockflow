@@ -551,6 +551,16 @@ pub fn TypingHome() -> Html {
     let max_cpm = timeline_data.iter().map(|(_, i, c, _)| i.max(*c)).fold(0.0f64, f64::max);
     let chart_max = (max_wpm.max(max_cpm / 5.0) * 1.1).max(1.0); // Add 10% headroom, min 1.0 to avoid div by zero
 
+    // Calculate tick values for Y-axis
+    let mut y_ticks: Vec<(f64, f64)> = Vec::new(); // (wpm_value, cpm_value)
+    let display_max_wpm = (chart_max / 50.0).ceil() * 50.0; // Round up to nearest 50 WPM
+    for i in 0..=((display_max_wpm / 50.0) as usize) {
+        let wpm_val = i as f64 * 50.0;
+        if wpm_val <= display_max_wpm {
+            y_ticks.push((wpm_val, wpm_val * 5.0));
+        }
+    }
+
     // Split quote into words and group into lines
     let words: Vec<&str> = current_quote.split_whitespace().collect();
     let chars_per_line = 55; // Approximate chars that fit in 70vw at text-4xl
@@ -817,7 +827,29 @@ pub fn TypingHome() -> Html {
                             </div>
 
                             // Chart lines
-                            <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                            <svg class="w-full h-full" viewBox="-15 0 130 100" preserveAspectRatio="none">
+                                // Y-axis ticks and labels
+                                {y_ticks.iter().map(|(wpm_val, cpm_val)| {
+                                    let y_pos = 100.0 - (wpm_val / chart_max * 90.0).min(95.0); // Same scaling as lines
+                                    html! {
+                                        <>
+                                            // Grid line
+                                            <line x1="0" y1={format!("{:.1}", y_pos)} x2="100" y2={format!("{:.1}", y_pos)}
+                                                  stroke="#4b5563" stroke-width="0.1" stroke-dasharray="0.5,0.5" />
+                                            // WPM Label (left)
+                                            <text x="-2" y={format!("{:.1}", y_pos + 0.5)} // +0.5 to vertically center text
+                                                  font-size="3" fill="#9ca3af" text-anchor="end" alignment-baseline="middle">
+                                                {format!("{:.0}", wpm_val)}
+                                            </text>
+                                            // CPM Label (right)
+                                            <text x="102" y={format!("{:.1}", y_pos + 0.5)} // +0.5 to vertically center text
+                                                  font-size="3" fill="#9ca3af" text-anchor="start" alignment-baseline="middle">
+                                                {format!("{:.0}", cpm_val)}
+                                            </text>
+                                        </>
+                                    }
+                                }).collect::<Html>()}
+
                                 // Cumulative WPM line (blue)
                                 <polyline
                                     fill="none"
