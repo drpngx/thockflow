@@ -792,71 +792,86 @@ pub fn TypingHome() -> Html {
                     // Timeline chart
                     <div class="mb-4">
                         <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">{"Speed Timeline"}</div>
-                        <div class="relative bg-gray-200 dark:bg-gray-700 rounded h-32 overflow-hidden">
-                            // Error bar at bottom
-                            <div class="absolute bottom-0 left-0 right-0 h-2 flex">
-                                {timeline_data.iter().map(|(_, _, _, is_error)| {
-                                    let width_pct = 100.0 / timeline_data.len() as f64;
-                                    let color = if *is_error { "bg-red-500" } else { "bg-transparent" };
+                        
+                        <div class="flex flex-row items-stretch h-32 select-none">
+                            // Left Axis (WPM)
+                            <div class="w-8 relative mr-1">
+                                {y_ticks.iter().map(|(wpm_val, _)| {
+                                    let pct = (wpm_val / chart_max * 90.0).min(95.0);
                                     html! {
-                                        <div class={color} style={format!("width: {}%;", width_pct)}></div>
+                                        <div class="absolute w-full text-right text-[10px] text-gray-400" style={format!("bottom: {:.1}%; transform: translateY(50%);", pct)}>
+                                            {format!("{:.0}", wpm_val)}
+                                        </div>
                                     }
                                 }).collect::<Html>()}
                             </div>
 
-                            // Chart lines
-                            <svg class="w-full h-full" viewBox="-15 0 130 100" preserveAspectRatio="none">
-                                // Y-axis ticks and labels
-                                {y_ticks.iter().map(|(wpm_val, cpm_val)| {
-                                    let y_pos = 100.0 - (wpm_val / chart_max * 90.0).min(95.0); // Same scaling as lines
-                                    html! {
-                                        <>
-                                            // Grid line
+                            // Chart Area
+                            <div class="flex-grow relative bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                // Error bar at bottom
+                                <div class="absolute bottom-0 left-0 right-0 h-2 flex">
+                                    {timeline_data.iter().map(|(_, _, _, is_error)| {
+                                        let width_pct = 100.0 / timeline_data.len() as f64;
+                                        let color = if *is_error { "bg-red-500" } else { "bg-transparent" };
+                                        html! {
+                                            <div class={color} style={format!("width: {}%;", width_pct)}></div>
+                                        }
+                                    }).collect::<Html>()}
+                                </div>
+
+                                // Chart lines
+                                <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    // Grid lines
+                                    {y_ticks.iter().map(|(wpm_val, _)| {
+                                        let y_pos = 100.0 - (wpm_val / chart_max * 90.0).min(95.0);
+                                        html! {
                                             <line x1="0" y1={format!("{:.1}", y_pos)} x2="100" y2={format!("{:.1}", y_pos)}
                                                   stroke="#4b5563" stroke-width="0.1" stroke-dasharray="0.5,0.5" />
-                                            // WPM Label (left)
-                                            <text x="-2" y={format!("{:.1}", y_pos + 0.5)} // +0.5 to vertically center text
-                                                  font-size="3" fill="#9ca3af" text-anchor="end" alignment-baseline="middle">
-                                                {format!("{:.0}", wpm_val)}
-                                            </text>
-                                            // CPM Label (right)
-                                            <text x="102" y={format!("{:.1}", y_pos + 0.5)} // +0.5 to vertically center text
-                                                  font-size="3" fill="#9ca3af" text-anchor="start" alignment-baseline="middle">
-                                                {format!("{:.0}", cpm_val)}
-                                            </text>
-                                        </>
+                                        }
+                                    }).collect::<Html>()}
+
+                                    // Cumulative WPM line (blue)
+                                    <polyline
+                                        fill="none"
+                                        stroke="#3b82f6"
+                                        stroke-width="0.5"
+                                        points={timeline_data.iter().enumerate().map(|(i, (cum_wpm, _, _, _))| {
+                                            let x = (i as f64 / timeline_data.len() as f64) * 100.0;
+                                            let y = 100.0 - (cum_wpm / chart_max * 90.0).min(95.0);
+                                            format!("{:.1},{:.1}", x, y)
+                                        }).collect::<Vec<_>>().join(" ")}
+                                    />
+                                    // Instantaneous CPM line (cyan, scaled to WPM equivalent)
+                                    <polyline
+                                        fill="none"
+                                        stroke="#06b6d4"
+                                        stroke-width="0.3"
+                                        stroke-opacity="0.6"
+                                        points={timeline_data.iter().enumerate().map(|(i, (_, inst_cpm, _, _))| {
+                                            let x = (i as f64 / timeline_data.len() as f64) * 100.0;
+                                            let y = 100.0 - ((inst_cpm / 5.0) / chart_max * 90.0).min(95.0);
+                                            format!("{:.1},{:.1}", x, y)
+                                        }).collect::<Vec<_>>().join(" ")}
+                                    />
+                                </svg>
+
+                                // Legend
+                                <div class="absolute top-1 right-1 text-xs flex gap-2">
+                                    <span class="text-blue-500">{"WPM"}</span>
+                                    <span class="text-cyan-500">{"CPM"}</span>
+                                </div>
+                            </div>
+
+                            // Right Axis (CPM)
+                            <div class="w-8 relative ml-1">
+                                {y_ticks.iter().map(|(wpm_val, cpm_val)| {
+                                    let pct = (wpm_val / chart_max * 90.0).min(95.0);
+                                    html! {
+                                        <div class="absolute w-full text-left text-[10px] text-gray-400" style={format!("bottom: {:.1}%; transform: translateY(50%);", pct)}>
+                                            {format!("{:.0}", cpm_val)}
+                                        </div>
                                     }
                                 }).collect::<Html>()}
-
-                                // Cumulative WPM line (blue)
-                                <polyline
-                                    fill="none"
-                                    stroke="#3b82f6"
-                                    stroke-width="0.5"
-                                    points={timeline_data.iter().enumerate().map(|(i, (cum_wpm, _, _, _))| {
-                                        let x = (i as f64 / timeline_data.len() as f64) * 100.0;
-                                        let y = 100.0 - (cum_wpm / chart_max * 90.0).min(95.0);
-                                        format!("{:.1},{:.1}", x, y)
-                                    }).collect::<Vec<_>>().join(" ")}
-                                />
-                                // Instantaneous CPM line (cyan, scaled to WPM equivalent)
-                                <polyline
-                                    fill="none"
-                                    stroke="#06b6d4"
-                                    stroke-width="0.3"
-                                    stroke-opacity="0.6"
-                                    points={timeline_data.iter().enumerate().map(|(i, (_, inst_cpm, _, _))| {
-                                        let x = (i as f64 / timeline_data.len() as f64) * 100.0;
-                                        let y = 100.0 - ((inst_cpm / 5.0) / chart_max * 90.0).min(95.0);
-                                        format!("{:.1},{:.1}", x, y)
-                                    }).collect::<Vec<_>>().join(" ")}
-                                />
-                            </svg>
-
-                            // Legend
-                            <div class="absolute top-1 right-1 text-xs flex gap-2">
-                                <span class="text-blue-500">{"WPM"}</span>
-                                <span class="text-cyan-500">{"CPM"}</span>
                             </div>
                         </div>
                     </div>
