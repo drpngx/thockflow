@@ -282,6 +282,7 @@ pub fn TypingHome() -> Html {
     let scroll_offset = use_state(|| 0usize); // Which line to start displaying from
     let keystroke_times = use_state(|| Vec::<f64>::new()); // Timestamp for each keystroke
     let error_positions = use_state(|| Vec::<usize>::new()); // Positions where errors occurred
+    let total_typed_chars = use_state(|| 0usize); // Total characters typed (including errors)
     let div_ref = use_node_ref();
 
     // Auto-focus on mount
@@ -307,6 +308,7 @@ pub fn TypingHome() -> Html {
         let scroll_offset = scroll_offset.clone();
         let keystroke_times = keystroke_times.clone();
         let error_positions = error_positions.clone();
+        let total_typed_chars = total_typed_chars.clone();
         let div_ref = div_ref.clone();
 
         Callback::from(move |_| {
@@ -322,6 +324,7 @@ pub fn TypingHome() -> Html {
             error_count.set(0);
             keystroke_times.set(Vec::new());
             error_positions.set(Vec::new());
+            total_typed_chars.set(0);
 
             // Re-focus after reset
             if let Some(element) = div_ref.cast::<web_sys::HtmlElement>() {
@@ -341,6 +344,7 @@ pub fn TypingHome() -> Html {
         let error_count = error_count.clone();
         let keystroke_times = keystroke_times.clone();
         let error_positions = error_positions.clone();
+        let total_typed_chars = total_typed_chars.clone();
         let reset = reset.clone();
 
         Callback::from(move |e: web_sys::KeyboardEvent| {
@@ -427,6 +431,9 @@ pub fn TypingHome() -> Html {
                 start_time.set(Some(now));
             }
 
+            // Increment total typed chars
+            total_typed_chars.set(*total_typed_chars + 1);
+
             // Record keystroke time
             let mut times = (*keystroke_times).clone();
             times.push(now);
@@ -490,14 +497,13 @@ pub fn TypingHome() -> Html {
             let cpm = if elapsed_min > 0.0 { calc_len as f64 / elapsed_min } else { 0.0 };
             let wpm = if elapsed_min > 0.0 { (calc_len as f64 / 5.0) / elapsed_min } else { 0.0 };
 
-            let distance = edit_distance(&dist_quote, &user_input);
-            let accuracy = if calc_len > 0 {
-                ((calc_len.saturating_sub(distance)) as f64 / calc_len as f64 * 100.0).max(0.0)
+            let accuracy = if *total_typed_chars > 0 {
+                (1.0 - (*error_count as f64 / *total_typed_chars as f64)) * 100.0
             } else {
                 100.0
             };
 
-            (wpm, cpm, accuracy, elapsed_sec)
+            (wpm, cpm, accuracy.max(0.0), elapsed_sec)
         } else {
             (0.0, 0.0, 0.0, 0.0)
         }
