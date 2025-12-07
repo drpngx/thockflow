@@ -280,6 +280,8 @@ pub fn TypingHome() -> Html {
     let end_time = use_state(|| None::<f64>);
     let error_count = use_state(|| 0usize);
     let scroll_offset = use_state(|| 0usize); // Which line to start displaying from
+    let keystroke_times = use_state(|| Vec::<f64>::new()); // Timestamp for each keystroke
+    let error_positions = use_state(|| Vec::<usize>::new()); // Positions where errors occurred
     let div_ref = use_node_ref();
 
     // Auto-focus on mount
@@ -303,6 +305,8 @@ pub fn TypingHome() -> Html {
         let current_quote = current_quote.clone();
         let error_count = error_count.clone();
         let scroll_offset = scroll_offset.clone();
+        let keystroke_times = keystroke_times.clone();
+        let error_positions = error_positions.clone();
         let div_ref = div_ref.clone();
 
         Callback::from(move |_| {
@@ -316,6 +320,8 @@ pub fn TypingHome() -> Html {
             start_time.set(None);
             end_time.set(None);
             error_count.set(0);
+            keystroke_times.set(Vec::new());
+            error_positions.set(Vec::new());
 
             // Re-focus after reset
             if let Some(element) = div_ref.cast::<web_sys::HtmlElement>() {
@@ -333,6 +339,8 @@ pub fn TypingHome() -> Html {
         let end_time = end_time.clone();
         let current_quote = current_quote.clone();
         let error_count = error_count.clone();
+        let keystroke_times = keystroke_times.clone();
+        let error_positions = error_positions.clone();
         let reset = reset.clone();
 
         Callback::from(move |e: web_sys::KeyboardEvent| {
@@ -358,6 +366,10 @@ pub fn TypingHome() -> Html {
                     current.pop();
                     user_input.set(current);
                     current_position.set(*current_position - 1);
+                    // Remove the last keystroke time
+                    let mut times = (*keystroke_times).clone();
+                    times.pop();
+                    keystroke_times.set(times);
                 }
                 return;
             }
@@ -369,10 +381,17 @@ pub fn TypingHome() -> Html {
 
             e.prevent_default();
 
+            let now = js_sys::Date::now();
+
             if !*started {
                 started.set(true);
-                start_time.set(Some(js_sys::Date::now()));
+                start_time.set(Some(now));
             }
+
+            // Record keystroke time
+            let mut times = (*keystroke_times).clone();
+            times.push(now);
+            keystroke_times.set(times);
 
             let mut current = (*user_input).clone();
             current.push_str(&key);
@@ -382,6 +401,10 @@ pub fn TypingHome() -> Html {
             if let Some(&expected_char) = quote_chars.get(*current_position) {
                 if key.chars().next() != Some(expected_char) {
                     error_count.set(*error_count + 1);
+                    // Record error position
+                    let mut errors = (*error_positions).clone();
+                    errors.push(*current_position);
+                    error_positions.set(errors);
                 }
             }
 
@@ -400,22 +423,67 @@ pub fn TypingHome() -> Html {
     };
 
     // Calculate statistics
-    let (wpm, accuracy) = if *finished {
+    let total_chars = current_quote.chars().count();
+    let total_words = current_quote.split_whitespace().count();
+
+    let (wpm, cpm, accuracy, elapsed_seconds) = if *finished {
         if let (Some(start), Some(end)) = (*start_time, *end_time) {
-            let elapsed_minutes = (end - start) / 1000.0 / 60.0;
-            let char_count = current_quote.chars().count();
-            let wpm = (char_count as f64 / 5.0) / elapsed_minutes; // Standard: 5 chars = 1 word
+            let elapsed_ms = end - start;
+            let elapsed_sec = elapsed_ms / 1000.0;
+            let elapsed_min = elapsed_sec / 60.0;
+            let cpm = total_chars as f64 / elapsed_min;
+            let wpm = (total_chars as f64 / 5.0) / elapsed_min; // Standard: 5 chars = 1 word
 
             let distance = edit_distance(&current_quote, &user_input);
-            let accuracy = ((char_count.saturating_sub(distance)) as f64 / char_count as f64 * 100.0).max(0.0);
+            let accuracy = ((total_chars.saturating_sub(distance)) as f64 / total_chars as f64 * 100.0).max(0.0);
 
-            (wpm, accuracy)
+            (wpm, cpm, accuracy, elapsed_sec)
         } else {
-            (0.0, 0.0)
+            (0.0, 0.0, 0.0, 0.0)
         }
     } else {
-        (0.0, 0.0)
+        (0.0, 0.0, 0.0, 0.0)
     };
+
+    // Calculate timeline data (WPM/CPM at each point)
+    let timeline_data: Vec<(f64, f64, f64, bool)> = if *finished && keystroke_times.len() > 1 {
+        let start = *start_time.as_ref().unwrap_or(&0.0);
+        let mut data = Vec::new();
+
+        for (i, &time) in keystroke_times.iter().enumerate() {
+            let elapsed_min = (time - start) / 1000.0 / 60.0;
+            if elapsed_min > 0.0 {
+                let chars_so_far = i + 1;
+                let cumulative_cpm = chars_so_far as f64 / elapsed_min;
+                let cumulative_wpm = (chars_so_far as f64 / 5.0) / elapsed_min;
+
+                // Instantaneous speed (based on last few keystrokes)
+                let window = 5.min(i + 1);
+                let instant_cpm = if i >= 1 {
+                    let window_start_time = keystroke_times.get(i.saturating_sub(window)).unwrap_or(&start);
+                    let window_elapsed = (time - window_start_time) / 1000.0 / 60.0;
+                    if window_elapsed > 0.0 {
+                        window as f64 / window_elapsed
+                    } else {
+                        cumulative_cpm
+                    }
+                } else {
+                    cumulative_cpm
+                };
+
+                let is_error = error_positions.contains(&i);
+                data.push((cumulative_wpm, instant_cpm, cumulative_cpm, is_error));
+            }
+        }
+        data
+    } else {
+        Vec::new()
+    };
+
+    // Find max values for scaling the chart
+    let max_wpm = timeline_data.iter().map(|(w, _, _, _)| *w).fold(0.0f64, f64::max);
+    let max_cpm = timeline_data.iter().map(|(_, i, c, _)| i.max(*c)).fold(0.0f64, f64::max);
+    let chart_max = (max_wpm.max(max_cpm / 5.0) * 1.1).max(1.0); // Add 10% headroom, min 1.0 to avoid div by zero
 
     // Split quote into words and group into lines
     let words: Vec<&str> = current_quote.split_whitespace().collect();
@@ -621,18 +689,90 @@ pub fn TypingHome() -> Html {
             } else {
                 <div class="mb-8 p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
                     <h3 class="text-3xl font-bold mb-6 text-center">{"Results"}</h3>
-                    <div class="grid grid-cols-3 gap-8 text-center mb-6">
+
+                    // Main stats grid
+                    <div class="grid grid-cols-3 gap-4 text-center mb-6">
                         <div>
-                            <div class="text-5xl font-bold text-blue-500">{format!("{:.0}", wpm)}</div>
-                            <div class="text-gray-600 dark:text-gray-400 mt-2">{"WPM"}</div>
+                            <div class="text-4xl font-bold text-blue-500">{format!("{:.0}", wpm)}</div>
+                            <div class="text-gray-600 dark:text-gray-400 text-sm">{"WPM"}</div>
                         </div>
                         <div>
-                            <div class="text-5xl font-bold text-green-500">{format!("{:.0}%", accuracy)}</div>
-                            <div class="text-gray-600 dark:text-gray-400 mt-2">{"Accuracy"}</div>
+                            <div class="text-4xl font-bold text-cyan-500">{format!("{:.0}", cpm)}</div>
+                            <div class="text-gray-600 dark:text-gray-400 text-sm">{"CPM"}</div>
                         </div>
                         <div>
-                            <div class="text-5xl font-bold text-red-500">{*error_count}</div>
-                            <div class="text-gray-600 dark:text-gray-400 mt-2">{"Errors"}</div>
+                            <div class="text-4xl font-bold text-green-500">{format!("{:.0}%", accuracy)}</div>
+                            <div class="text-gray-600 dark:text-gray-400 text-sm">{"Accuracy"}</div>
+                        </div>
+                    </div>
+
+                    // Secondary stats
+                    <div class="grid grid-cols-4 gap-4 text-center mb-6 text-sm">
+                        <div class="bg-gray-200 dark:bg-gray-700 rounded p-2">
+                            <div class="text-xl font-bold">{total_chars}</div>
+                            <div class="text-gray-600 dark:text-gray-400">{"Characters"}</div>
+                        </div>
+                        <div class="bg-gray-200 dark:bg-gray-700 rounded p-2">
+                            <div class="text-xl font-bold">{total_words}</div>
+                            <div class="text-gray-600 dark:text-gray-400">{"Words"}</div>
+                        </div>
+                        <div class="bg-gray-200 dark:bg-gray-700 rounded p-2">
+                            <div class="text-xl font-bold text-red-500">{*error_count}</div>
+                            <div class="text-gray-600 dark:text-gray-400">{"Errors"}</div>
+                        </div>
+                        <div class="bg-gray-200 dark:bg-gray-700 rounded p-2">
+                            <div class="text-xl font-bold">{format!("{:.1}s", elapsed_seconds)}</div>
+                            <div class="text-gray-600 dark:text-gray-400">{"Time"}</div>
+                        </div>
+                    </div>
+
+                    // Timeline chart
+                    <div class="mb-4">
+                        <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">{"Speed Timeline"}</div>
+                        <div class="relative bg-gray-200 dark:bg-gray-700 rounded h-32 overflow-hidden">
+                            // Error bar at bottom
+                            <div class="absolute bottom-0 left-0 right-0 h-2 flex">
+                                {timeline_data.iter().map(|(_, _, _, is_error)| {
+                                    let width_pct = 100.0 / timeline_data.len() as f64;
+                                    let color = if *is_error { "bg-red-500" } else { "bg-transparent" };
+                                    html! {
+                                        <div class={color} style={format!("width: {}%;", width_pct)}></div>
+                                    }
+                                }).collect::<Html>()}
+                            </div>
+
+                            // Chart lines
+                            <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                // Cumulative WPM line (blue)
+                                <polyline
+                                    fill="none"
+                                    stroke="#3b82f6"
+                                    stroke-width="0.5"
+                                    points={timeline_data.iter().enumerate().map(|(i, (cum_wpm, _, _, _))| {
+                                        let x = (i as f64 / timeline_data.len() as f64) * 100.0;
+                                        let y = 100.0 - (cum_wpm / chart_max * 90.0).min(95.0);
+                                        format!("{:.1},{:.1}", x, y)
+                                    }).collect::<Vec<_>>().join(" ")}
+                                />
+                                // Instantaneous CPM line (cyan, scaled to WPM equivalent)
+                                <polyline
+                                    fill="none"
+                                    stroke="#06b6d4"
+                                    stroke-width="0.3"
+                                    stroke-opacity="0.6"
+                                    points={timeline_data.iter().enumerate().map(|(i, (_, inst_cpm, _, _))| {
+                                        let x = (i as f64 / timeline_data.len() as f64) * 100.0;
+                                        let y = 100.0 - ((inst_cpm / 5.0) / chart_max * 90.0).min(95.0);
+                                        format!("{:.1},{:.1}", x, y)
+                                    }).collect::<Vec<_>>().join(" ")}
+                                />
+                            </svg>
+
+                            // Legend
+                            <div class="absolute top-1 right-1 text-xs flex gap-2">
+                                <span class="text-blue-500">{"WPM"}</span>
+                                <span class="text-cyan-500">{"CPM"}</span>
+                            </div>
                         </div>
                     </div>
 
