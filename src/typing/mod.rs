@@ -363,13 +363,39 @@ pub fn TypingHome() -> Html {
                 e.prevent_default();
                 if *current_position > 0 {
                     let mut current = (*user_input).clone();
-                    current.pop();
+
+                    if e.ctrl_key() {
+                        // Ctrl+Backspace: Delete word
+                        // 1. Remove trailing whitespace
+                        while let Some(c) = current.chars().last() {
+                            if c.is_whitespace() {
+                                current.pop();
+                            } else {
+                                break;
+                            }
+                        }
+                        // 2. Remove trailing non-whitespace
+                        while let Some(c) = current.chars().last() {
+                            if !c.is_whitespace() {
+                                current.pop();
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        current.pop();
+                    }
+
+                    let new_len = current.chars().count();
                     user_input.set(current);
-                    current_position.set(*current_position - 1);
-                    // Remove the last keystroke time
+                    current_position.set(new_len);
+
+                    // Sync keystroke times
                     let mut times = (*keystroke_times).clone();
-                    times.pop();
-                    keystroke_times.set(times);
+                    if times.len() > new_len {
+                        times.truncate(new_len);
+                        keystroke_times.set(times);
+                    }
                 }
                 return;
             }
@@ -681,11 +707,20 @@ pub fn TypingHome() -> Html {
 
     let rendered_text = rendered_lines.into_iter().collect::<Html>();
 
+    let progress_pct = if total_chars > 0 {
+        (consumed_quote_chars as f64 / total_chars as f64) * 100.0
+    } else {
+        0.0
+    };
+
     html! {
         <div ref={div_ref} class="w-full px-4 focus:outline-none" tabindex="0" onkeydown={on_keydown} style="max-width: 70vw; margin: 0 auto;">
             <h2 class="text-3xl font-bold mb-4 text-center">{"ThockFlow"}</h2>
 
             if !*finished {
+                <div class="w-full h-1.5 bg-gray-200 rounded-full mb-6 dark:bg-gray-700">
+                    <div class="h-1.5 bg-blue-500 rounded-full dark:bg-blue-400 transition-all duration-200 ease-out" style={format!("width: {:.1}%", progress_pct)}></div>
+                </div>
                 <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
                     <div class="text-4xl font-mono select-none" style="line-height: 1.8;">
                         {rendered_text}
