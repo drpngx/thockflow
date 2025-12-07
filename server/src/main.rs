@@ -40,7 +40,7 @@ fn html_wasm_init_head() -> String {
         r#"
     <script type="module">
       import init from "{js_path}";
-      init("{wasm_path}");
+      init({{ module_or_path: "{wasm_path}" }});
     </script>
 "#,
         js_path = *APP_JS_PATH,
