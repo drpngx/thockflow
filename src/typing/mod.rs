@@ -369,32 +369,44 @@ pub fn TypingHome() -> Html {
     // Render each character with color coding
     let rendered_text = current_quote.chars().enumerate().map(|(i, quote_char)| {
         let user_chars: Vec<char> = user_input.chars().collect();
-        let (class, show_cursor) = if i < user_chars.len() {
+        let (class, show_cursor, typed_char_wrong) = if i < user_chars.len() {
             // Already typed
-            let color = if user_chars[i] == quote_char {
-                "text-white dark:text-white"
+            if user_chars[i] == quote_char {
+                // Correct
+                ("text-white dark:text-white", false, None)
             } else {
-                "text-red-500 dark:text-red-400 bg-red-900/30"
-            };
-            (color, false)
+                // Incorrect - show what was typed
+                ("text-red-500 dark:text-red-400 bg-red-900/30", false, Some(user_chars[i]))
+            }
         } else if i == *current_position && !*finished {
             // Current position - show cursor
-            ("text-gray-500 dark:text-gray-500", true)
+            ("text-gray-500 dark:text-gray-500", true, None)
         } else {
             // Not yet typed
-            ("text-gray-500 dark:text-gray-500", false)
+            ("text-gray-500 dark:text-gray-500", false, None)
         };
 
         html! {
-            <span class={format!("{} relative", class)}>
-                {if show_cursor {
+            <span class="relative inline-block" style="min-width: 0.6em;">
+                <span class={class}>
+                    {if show_cursor {
+                        html! {
+                            <span class="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" style="margin-left: -2px;"></span>
+                        }
+                    } else {
+                        html! {}
+                    }}
+                    {quote_char}
+                </span>
+                {if let Some(ch) = typed_char_wrong {
                     html! {
-                        <span class="absolute -left-0.5 top-0 bottom-0 w-0.5 bg-yellow-400 animate-pulse"></span>
+                        <span class="absolute text-sm font-bold text-red-300 dark:text-red-200" style="left: 50%; transform: translateX(-50%); top: 1.8em; white-space: nowrap;">
+                            {ch}
+                        </span>
                     }
                 } else {
                     html! {}
                 }}
-                {quote_char}
             </span>
         }
     }).collect::<Html>();
@@ -405,7 +417,7 @@ pub fn TypingHome() -> Html {
 
             if !*finished {
                 <div class="mb-8 p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                    <div class="text-3xl font-mono leading-relaxed tracking-wider select-none">
+                    <div class="text-3xl font-mono select-none" style="line-height: 3em;">
                         {rendered_text}
                     </div>
                 </div>

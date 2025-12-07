@@ -1,15 +1,13 @@
 // Typing practice quotes
-// Add your own quotes here
+// Loaded from static/quotes.txt
 
-pub const QUOTES: &[&str] = &[
-    "The quick brown fox jumps over the lazy dog.",
-    "Practice makes perfect.",
-    "TypeScript is JavaScript with syntax for types.",
-    "Rust empowers everyone to build reliable and efficient software.",
-    "The only way to do great work is to love what you do.",
-    "In the middle of difficulty lies opportunity.",
-    "Code is like humor. When you have to explain it, it's bad.",
-    "First, solve the problem. Then, write the code.",
-    "Experience is the name everyone gives to their mistakes.",
-    "The best error message is the one that never shows up.",
-];
+use lazy_static::lazy_static;
+
+const QUOTES_RAW: &str = include_str!("../../static/quotes.txt");
+
+lazy_static! {
+    pub static ref QUOTES: Vec<&'static str> = QUOTES_RAW
+        .lines()
+        .filter(|line| !line.is_empty())
+        .collect();
+}

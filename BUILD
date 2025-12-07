@@ -63,7 +63,7 @@ rust_library(
         exclude = ["src/bin/**"],
     ),
     aliases = aliases(),
-    compile_data = glob(["src/**/*.mdx"]),
+    compile_data = glob(["src/**/*.mdx"]) + ["static/quotes.txt"],
     edition = "2021",
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
