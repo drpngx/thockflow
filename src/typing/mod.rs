@@ -346,10 +346,23 @@ pub fn TypingHome() -> Html {
         Callback::from(move |e: web_sys::KeyboardEvent| {
             let key = e.key();
 
-            // ESC or Tab always starts new quote
-            if key == "Escape" || key == "Tab" {
+            // Tab always starts new quote
+            if key == "Tab" {
                 e.prevent_default();
                 reset.emit(());
+                return;
+            }
+
+            // Escape: finish early if started, otherwise reset
+            if key == "Escape" {
+                e.prevent_default();
+                if *started {
+                    finished.set(true);
+                    end_time.set(Some(js_sys::Date::now()));
+                    started.set(false);
+                } else {
+                    reset.emit(());
+                }
                 return;
             }
 
@@ -449,6 +462,7 @@ pub fn TypingHome() -> Html {
             if consumed_quote_chars >= quote_chars.len() {
                 finished.set(true);
                 end_time.set(Some(js_sys::Date::now()));
+                started.set(false);
             }
         })
     };
@@ -462,11 +476,26 @@ pub fn TypingHome() -> Html {
             let elapsed_ms = end - start;
             let elapsed_sec = elapsed_ms / 1000.0;
             let elapsed_min = elapsed_sec / 60.0;
-            let cpm = total_chars as f64 / elapsed_min;
-            let wpm = (total_chars as f64 / 5.0) / elapsed_min; // Standard: 5 chars = 1 word
 
-            let distance = edit_distance(&current_quote, &user_input);
-            let accuracy = ((total_chars.saturating_sub(distance)) as f64 / total_chars as f64 * 100.0).max(0.0);
+            // For partial completion, base stats on what was typed
+            let typed_len = user_input.chars().count();
+            let (calc_len, dist_quote) = if typed_len < total_chars {
+                // Partial: compare input against prefix of quote
+                (typed_len, current_quote.chars().take(typed_len).collect::<String>())
+            } else {
+                // Full: compare input against full quote
+                (total_chars, (*current_quote).clone())
+            };
+
+            let cpm = if elapsed_min > 0.0 { calc_len as f64 / elapsed_min } else { 0.0 };
+            let wpm = if elapsed_min > 0.0 { (calc_len as f64 / 5.0) / elapsed_min } else { 0.0 };
+
+            let distance = edit_distance(&dist_quote, &user_input);
+            let accuracy = if calc_len > 0 {
+                ((calc_len.saturating_sub(distance)) as f64 / calc_len as f64 * 100.0).max(0.0)
+            } else {
+                100.0
+            };
 
             (wpm, cpm, accuracy, elapsed_sec)
         } else {
