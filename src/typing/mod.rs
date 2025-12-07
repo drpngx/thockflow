@@ -1,13 +1,9 @@
 use std::borrow::Borrow;
 
-use wasm_bindgen::JsCast;
 use yew::{
-    function_component, html, include_mdx, mdx, mdx_style, use_callback, use_effect, use_node_ref, use_state, Callback, Children, Html,
+    function_component, html, mdx_style, use_callback, use_effect, use_node_ref, use_state, Callback, Children, Html,
     Properties,
 };
-use yew_router::prelude::Link;
-
-use crate::Route;
 
 mod quotes;
 
@@ -192,30 +188,82 @@ fn Counter() -> Html {
     }
 }
 
-// Calculate Levenshtein distance (edit distance) between two strings
-fn edit_distance(s1: &str, s2: &str) -> usize {
-    let len1 = s1.chars().count();
-    let len2 = s2.chars().count();
-    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
+// Edit operation for alignment
+#[derive(Clone, Copy, PartialEq)]
+enum EditOp {
+    Match,      // Characters match
+    Substitute, // Wrong character typed
+    Insert,     // Extra character in user input
+}
 
-    for i in 0..=len1 {
-        matrix[i][0] = i;
-    }
-    for j in 0..=len2 {
-        matrix[0][j] = j;
-    }
+// Greedy incremental alignment - only looks 1-2 chars ahead for local errors
+// This is O(n) and progresses through the quote gradually
+fn align_incremental(quote: &str, input: &str) -> Vec<(EditOp, Option<char>, Option<char>)> {
+    let quote_chars: Vec<char> = quote.chars().collect();
+    let input_chars: Vec<char> = input.chars().collect();
 
-    for (i, c1) in s1.chars().enumerate() {
-        for (j, c2) in s2.chars().enumerate() {
-            let cost = if c1 == c2 { 0 } else { 1 };
-            matrix[i + 1][j + 1] = std::cmp::min(
-                std::cmp::min(matrix[i][j + 1] + 1, matrix[i + 1][j] + 1),
-                matrix[i][j] + cost,
-            );
+    let mut result = Vec::new();
+    let mut q_idx = 0;
+    let mut i_idx = 0;
+
+    while i_idx < input_chars.len() && q_idx < quote_chars.len() {
+        if input_chars[i_idx] == quote_chars[q_idx] {
+            // Direct match
+            result.push((EditOp::Match, Some(quote_chars[q_idx]), Some(input_chars[i_idx])));
+            q_idx += 1;
+            i_idx += 1;
+        } else {
+            // Check if next input char matches current quote char (insertion - extra char typed)
+            let is_insertion = i_idx + 1 < input_chars.len()
+                && input_chars[i_idx + 1] == quote_chars[q_idx];
+
+            // Check if current input matches next quote char (user skipped a quote char)
+            let is_skip = q_idx + 1 < quote_chars.len()
+                && input_chars[i_idx] == quote_chars[q_idx + 1];
+
+            if is_insertion && !is_skip {
+                // Extra character typed
+                result.push((EditOp::Insert, None, Some(input_chars[i_idx])));
+                i_idx += 1;
+            } else if is_skip && !is_insertion {
+                // User skipped a quote char - mark the skipped char as missed (no input for it)
+                result.push((EditOp::Substitute, Some(quote_chars[q_idx]), None));
+                q_idx += 1;
+                // Don't advance i_idx - it will match the next quote char in the next iteration
+            } else {
+                // Simple substitution (typo)
+                result.push((EditOp::Substitute, Some(quote_chars[q_idx]), Some(input_chars[i_idx])));
+                q_idx += 1;
+                i_idx += 1;
+            }
         }
     }
 
-    matrix[len1][len2]
+    // Handle remaining input chars as insertions (typed beyond quote)
+    while i_idx < input_chars.len() {
+        result.push((EditOp::Insert, None, Some(input_chars[i_idx])));
+        i_idx += 1;
+    }
+
+    result
+}
+
+// Simple edit distance for final accuracy calculation
+fn edit_distance(s1: &str, s2: &str) -> usize {
+    let a: Vec<char> = s1.chars().collect();
+    let b: Vec<char> = s2.chars().collect();
+    let mut dp = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+
+    for i in 0..=a.len() { dp[i][0] = i; }
+    for j in 0..=b.len() { dp[0][j] = j; }
+
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            let cost = if a[i-1] == b[j-1] { 0 } else { 1 };
+            dp[i][j] = (dp[i-1][j] + 1).min(dp[i][j-1] + 1).min(dp[i-1][j-1] + cost);
+        }
+    }
+    dp[a.len()][b.len()]
 }
 
 #[function_component]
@@ -231,6 +279,7 @@ pub fn TypingHome() -> Html {
     let start_time = use_state(|| None::<f64>);
     let end_time = use_state(|| None::<f64>);
     let error_count = use_state(|| 0usize);
+    let scroll_offset = use_state(|| 0usize); // Which line to start displaying from
     let div_ref = use_node_ref();
 
     // Auto-focus on mount
@@ -253,11 +302,13 @@ pub fn TypingHome() -> Html {
         let end_time = end_time.clone();
         let current_quote = current_quote.clone();
         let error_count = error_count.clone();
+        let scroll_offset = scroll_offset.clone();
         let div_ref = div_ref.clone();
 
         Callback::from(move |_| {
             let idx = (js_sys::Math::random() * quotes::QUOTES.len() as f64) as usize;
             current_quote.set(quotes::QUOTES[idx].to_string());
+            scroll_offset.set(0);
             user_input.set(String::new());
             current_position.set(0);
             started.set(false);
@@ -366,58 +417,204 @@ pub fn TypingHome() -> Html {
         (0.0, 0.0)
     };
 
-    // Render each character with color coding
-    let rendered_text = current_quote.chars().enumerate().map(|(i, quote_char)| {
-        let user_chars: Vec<char> = user_input.chars().collect();
-        let (class, show_cursor, typed_char_wrong) = if i < user_chars.len() {
-            // Already typed
-            if user_chars[i] == quote_char {
-                // Correct
-                ("text-white dark:text-white", false, None)
-            } else {
-                // Incorrect - show what was typed
-                ("text-red-500 dark:text-red-400 bg-red-900/30", false, Some(user_chars[i]))
-            }
-        } else if i == *current_position && !*finished {
-            // Current position - show cursor
-            ("text-gray-500 dark:text-gray-500", true, None)
-        } else {
-            // Not yet typed
-            ("text-gray-500 dark:text-gray-500", false, None)
-        };
+    // Split quote into words and group into lines
+    let words: Vec<&str> = current_quote.split_whitespace().collect();
+    let chars_per_line = 55; // Approximate chars that fit in 70vw at text-4xl
 
-        html! {
-            <span class="relative inline-block" style="min-width: 0.6em;">
-                <span class={class}>
-                    {if show_cursor {
-                        html! {
-                            <span class="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" style="margin-left: -2px;"></span>
-                        }
+    // Group words into lines based on character count
+    let mut lines: Vec<Vec<&str>> = Vec::new();
+    let mut current_line_words: Vec<&str> = Vec::new();
+    let mut current_line_len = 0;
+
+    for word in &words {
+        let word_len = word.chars().count() + 1; // +1 for space
+        if current_line_len + word_len > chars_per_line && !current_line_words.is_empty() {
+            lines.push(current_line_words);
+            current_line_words = Vec::new();
+            current_line_len = 0;
+        }
+        current_line_words.push(word);
+        current_line_len += word_len;
+    }
+    if !current_line_words.is_empty() {
+        lines.push(current_line_words);
+    }
+
+    // Get alignment to find cursor position
+    let alignment = align_incremental(&current_quote, &user_input);
+    let consumed_quote_chars = alignment.iter()
+        .filter(|(op, _, _)| *op != EditOp::Insert)
+        .count();
+
+    // Find which line the cursor is on
+    let mut char_count = 0;
+    let mut cursor_line = 0;
+    for (i, line_words) in lines.iter().enumerate() {
+        let line_char_count: usize = line_words.iter().map(|w| w.chars().count() + 1).sum();
+        if char_count + line_char_count > consumed_quote_chars {
+            cursor_line = i;
+            break;
+        }
+        char_count += line_char_count;
+        cursor_line = i + 1;
+    }
+
+    // Scroll offset: only advances forward, keeps cursor on line 2 (middle)
+    // Once cursor reaches line 2 (index 1 in visible), we start scrolling
+    let new_scroll = if cursor_line <= 1 { 0 } else { cursor_line - 1 };
+    let current_scroll = *scroll_offset;
+    if new_scroll > current_scroll {
+        scroll_offset.set(new_scroll);
+    }
+    let scroll = *scroll_offset;
+
+    // Get the 3 lines to display
+    let visible_lines: Vec<&Vec<&str>> = lines.iter().skip(scroll).take(3).collect();
+
+    // Build the text for visible lines with alignment coloring
+    let mut visible_start_char = 0;
+    for line_words in lines.iter().take(scroll) {
+        visible_start_char += line_words.iter().map(|w| w.chars().count() + 1).sum::<usize>();
+    }
+
+    // Build a map: for each quote position, what insertions come before it, and what's the status
+    // Also track insertions at the end (after all quote chars)
+    let mut insertions_before: std::collections::HashMap<usize, Vec<char>> = std::collections::HashMap::new();
+    let mut char_status: std::collections::HashMap<usize, (bool, Option<char>)> = std::collections::HashMap::new(); // (is_error, typed_char)
+
+    let mut quote_pos = 0;
+    for (op, _, input_char) in alignment.iter() {
+        match op {
+            EditOp::Insert => {
+                // This insertion comes before quote_pos
+                insertions_before.entry(quote_pos).or_insert_with(Vec::new).push(input_char.unwrap());
+            }
+            EditOp::Match => {
+                char_status.insert(quote_pos, (false, None));
+                quote_pos += 1;
+            }
+            EditOp::Substitute => {
+                char_status.insert(quote_pos, (true, *input_char));
+                quote_pos += 1;
+            }
+        }
+    }
+
+    // Render the 3 visible lines
+    let mut rendered_lines: Vec<Html> = Vec::new();
+    let mut pos = visible_start_char;
+
+    for line_words in visible_lines.iter() {
+        let mut line_elements: Vec<Html> = Vec::new();
+
+        for (word_idx, word) in line_words.iter().enumerate() {
+            for ch in word.chars() {
+                // First, render any insertions before this position
+                if let Some(inserts) = insertions_before.get(&pos) {
+                    for &ins_char in inserts {
+                        // Use U+2423 (Open Box) to display inserted spaces visibly
+                        let display_char = if ins_char == ' ' { '\u{2423}' } else { ins_char };
+                        line_elements.push(html! {
+                            <span class="text-red-500 dark:text-red-400 bg-red-900/30 line-through">{display_char}</span>
+                        });
+                    }
+                }
+
+                let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
+                let show_cursor = pos == consumed_quote_chars && !*finished;
+
+                let class = if pos < consumed_quote_chars {
+                    if is_error {
+                        "text-red-500 dark:text-red-400 bg-red-900/30"
                     } else {
-                        html! {}
-                    }}
-                    {quote_char}
-                </span>
-                {if let Some(ch) = typed_char_wrong {
-                    html! {
-                        <span class="absolute text-sm font-bold text-red-300 dark:text-red-200" style="left: 50%; transform: translateX(-50%); top: 1.8em; white-space: nowrap;">
-                            {ch}
-                        </span>
+                        "text-white dark:text-white"
                     }
                 } else {
-                    html! {}
-                }}
-            </span>
+                    "text-gray-500 dark:text-gray-500"
+                };
+
+                line_elements.push(html! {
+                    <span class="relative inline">
+                        {if show_cursor {
+                            html! { <span class="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" style="margin-left: -1px;"></span> }
+                        } else {
+                            html! {}
+                        }}
+                        <span class={class}>{ch}</span>
+                        {if let Some(typed) = typed_char {
+                            html! { <span class="absolute text-xs text-red-300" style="top: 100%; left: 0; line-height: 1;">{typed}</span> }
+                        } else {
+                            html! {}
+                        }}
+                    </span>
+                });
+                pos += 1;
+            }
+            // Add space after word (except last word)
+            if word_idx < line_words.len() - 1 {
+                // First, render any insertions before this space
+                if let Some(inserts) = insertions_before.get(&pos) {
+                    for &ins_char in inserts {
+                        // Use U+2423 (Open Box) to display inserted spaces visibly
+                        let display_char = if ins_char == ' ' { '\u{2423}' } else { ins_char };
+                        line_elements.push(html! {
+                            <span class="text-red-500 dark:text-red-400 bg-red-900/30 line-through">{display_char}</span>
+                        });
+                    }
+                }
+
+                let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
+                let show_cursor = pos == consumed_quote_chars && !*finished;
+
+                let class = if pos < consumed_quote_chars {
+                    if is_error {
+                        "text-red-500 dark:text-red-400 bg-red-900/30"
+                    } else {
+                        "text-white dark:text-white"
+                    }
+                } else {
+                    "text-gray-500 dark:text-gray-500"
+                };
+
+                line_elements.push(html! {
+                    <span class="relative inline">
+                        {if show_cursor {
+                            html! { <span class="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" style="margin-left: -1px;"></span> }
+                        } else {
+                            html! {}
+                        }}
+                        <span class={class}>{" "}</span>
+                        {if let Some(typed) = typed_char {
+                            html! { <span class="absolute text-xs text-red-300" style="top: 100%; left: 0; line-height: 1;">{typed}</span> }
+                        } else {
+                            html! {}
+                        }}
+                    </span>
+                });
+                pos += 1;
+            }
         }
-    }).collect::<Html>();
+        // Add space at end of line for word separation
+        if pos < current_quote.chars().count() {
+            pos += 1; // Account for space between lines
+        }
+
+        rendered_lines.push(html! {
+            <div class="whitespace-nowrap overflow-hidden">
+                {line_elements.into_iter().collect::<Html>()}
+            </div>
+        });
+    }
+
+    let rendered_text = rendered_lines.into_iter().collect::<Html>();
 
     html! {
-        <div ref={div_ref} class="w-full max-w-4xl mx-auto p-8 focus:outline-none" tabindex="0" onkeydown={on_keydown}>
-            <h2 class="text-4xl font-bold mb-8 text-center">{"ThockFlow"}</h2>
+        <div ref={div_ref} class="w-full px-4 focus:outline-none" tabindex="0" onkeydown={on_keydown} style="max-width: 70vw; margin: 0 auto;">
+            <h2 class="text-3xl font-bold mb-4 text-center">{"ThockFlow"}</h2>
 
             if !*finished {
-                <div class="mb-8 p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                    <div class="text-3xl font-mono select-none" style="line-height: 3em;">
+                <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                    <div class="text-4xl font-mono select-none" style="line-height: 1.8;">
                         {rendered_text}
                     </div>
                 </div>
