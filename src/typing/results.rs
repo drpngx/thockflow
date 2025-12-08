@@ -17,11 +17,46 @@ pub struct TypingResultsProps {
     pub key_log: String,
 }
 
+fn get_word_at_index(input: &str, index: usize) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    if index >= chars.len() {
+        return String::new();
+    }
+
+    // Find start
+    let mut start = index;
+    while start > 0 && !chars[start].is_whitespace() {
+        start -= 1;
+    }
+    if start < chars.len() && chars[start].is_whitespace() && start < index {
+         start += 1;
+    }
+    // Correction: if we are at whitespace, maybe we want the previous word? 
+    // Or just empty? Let's show the word we are "in".
+    // If input[index] is whitespace, maybe just return " " or "<space>".
+    if chars[index].is_whitespace() {
+        return "<space>".to_string();
+    }
+    // If start points to whitespace (e.g. index was 0 and it was not whitespace, loop didn't run. 
+    // If index was > 0, loop ran. 
+    
+    // Find end
+    let mut end = index;
+    while end < chars.len() && !chars[end].is_whitespace() {
+        end += 1;
+    }
+    
+    chars[start..end].iter().collect()
+}
+
 #[function_component]
 pub fn TypingResults(props: &TypingResultsProps) -> Html {
     let keystroke_times = &props.keystroke_times;
     let start_time = props.start_time;
     let error_positions = &props.error_positions;
+    
+    let chart_ref = use_node_ref();
+    let hovered_stats = use_state(|| None::<(f64, f64, String)>);
 
     // Calculate timeline data (WPM/CPM at each point)
     let timeline_data: Vec<(f64, f64, f64, bool)> = if keystroke_times.len() > 1 {
@@ -56,6 +91,45 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
         data
     } else {
         Vec::new()
+    };
+
+    let on_chart_mousemove = {
+        let chart_ref = chart_ref.clone();
+        let hovered_stats = hovered_stats.clone();
+        let timeline_data = timeline_data.clone();
+        let user_input = props.user_input.clone();
+
+        Callback::from(move |e: MouseEvent| {
+            if let Some(element) = chart_ref.cast::<web_sys::HtmlElement>() {
+                let rect = element.get_bounding_client_rect();
+                let x = e.client_x() as f64 - rect.left();
+                let width = rect.width();
+                let pct = (x / width).max(0.0).min(1.0);
+                
+                let data_len = timeline_data.len();
+                if data_len > 0 {
+                    let index = ((data_len as f64 * pct) as usize).min(data_len - 1);
+                    if let Some((wpm, _, _, _)) = timeline_data.get(index) {
+                         // Note: using cumulative WPM here. Instantaneous might be more interesting?
+                         // The chart shows both. Let's show instant cpm and cumulative wpm as per tuple structure?
+                         // tuple is (cumulative_wpm, instant_cpm, cumulative_cpm, is_error)
+                         // Let's grab instant_cpm for CPM display, and cumulative_wpm for WPM.
+                         let (_, instant_cpm, _, _) = timeline_data[index];
+                         let wpm = *wpm; // cumulative
+                         
+                         let word = get_word_at_index(&user_input, index);
+                         hovered_stats.set(Some((wpm, instant_cpm, word)));
+                    }
+                }
+            }
+        })
+    };
+
+    let on_chart_mouseleave = {
+        let hovered_stats = hovered_stats.clone();
+        Callback::from(move |_| {
+            hovered_stats.set(None);
+        })
     };
 
     // Find max values for scaling the chart
@@ -131,7 +205,20 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
                     </div>
 
                     // Chart Area
-                    <div class="flex-grow relative bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                    <div class="flex-grow relative bg-gray-200 dark:bg-gray-700 rounded overflow-hidden" 
+                         ref={chart_ref}
+                         onmousemove={on_chart_mousemove}
+                         onmouseleave={on_chart_mouseleave}>
+                        
+                        // Tooltip
+                        if let Some((wpm, cpm, word)) = &*hovered_stats {
+                             <div class="absolute top-2 right-2 bg-white/90 dark:bg-black/80 p-2 rounded shadow text-xs pointer-events-none z-10 border border-gray-200 dark:border-gray-600">
+                                 <div class="text-blue-500 font-bold">{format!("WPM: {:.0}", wpm)}</div>
+                                 <div class="text-cyan-500 font-bold">{format!("CPM: {:.0}", cpm)}</div>
+                                 <div class="text-gray-600 dark:text-gray-400 mt-1">{format!("\"{}\"", word)}</div>
+                             </div>
+                        }
+
                         // Chart lines
                         <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                             // Grid lines
