@@ -5,20 +5,25 @@ use super::matching::{align_incremental, EditOp};
 pub struct TypingGameReturn {
     pub current_quote: String,
     pub user_input: String,
+    #[allow(dead_code)]
     pub current_position: usize,
+    #[allow(dead_code)]
     pub started: bool,
     pub finished: bool,
     pub scroll_offset: usize, // Expose scroll_offset
     pub on_keydown: Callback<web_sys::KeyboardEvent>,
     pub div_ref: NodeRef,
+    #[allow(dead_code)]
     pub reset: Callback<()>,
     pub set_scroll_offset: Callback<usize>, // Expose setter
     
     // Stats & Data
     pub error_count: usize,
+    #[allow(dead_code)]
     pub total_typed_chars: usize,
     pub keystroke_times: Vec<f64>,
     pub start_time: Option<f64>,
+    #[allow(dead_code)]
     pub end_time: Option<f64>,
     pub error_positions: Vec<usize>,
     pub key_log: String,

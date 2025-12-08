@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-use yew::{function_component, html, mdx_style, Children, Html, Properties};
+use yew::{function_component, html, Children, Html, Properties};
 
 #[derive(PartialEq, Properties)]
 pub struct ChildProps {
@@ -7,21 +7,13 @@ pub struct ChildProps {
     pub children: Children,
 }
 
+#[allow(dead_code)]
 const HEADER_LINK_LEN: usize = 20;
 
+#[allow(dead_code)]
 #[function_component]
 pub fn MyH1(c: &ChildProps) -> Html {
-    let mut tag = String::new();
-    for c in c.children.iter() {
-        match c {
-            yew::virtual_dom::VNode::VText(t) => {
-                tag += &t.text.to_string();
-            }
-            _ => (),
-        };
-    }
-    tag = tag.replace(" ", "-").to_lowercase();
-    tag.truncate(HEADER_LINK_LEN);
+    let tag = children_to_slug(c.children.iter());
     html! {
       <h1 id={tag.clone()} class="text-4xl pt-10 pb-6">
         <a class="text-inherit" href={format!("#{tag}")}>
@@ -31,19 +23,10 @@ pub fn MyH1(c: &ChildProps) -> Html {
     }
 }
 
+#[allow(dead_code)]
 #[function_component]
 pub fn MyH2(c: &ChildProps) -> Html {
-    let mut tag = String::new();
-    for c in c.children.iter() {
-        match c {
-            yew::virtual_dom::VNode::VText(t) => {
-                tag += &t.text.to_string();
-            }
-            _ => (),
-        };
-    }
-    tag = tag.replace(" ", "-").to_lowercase();
-    tag.truncate(HEADER_LINK_LEN);
+    let tag = children_to_slug(c.children.iter());
     html! {
       <h2 id={tag.clone()} class="text-2xl pt-8 pb-4">
         <a class="text-inherit" href={format!("#{tag}")}>
@@ -53,6 +36,7 @@ pub fn MyH2(c: &ChildProps) -> Html {
     }
 }
 
+#[allow(dead_code)]
 #[function_component]
 pub fn MyH3(c: &ChildProps) -> Html {
     let tag = children_to_slug(c.children.iter());
@@ -65,12 +49,14 @@ pub fn MyH3(c: &ChildProps) -> Html {
     }
 }
 
-fn children_to_slug(c: impl IntoIterator<Item = Html>) -> String {
+#[allow(dead_code)]
+fn children_to_slug<H: Borrow<Html>>(c: impl IntoIterator<Item = H>) -> String {
     let mut out = children_to_string(c);
     out.truncate(HEADER_LINK_LEN);
     out
 }
 
+#[allow(dead_code)]
 fn children_to_string<H: Borrow<Html>>(c: impl IntoIterator<Item = H>) -> String {
     let mut out = String::new();
     for c in c.into_iter() {
