@@ -20,7 +20,7 @@ yew = { version = "0.19", features = ["hydration"] }
 yew-router = { version = "0.16.0" }
 time = { version = "0.3.12", features = ["macros", "formatting"] }
 lazy_static = "1.4.0"
-web-sys = "0.3.58"
+web-sys = { version = "0.3.58", features = ["Element", "DomRect", "HtmlElement", "Node", "Window", "Document"] }
 js-sys = "0.3"
 
 [patch.'crates-io']

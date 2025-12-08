@@ -1,4 +1,5 @@
-use yew::{function_component, html, Html};
+use yew::{function_component, html, Html, use_node_ref, use_effect, NodeRef};
+use web_sys::Element;
 
 mod matching;
 mod quotes;
@@ -6,12 +7,45 @@ pub mod mdx_components;
 mod hook;
 mod results;
 
-pub use crate::typing_style;
 use matching::{align_incremental, EditOp};
 
 #[function_component]
 pub fn TypingHome() -> Html {
     let game = hook::use_typing_game();
+    
+    // Refs for smooth cursor
+    let active_char_ref = use_node_ref();
+    let cursor_ref = use_node_ref();
+    let marker_ref = use_node_ref();
+
+    // Effect to update cursor position
+    {
+        let active_char_ref = active_char_ref.clone();
+        let cursor_ref = cursor_ref.clone();
+        let marker_ref = marker_ref.clone();
+        use_effect(move || {
+            if let (Some(active_char_el), Some(cursor_el), Some(marker_el)) = (
+                active_char_ref.cast::<Element>(),
+                cursor_ref.cast::<Element>(),
+                marker_ref.cast::<Element>(),
+            ) {
+                let char_rect = active_char_el.get_bounding_client_rect();
+                let marker_rect = marker_el.get_bounding_client_rect();
+                
+                let left = char_rect.left() - marker_rect.left();
+                let top = char_rect.top() - marker_rect.top();
+                let height = char_rect.height();
+                
+                // Construct the full style string.
+                let style_str = format!("left: {}px; top: {}px; height: {}px; opacity: 1;", left, top, height);
+                let _ = cursor_el.set_attribute("style", &style_str);
+            } else if let Some(cursor_el) = cursor_ref.cast::<Element>() {
+                 // If active ref is missing (e.g. init or glitch), hide cursor.
+                 let _ = cursor_el.set_attribute("style", "opacity: 0;");
+            }
+            || ()
+        });
+    }
 
     // Render logic for the active game view
     // We compute this even if finished to avoid conditional logic complexity inside the component body,
@@ -133,6 +167,9 @@ pub fn TypingHome() -> Html {
 
                     let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
                     let show_cursor = pos == consumed_quote_chars;
+                    
+                    // Attach active_char_ref if this is the cursor position
+                    let node_ref = if show_cursor { active_char_ref.clone() } else { NodeRef::default() };
 
                     let class = if pos < consumed_quote_chars {
                         if is_error {
@@ -146,12 +183,7 @@ pub fn TypingHome() -> Html {
 
                     line_elements.push(html! {
                         <span class="relative inline">
-                            {if show_cursor {
-                                html! { <span class="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" style="margin-left: -1px;"></span> }
-                            } else {
-                                html! {}
-                            }}
-                            <span class={class}>{ch}</span>
+                            <span ref={node_ref} class={class}>{ch}</span>
                             {if let Some(typed) = typed_char {
                                 html! { <span class="absolute text-xs text-red-300" style="top: 100%; left: 0; line-height: 1;">{typed}</span> }
                             } else {
@@ -174,6 +206,7 @@ pub fn TypingHome() -> Html {
 
                     let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
                     let show_cursor = pos == consumed_quote_chars;
+                    let node_ref = if show_cursor { active_char_ref.clone() } else { NodeRef::default() };
 
                     let class = if pos < consumed_quote_chars {
                         if is_error {
@@ -187,12 +220,7 @@ pub fn TypingHome() -> Html {
 
                     line_elements.push(html! {
                         <span class="relative inline">
-                            {if show_cursor {
-                                html! { <span class="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" style="margin-left: -1px;"></span> }
-                            } else {
-                                html! {}
-                            }}
-                            <span class={class}>{" "}</span>
+                            <span ref={node_ref} class={class}>{" "}</span>
                             {if let Some(typed) = typed_char {
                                 html! { <span class="absolute text-xs text-red-300" style="top: 100%; left: 0; line-height: 1;">{typed}</span> }
                             } else {
@@ -204,6 +232,10 @@ pub fn TypingHome() -> Html {
                 }
             }
             if pos < current_quote.chars().count() {
+                // Handle cursor at end of line (split by wrapping)
+                if pos == consumed_quote_chars {
+                    line_elements.push(html! { <span ref={active_char_ref.clone()} class="inline-block w-0 h-8 align-middle"></span> });
+                }
                 pos += 1; 
             }
 
@@ -228,8 +260,14 @@ pub fn TypingHome() -> Html {
             <div class="w-full h-1.5 bg-gray-200 rounded-full mb-6 dark:bg-gray-700">
                 <div class="h-1.5 bg-blue-500 rounded-full dark:bg-blue-400 transition-all duration-200 ease-out" style={format!("width: {:.1}%", progress_pct)}></div>
             </div>
-            <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <div class="text-4xl font-mono select-none" style="line-height: 1.8;">
+            <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg relative">
+                 // Position Marker
+                 <div ref={marker_ref} class="absolute top-0 left-0 w-0 h-0 pointer-events-none"></div>
+                 // Smooth Cursor
+                 <div ref={cursor_ref} class="absolute w-0.5 bg-yellow-400 transition-all duration-100 ease-out z-10 pointer-events-none" 
+                      style="left: 0; top: 0; height: 1.5em; opacity: 1;"></div>
+                
+                <div class="text-4xl font-mono select-none relative z-0" style="line-height: 1.8;">
                     {rendered_text}
                 </div>
             </div>
