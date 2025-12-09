@@ -913,7 +913,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "5YPZnIVU1UKCzMLXdTPyNHAiknT+CNDiKZUpPs4C1Ic=",
-        "usagesDigest": "LQW4nKsBuiNAe4OZPkEcuGTO9IV7cEs64WkNexETzVM=",
+        "usagesDigest": "94wPx3IN1tv0FQJAmWXwojcg7IK8HrbmTc9ZJAjZkCo=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -958,6 +958,35 @@
                 "@@platforms//cpu:arm64": "@distroless_base_linux_arm64_v8"
               },
               "bzlmod_repository": "distroless_base",
+              "reproducible": true
+            }
+          },
+          "distroless_base_nonroot_linux_amd64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/cc",
+              "identifier": "nonroot",
+              "platform": "linux/amd64",
+              "target_name": "distroless_base_nonroot_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "distroless_base_nonroot": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
+            "attributes": {
+              "target_name": "distroless_base_nonroot",
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/cc",
+              "identifier": "nonroot",
+              "platforms": {
+                "@@platforms//cpu:x86_64": "@distroless_base_nonroot_linux_amd64"
+              },
+              "bzlmod_repository": "distroless_base_nonroot",
               "reproducible": true
             }
           },
@@ -1079,7 +1108,9 @@
           "explicitRootModuleDirectDeps": [
             "distroless_base",
             "distroless_base_linux_amd64",
-            "distroless_base_linux_arm64_v8"
+            "distroless_base_linux_arm64_v8",
+            "distroless_base_nonroot",
+            "distroless_base_nonroot_linux_amd64"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",

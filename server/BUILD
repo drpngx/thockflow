@@ -1,5 +1,5 @@
 load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_push")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_load", "oci_push")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
 load("//tools:platform_transitions.bzl", "platform_passthrough")
@@ -129,6 +129,32 @@ oci_image_index(
         ":linux_amd64",
         ":linux_arm64",
     ],
+)
+
+# Nonroot image for rootless container runtimes (Podman, etc.)
+# Runs as UID 65532 (nonroot user in distroless)
+# Listens on localhost only since Cloudflare Tunnel connects locally
+oci_image(
+    name = "image-nonroot-amd64",
+    base = "@distroless_base_nonroot_linux_amd64",
+    cmd = ["/app/opt"],
+    env = {
+        "HTTP_LISTEN_ADDR": "127.0.0.1:8080",
+    },
+    tars = [":opt_tar_amd64"],
+    workdir = "/app/opt.runfiles/_main",
+)
+
+oci_load(
+    name = "image-nonroot-amd64-load",
+    image = ":image-nonroot-amd64",
+    repo_tags = ["thockflow:latest"],
+)
+
+filegroup(
+    name = "image-nonroot-amd64-tarball",
+    srcs = [":image-nonroot-amd64-load"],
+    output_group = "tarball",
 )
 
 # uses https://github.com/awslabs/amazon-ecr-credential-helper

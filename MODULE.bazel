@@ -15,6 +15,15 @@ oci.pull(
 )
 use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_base_linux_arm64_v8")
 
+# Nonroot variant for rootless container runtimes (Podman, etc.)
+oci.pull(
+    name = "distroless_base_nonroot",
+    image = "gcr.io/distroless/cc",
+    platforms = ["linux/amd64"],
+    tag = "nonroot",
+)
+use_repo(oci, "distroless_base_nonroot", "distroless_base_nonroot_linux_amd64")
+
 bazel_dep(name = "hermetic_cc_toolchain", version = "4.0.0")
 git_override(
     module_name = "hermetic_cc_toolchain",

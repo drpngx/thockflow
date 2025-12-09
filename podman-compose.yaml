@@ -1,0 +1,23 @@
+#
+services:
+  thockflow:
+    container_name: thockflow
+    image: thockflow:latest
+    restart: unless-stopped
+    networks:
+      - thockflow
+
+  cloudflared:
+    container_name: cloudflared-thockflow
+    image: docker.io/cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    networks:
+      - thockflow
+    labels:
+      - "io.containers.autoupdate=registry"
+    depends_on:
+      - thockflow
+
+networks:
+  thockflow:
