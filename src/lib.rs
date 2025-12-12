@@ -8,6 +8,11 @@ use yew_router::{
     prelude::*,
 };
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct QuoteContext {
+    pub index: usize,
+}
+
 #[derive(Routable, PartialEq, Clone)]
 pub enum Route {
     #[at("/")]
@@ -16,12 +21,21 @@ pub enum Route {
     Typing,
 }
 
+#[derive(Properties, PartialEq, Debug, Default)]
+pub struct AppProps {
+    pub init_quote_index: Option<usize>,
+}
+
 #[function_component]
-pub fn App() -> Html {
+pub fn App(props: &AppProps) -> Html {
+    let context = props.init_quote_index.map(|i| QuoteContext { index: i });
+    
     html! {
-        <BrowserRouter>
-            <Switch<Route> render={switch} />
-        </BrowserRouter>
+        <ContextProvider<Option<QuoteContext>> context={context}>
+            <BrowserRouter>
+                <Switch<Route> render={switch} />
+            </BrowserRouter>
+        </ContextProvider<Option<QuoteContext>>>
     }
 }
 
@@ -29,6 +43,7 @@ pub fn App() -> Html {
 pub struct ServerAppProps {
     pub path: AttrValue,
     pub queries: HashMap<String, String>,
+    pub init_quote_index: Option<usize>,
 }
 
 #[function_component]
@@ -37,11 +52,15 @@ pub fn ServerApp(props: &ServerAppProps) -> Html {
     history
         .push_with_query(&*props.path, &props.queries)
         .unwrap();
+        
+    let context = props.init_quote_index.map(|i| QuoteContext { index: i });
 
     html! {
-        <Router history={history}>
-            <Switch<Route> render={switch} />
-        </Router>
+        <ContextProvider<Option<QuoteContext>> context={context}>
+            <Router history={history}>
+                <Switch<Route> render={switch} />
+            </Router>
+        </ContextProvider<Option<QuoteContext>>>
     }
 }
 

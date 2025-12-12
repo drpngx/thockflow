@@ -36,15 +36,20 @@ lazy_static::lazy_static!(
 static LOCAL_POOL: Lazy<LocalPoolHandle> = Lazy::new(|| LocalPoolHandle::new(num_cpus::get()));
 
 fn html_wasm_init_head() -> String {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     format!(
         r#"
     <script type="module">
-      import init from "{js_path}";
-      init({{ module_or_path: "{wasm_path}" }});
+      import init from "{js_path}?v={ts}";
+      init({{ module_or_path: "{wasm_path}?v={ts}" }});
     </script>
 "#,
         js_path = *APP_JS_PATH,
         wasm_path = *APP_WASM_PATH,
+        ts = timestamp,
     )
 }
 

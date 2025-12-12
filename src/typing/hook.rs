@@ -40,10 +40,22 @@ pub struct TypingGameReturn {
 #[hook]
 pub fn use_typing_game() -> TypingGameReturn {
     let current_quote = use_state(|| {
+        let count = quotes::QUOTES.len();
         #[cfg(target_arch = "wasm32")]
-        let idx = (js_sys::Math::random() * quotes::QUOTES.len() as f64) as usize;
+        let idx = {
+            let now = js_sys::Date::new_0();
+            let days = (now.get_time() / 86_400_000.0) as usize;
+            days % count
+        };
         #[cfg(not(target_arch = "wasm32"))]
-        let idx = 0;
+        let idx = {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let days = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() / 86400;
+            (days as usize) % count
+        };
         quotes::QUOTES[idx].to_string()
     });
     let user_input = use_state(|| String::new());
