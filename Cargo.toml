@@ -12,12 +12,12 @@ name = "app"
 [dependencies]
 wasm-bindgen = "=0.2.100"
 log = "0.4"
-stylist = { version = "0.10.1", features = [
+stylist = { version = "0.13", features = [
     "yew",
     "macros",
 ], default-features = false }
-yew = { version = "0.19", features = ["hydration"] }
-yew-router = { version = "0.16.0" }
+yew = { version = "0.21", features = ["hydration"] }
+yew-router = { version = "0.18" }
 time = { version = "0.3.12", features = ["macros", "formatting"] }
 lazy_static = "1.4.0"
 web-sys = { version = "0.3.58", features = ["Element", "DomRect", "HtmlElement", "Node", "Window", "Document"] }
@@ -26,10 +26,6 @@ js-sys = "0.3"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-logger = "0.2"
 
-[patch.'crates-io']
-# yew = { path = "../yew/packages/yew" }
-# yew-router = { path = "../yew/packages/yew-router" }
-yew = { git = "https://github.com/kcking/yew", branch = "mdx" }
-yew-router = { git = "https://github.com/kcking/yew", branch = "mdx" }
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

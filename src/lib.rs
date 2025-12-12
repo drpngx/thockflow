@@ -41,7 +41,7 @@ pub fn App(props: &AppProps) -> Html {
 
 #[derive(Properties, PartialEq, Debug)]
 pub struct ServerAppProps {
-    pub path: AttrValue,
+    pub path: String,
     pub queries: HashMap<String, String>,
     pub init_quote_index: Option<usize>,
 }

@@ -76,7 +76,7 @@ async fn index(
                 init_quote_index: Some(init_quote_index),
             };
             let mut out = String::new();
-            yew::ServerRenderer::<thockflow::ServerApp>::with_props(props)
+            yew::ServerRenderer::<thockflow::ServerApp>::with_props(move || props)
                 .render_to_string(&mut out)
                 .await;
             out

@@ -79,7 +79,7 @@ rust_library(
         exclude = ["src/bin/**"],
     ),
     aliases = aliases(),
-    compile_data = glob(["src/**/*.mdx"]) + [
+    compile_data = [
         "static/quotes.txt",
         ":validate_quotes",
     ],

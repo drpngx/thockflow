@@ -17,8 +17,8 @@ tower = { version = "0.4", features = ["make"] }
 tower-http = { version = "0.3", features = ["fs"] }
 anyhow = "1.0.58"
 axum-extra = { version = "0.3.5", features = ["spa"] }
-yew = { version = "0.19", features = ["ssr"] }
-yew-router = { version = "0.16.0" }
+yew = { version = "0.21", features = ["ssr"] }
+yew-router = { version = "0.18" }
 futures = "0.3.21"
 lazy_static = "1.4.0"
 lambda-web = { version = "0.2.0", features = ["hyper"] }

@@ -3,7 +3,7 @@ use web_sys::Element;
 
 mod matching;
 mod quotes;
-pub mod mdx_components;
+
 mod hook;
 mod results;
 
