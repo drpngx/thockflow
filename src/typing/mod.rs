@@ -156,14 +156,18 @@ pub fn TypingHome() -> Html {
 
             for (word_idx, word) in line_words.iter().enumerate() {
                 for ch in word.chars() {
-                    if let Some(inserts) = insertions_before.get(&pos) {
-                        for &ins_char in inserts {
-                            let display_char = if ins_char == ' ' { '\u{2423}' } else { ins_char };
-                            line_elements.push(html! {
-                                <span class="text-red-500 dark:text-red-400 bg-red-900/30 line-through">{display_char}</span>
-                            });
+                    let inserts_html = if let Some(inserts) = insertions_before.get(&pos) {
+                        html! {
+                            <span class="absolute left-0 flex flex-col-reverse items-center pointer-events-none z-20" style="bottom: 100%; line-height: 1;">
+                                { for inserts.iter().map(|&ins_char| {
+                                    let display_char = if ins_char == ' ' { '\u{2423}' } else { ins_char };
+                                    html! { <span class="text-red-500 dark:text-red-400 text-sm font-bold">{display_char}</span> }
+                                }) }
+                            </span>
                         }
-                    }
+                    } else {
+                        html! {}
+                    };
 
                     let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
                     let show_cursor = pos == consumed_quote_chars;
@@ -183,6 +187,7 @@ pub fn TypingHome() -> Html {
 
                     line_elements.push(html! {
                         <span class="relative inline">
+                            {inserts_html}
                             <span ref={node_ref} class={class}>{ch}</span>
                             {if let Some(typed) = typed_char {
                                 html! { <span class="absolute text-xs text-red-300" style="top: 100%; left: 0; line-height: 1;">{typed}</span> }
@@ -195,14 +200,18 @@ pub fn TypingHome() -> Html {
                 }
                 
                 if word_idx < line_words.len() - 1 {
-                    if let Some(inserts) = insertions_before.get(&pos) {
-                        for &ins_char in inserts {
-                            let display_char = if ins_char == ' ' { '\u{2423}' } else { ins_char };
-                            line_elements.push(html! {
-                                <span class="text-red-500 dark:text-red-400 bg-red-900/30 line-through">{display_char}</span>
-                            });
+                    let inserts_html = if let Some(inserts) = insertions_before.get(&pos) {
+                        html! {
+                            <span class="absolute left-0 flex flex-col-reverse items-center pointer-events-none z-20" style="bottom: 100%; line-height: 1;">
+                                { for inserts.iter().map(|&ins_char| {
+                                    let display_char = if ins_char == ' ' { '\u{2423}' } else { ins_char };
+                                    html! { <span class="text-red-500 dark:text-red-400 text-sm font-bold">{display_char}</span> }
+                                }) }
+                            </span>
                         }
-                    }
+                    } else {
+                        html! {}
+                    };
 
                     let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
                     let show_cursor = pos == consumed_quote_chars;
@@ -220,7 +229,8 @@ pub fn TypingHome() -> Html {
 
                     line_elements.push(html! {
                         <span class="relative inline">
-                            <span ref={node_ref} class={class}>{" "}</span>
+                            {inserts_html}
+                            <span ref={node_ref} class={class}>{"\u{00A0}"}</span>
                             {if let Some(typed) = typed_char {
                                 html! { <span class="absolute text-xs text-red-300" style="top: 100%; left: 0; line-height: 1;">{typed}</span> }
                             } else {
@@ -240,7 +250,7 @@ pub fn TypingHome() -> Html {
             }
 
             rendered_lines.push(html! {
-                <div class="whitespace-nowrap overflow-hidden">
+                <div class="whitespace-nowrap">
                     {line_elements.into_iter().collect::<Html>()}
                 </div>
             });
