@@ -4,6 +4,7 @@ load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 load("@rules_rust_wasm_bindgen//:defs.bzl", "rust_wasm_bindgen")
 load("//emsdk:emsdk.bzl", "wasmopt")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 package(
     default_visibility = ["//:__subpackages__"],
@@ -26,6 +27,13 @@ config_setting(
 bool_flag(
     name = "show_drafts",
     build_setting_default = False,
+)
+
+
+compile_pip_requirements(
+    name = "requirements",
+    requirements_in = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
 )
 
 rust_binary(
@@ -54,6 +62,14 @@ rust_binary(
     ],
 )
 
+genrule(
+    name = "validate_quotes",
+    srcs = ["static/quotes.txt"],
+    outs = ["quotes_validated.txt"],
+    cmd = "$(location //tools:validate_quotes) --input $(location static/quotes.txt) --output $@",
+    tools = ["//tools:validate_quotes"],
+)
+
 rust_library(
     name = "thockflow",
     srcs = glob(
@@ -63,7 +79,10 @@ rust_library(
         exclude = ["src/bin/**"],
     ),
     aliases = aliases(),
-    compile_data = glob(["src/**/*.mdx"]) + ["static/quotes.txt"],
+    compile_data = glob(["src/**/*.mdx"]) + [
+        "static/quotes.txt",
+        ":validate_quotes",
+    ],
     edition = "2021",
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -119,6 +138,7 @@ js_run_binary(
     srcs = glob(["src/**/*.rs"]) + [
         "tailwind.config.js",
     ],
+    copy_srcs_to_bin = False,
     args = ["--output=static/css/tailwind.css"],
     out_dirs = ["static/css"],
     tool = "//bundle:tailwindcss",

@@ -1,3 +1,23 @@
+module(
+    name = "thockflow",
+    version = "0.0.0",
+    compatibility_level = 1,
+)
+
+bazel_dep(name = "rules_python", version="1.7.0")
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+
+kPythonVersion = "3.12"
+python.toolchain(python_version = kPythonVersion, is_default = True)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip_deps",
+    python_version = kPythonVersion,
+    requirements_lock = "//:requirements_lock.txt",
+)
+use_repo(pip, "pip_deps")
+
 bazel_dep(name = "rules_oci", version = "2.2.6")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
