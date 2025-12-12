@@ -35,18 +35,20 @@ lazy_static::lazy_static!(
 
 static LOCAL_POOL: Lazy<LocalPoolHandle> = Lazy::new(|| LocalPoolHandle::new(num_cpus::get()));
 
-fn html_wasm_init_head() -> String {
+fn html_wasm_init_head(init_quote_index: usize) -> String {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     format!(
         r#"
+    <script>window.THOCKFLOW_INIT_INDEX = {};</script>
     <script type="module">
       import init from "{js_path}?v={ts}";
       init({{ module_or_path: "{wasm_path}?v={ts}" }});
     </script>
 "#,
+        init_quote_index,
         js_path = *APP_JS_PATH,
         wasm_path = *APP_WASM_PATH,
         ts = timestamp,
@@ -58,11 +60,20 @@ async fn index(
     url: Request<Body>,
     Query(queries): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
+    let init_quote_index = {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        (now % 10000) as usize // Simple pseudo-random using nanoseconds
+    };
+
     let out = LOCAL_POOL
-        .spawn_pinned(|| async move {
+        .spawn_pinned(move || async move {
             let props = ServerAppProps {
                 path: url.uri().path().to_owned().into(),
                 queries,
+                init_quote_index: Some(init_quote_index),
             };
             let mut out = String::new();
             yew::ServerRenderer::<thockflow::ServerApp>::with_props(props)
@@ -75,7 +86,7 @@ async fn index(
     // Remove dev script tag if present to avoid duplicate loads
     let html = index_html_s
         .replace("<body>", &format!("<body>{}", out))
-        .replace("</head>", &format!("{}</head>", html_wasm_init_head()));
+        .replace("</head>", &format!("{}</head>", html_wasm_init_head(init_quote_index)));
     (
         HeaderMap::from_iter([(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"))]),
         Html(html),

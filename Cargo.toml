@@ -23,6 +23,9 @@ lazy_static = "1.4.0"
 web-sys = { version = "0.3.58", features = ["Element", "DomRect", "HtmlElement", "Node", "Window", "Document"] }
 js-sys = "0.3"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-logger = "0.2"
+
 [patch.'crates-io']
 # yew = { path = "../yew/packages/yew" }
 # yew-router = { path = "../yew/packages/yew-router" }
