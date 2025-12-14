@@ -314,18 +314,14 @@ pub fn use_typing_game() -> TypingGameReturn {
             let elapsed_sec = elapsed_ms / 1000.0;
             let elapsed_min = elapsed_sec / 60.0;
 
-            // For partial completion, base stats on what was typed
-            let typed_len = user_input.chars().count();
-            let (calc_len, _dist_quote) = if typed_len < total_chars {
-                // Partial: compare input against prefix of quote
-                (typed_len, current_quote.chars().take(typed_len).collect::<String>())
-            } else {
-                // Full: compare input against full quote
-                (total_chars, (*current_quote).clone())
-            };
+            // Count only correct characters using alignment
+            let alignment = align_incremental(&current_quote, &user_input);
+            let correct_chars = alignment.iter()
+                .filter(|(op, _, _)| *op == EditOp::Match)
+                .count();
 
-            let cpm = if elapsed_min > 0.0 { calc_len as f64 / elapsed_min } else { 0.0 };
-            let wpm = if elapsed_min > 0.0 { (calc_len as f64 / 5.0) / elapsed_min } else { 0.0 };
+            let cpm = if elapsed_min > 0.0 { correct_chars as f64 / elapsed_min } else { 0.0 };
+            let wpm = if elapsed_min > 0.0 { (correct_chars as f64 / 5.0) / elapsed_min } else { 0.0 };
 
             let accuracy = if *total_typed_chars > 0 {
                 (1.0 - (*error_count as f64 / *total_typed_chars as f64)) * 100.0

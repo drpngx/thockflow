@@ -58,25 +58,44 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
     let chart_ref = use_node_ref();
     let hovered_stats = use_state(|| None::<(f64, f64, String)>);
 
-    // Calculate timeline data (WPM/CPM at each point)
+    // Calculate timeline data (WPM/CPM at each point, counting only correct characters)
     let timeline_data: Vec<(f64, f64, f64, bool)> = if keystroke_times.len() > 1 {
         let start = *start_time.as_ref().unwrap_or(&0.0);
         let mut data = Vec::new();
+        let mut errors_so_far = 0usize;
+        let mut error_iter = error_positions.iter().peekable();
 
         for (i, &time) in keystroke_times.iter().enumerate() {
+            // Count errors up to and including this index
+            while let Some(&&err_pos) = error_iter.peek() {
+                if err_pos <= i {
+                    errors_so_far += 1;
+                    error_iter.next();
+                } else {
+                    break;
+                }
+            }
+
             let elapsed_min = (time - start) / 1000.0 / 60.0;
             if elapsed_min > 0.0 {
-                let chars_so_far = i + 1;
-                let cumulative_cpm = chars_so_far as f64 / elapsed_min;
-                let cumulative_wpm = (chars_so_far as f64 / 5.0) / elapsed_min;
+                // Only count correct characters (total keystrokes minus errors)
+                let correct_chars_so_far = (i + 1).saturating_sub(errors_so_far);
+                let cumulative_cpm = correct_chars_so_far as f64 / elapsed_min;
+                let cumulative_wpm = (correct_chars_so_far as f64 / 5.0) / elapsed_min;
 
-                // Instantaneous speed (based on last few keystrokes)
+                // Instantaneous speed (based on last few keystrokes, counting correct ones)
                 let window = 5.min(i + 1);
-                let instant_cpm = if i >= 1 {
+                let window_start_idx = i.saturating_sub(window - 1);
+                let errors_in_window = error_positions.iter()
+                    .filter(|&&pos| pos >= window_start_idx && pos <= i)
+                    .count();
+                let correct_in_window = window.saturating_sub(errors_in_window);
+
+                let instant_cpm = if i >= 1 && correct_in_window > 0 {
                     let window_start_time = keystroke_times.get(i.saturating_sub(window)).unwrap_or(&start);
                     let window_elapsed = (time - window_start_time) / 1000.0 / 60.0;
                     if window_elapsed > 0.0 {
-                        window as f64 / window_elapsed
+                        correct_in_window as f64 / window_elapsed
                     } else {
                         cumulative_cpm
                     }
