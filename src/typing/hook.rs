@@ -143,7 +143,9 @@ pub fn use_typing_game() -> TypingGameReturn {
                 e.prevent_default();
                 if *started {
                     finished.set(true);
-                    end_time.set(Some(js_sys::Date::now()));
+                    // Use the last keystroke time instead of now
+                    let last_keystroke_time = keystroke_times.last().copied();
+                    end_time.set(last_keystroke_time.or(Some(js_sys::Date::now())));
                     started.set(false);
                 } else {
                     reset.emit(());
@@ -295,7 +297,8 @@ pub fn use_typing_game() -> TypingGameReturn {
             let quote_len = current_quote.chars().count();
             if consumed_quote_chars >= quote_len {
                  finished.set(true);
-                 end_time.set(Some(js_sys::Date::now()));
+                 // Use the last keystroke time (which is `now` that we just pushed)
+                 end_time.set(Some(now));
                  started.set(false);
             }
         })
