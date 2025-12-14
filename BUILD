@@ -111,6 +111,20 @@ rust_wasm_bindgen(
     wasm_file = ":app",
 )
 
+js_run_binary(
+    name = "tailwind",
+    srcs = glob(["src/**/*.rs"]) + ["tailwind.config.js"],
+    args = [
+        "-c",
+        "tailwind.config.js",
+        "--output=$(BINDIR)/static/css/tailwind.css",
+    ],
+    chdir = "../../..",
+    copy_srcs_to_bin = False,
+    out_dirs = ["static/css"],
+    tool = "//bundle:tailwindcss",
+)
+
 filegroup(
     name = "static_files",
     srcs = glob(["static/**"]) + [
@@ -131,15 +145,4 @@ genrule(
     outs = ["app_wasm/app_wasm_bg_opt.wasm.br"],
     cmd = "$(execpath @brotli) -9 $<",
     tools = ["@brotli"],
-)
-
-js_run_binary(
-    name = "tailwind",
-    srcs = glob(["src/**/*.rs"]) + [
-        "tailwind.config.js",
-    ],
-    copy_srcs_to_bin = False,
-    args = ["--output=static/css/tailwind.css"],
-    out_dirs = ["static/css"],
-    tool = "//bundle:tailwindcss",
 )
