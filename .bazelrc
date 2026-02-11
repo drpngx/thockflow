@@ -12,8 +12,3 @@ common:windows --enable_runfiles
 
 # Reduce parallelism to avoid memory issues
 build --jobs=8
-
-# Fix emscript which relies on auto-loaded rules_cc.
-#build --incompatible_autoload_externally=+CcToolchainConfigInfo
-#build --incompatible_autoload_externally=+@rules_cc
-#build --incompatible_autoload_externally=+cc_library,+cc_binary,+cc_toolchain,+cc_toolchain_suite,+cc_common,+CcToolchainConfigInfo,+CcInfo,+cc_import,+cc_shared_library,+objc_library,+objc_import

@@ -4,8 +4,7 @@ module(
     compatibility_level = 1,
 )
 
-bazel_dep(name = "rules_python", version = "1.8.3")
-bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "rules_python", version = "1.7.0")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 
@@ -24,7 +23,7 @@ pip.parse(
 )
 use_repo(pip, "pip_deps")
 
-bazel_dep(name = "rules_oci", version = "2.2.7")
+bazel_dep(name = "rules_oci", version = "2.2.6")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
@@ -50,21 +49,19 @@ oci.pull(
 )
 use_repo(oci, "distroless_base_nonroot", "distroless_base_nonroot_linux_amd64")
 
-bazel_dep(name = "hermetic_cc_toolchain", version = "4.0.1")
-# NOTE: Previously used git_override to commit e906f270. If 4.0.1 from BCR
-# doesn't include the fix you needed, re-add the git_override below:
-# git_override(
-#     module_name = "hermetic_cc_toolchain",
-#     commit = "e906f270fa38c1fe0b2db346717d2f2cd90da123",
-#     remote = "https://github.com/uber/hermetic_cc_toolchain.git",
-# )
+bazel_dep(name = "hermetic_cc_toolchain", version = "4.0.0")
+git_override(
+    module_name = "hermetic_cc_toolchain",
+    commit = "e906f270fa38c1fe0b2db346717d2f2cd90da123",
+    remote = "https://github.com/uber/hermetic_cc_toolchain.git",
+)
 
-bazel_dep(name = "rules_rust", version = "0.68.1")
+bazel_dep(name = "rules_rust", version = "0.64.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 
 RUST_EDITION = "2024"
 
-RUST_VERSION = "1.93.0"
+RUST_VERSION = "1.89.0"
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
@@ -116,14 +113,14 @@ use_repo(
     "rust_host_tools_nightly",
 )
 
-bazel_dep(name = "rules_rust_wasm_bindgen", version = "0.68.1")
+bazel_dep(name = "rules_rust_wasm_bindgen", version = "0.64.0")
 
 # use manual wasm-bindgen toolchain to fix windows build failure
 bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
 bindeps.spec(
     artifact = "bin",
     package = "wasm-bindgen-cli",
-    version = "=0.2.108",
+    version = "=0.2.100",
 )
 bindeps.annotation(
     crate = "wasm-bindgen-cli",
@@ -137,22 +134,22 @@ use_repo(bindeps, "bindeps")
 
 register_toolchains("//toolchains:wasm_bindgen_toolchain")
 
-bazel_dep(name = "rules_pkg", version = "1.2.0")
+bazel_dep(name = "rules_pkg", version = "1.0.1")
 
 #### JAVASCRIPT ####
 
 # for jq as well
 # Much of this was inspired by the bazel react-frontend example.
-bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
-bazel_dep(name = "aspect_rules_lint", version = "2.0.0")
-bazel_dep(name = "aspect_rules_jest", version = "0.24.3")
+bazel_dep(name = "aspect_bazel_lib", version = "2.21.0")
+bazel_dep(name = "aspect_rules_lint", version = "1.2.2")
+bazel_dep(name = "aspect_rules_jest", version = "0.22.0")
 bazel_dep(name = "aspect_rules_js", version = "2.5.0")
-bazel_dep(name = "aspect_rules_swc", version = "2.6.1")
-bazel_dep(name = "aspect_rules_ts", version = "3.8.3")
+bazel_dep(name = "aspect_rules_swc", version = "2.4.4")
+bazel_dep(name = "aspect_rules_ts", version = "3.1.0")
 bazel_dep(name = "aspect_rules_rollup", version = "2.0.1")
-bazel_dep(name = "aspect_rules_webpack", version = "0.17.1")
-bazel_dep(name = "bazel_skylib", version = "1.9.0")
-bazel_dep(name = "rules_nodejs", version = "6.6.2")
+bazel_dep(name = "aspect_rules_webpack", version = "0.16.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "rules_nodejs", version = "6.5.0")
 
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
 node.toolchain(node_version = "20.13.1")
@@ -181,14 +178,8 @@ use_repo(rules_ts_ext, "npm_typescript")
 bazel_dep(name = "brotli", version = "1.1.0")
 
 #### wasm-opt
-# One day, in the future, emsdk will support bazel 9, until then, we pin the bazel version.
-bazel_dep(name = "emsdk", version = "4.0.23")
-git_override(
-    module_name = "emsdk",
-    remote = "https://github.com/emscripten-core/emsdk.git",
-    strip_prefix = "bazel",
-    tag = "4.0.23",
-)
+bazel_dep(name = "emsdk", version = "4.0.13")
+
 emscripten_deps = use_extension(
     "@emsdk//:emscripten_deps.bzl",
     "emscripten_deps",
