@@ -19,3 +19,16 @@ podman-compose -f podman-compose.yaml up
 
 ## More quotes prompt
 I want to generate long quotes for a typing practice. They don't have to be actual quotes. They must be about 150 words long. Please output a text file that has one such quote on each line. Please generate 20 quotes. Put each quote on a line, and no blank lines in between. I repeat, no blank lines in between the quotes. Strictly use ASCII characters, for instance with single quotes are: ', and hyphens are just a dash. Don't output any preamble or formatting, just the quotes, without blank lines between the quotes. You must make sure not to insert a blank line between the quotes. No blank line, please.
+
+## TODO
+Mod-tap optimizer:
+- vial connect to read the tap terms
+- use kanata as a hardware-independent quick turnaround config instead
+- see failure conditions from [howto](https://precondition.github.io/home-row-mods)
+- tap term, permissive
+- design text for emacs mods, `C-x C-s`, `C-a`, `M-b`, etc; `C-S-<tab>`, `C-M-v`.
+- bilateral, miryoku, zmk
+- diagnostics with helpful explanations
+- hrm-enabled alternate base layer (needs to return properly from auto-mouse)
+- maybe tap-dance double-click hold
+- trainer
