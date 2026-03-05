@@ -1,9 +1,33 @@
 use yew::prelude::*;
-use web_sys::{HtmlInputElement, FileReader};
+use web_sys::HtmlInputElement;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use gloo_net::http::Request;
 use wasm_bindgen_futures::spawn_local;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = showOpenFilePicker)]
+    fn show_open_file_picker(options: &JsValue) -> js_sys::Promise;
+
+    #[wasm_bindgen(method, js_name = getFile)]
+    fn get_file(this: &FileSystemFileHandle) -> js_sys::Promise;
+
+    #[wasm_bindgen(method, js_name = createWritable)]
+    fn create_writable(this: &FileSystemFileHandle) -> js_sys::Promise;
+
+    #[wasm_bindgen]
+    pub type FileSystemFileHandle;
+
+    #[wasm_bindgen(method, js_name = write)]
+    fn write(this: &FileSystemWritableFileStream, data: &JsValue) -> js_sys::Promise;
+
+    #[wasm_bindgen(method, js_name = close)]
+    fn close(this: &FileSystemWritableFileStream) -> js_sys::Promise;
+
+    #[wasm_bindgen]
+    pub type FileSystemWritableFileStream;
+}
 
 pub mod behaviors;
 use behaviors::{ZMK_BEHAVIORS, ParameterType};
@@ -130,67 +154,102 @@ pub fn KeymapHome() -> Html {
     let original_content = use_state(|| String::new());
     let error = use_state(|| None::<String>);
     let loading = use_state(|| false);
+    let file_handle = use_state(|| None::<FileSystemFileHandle>);
 
-    let on_file_input = {
+    let on_open = {
         let keymap_data = keymap_data.clone();
         let original_content = original_content.clone();
         let error = error.clone();
         let loading = loading.clone();
-        Callback::from(move |e: InputEvent| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            if let Some(files) = input.files() {
-                if let Some(file) = files.get(0) {
-                    let reader = FileReader::new().unwrap();
-                    let reader_c = reader.clone();
-                    let keymap_data = keymap_data.clone();
-                    let original_content = original_content.clone();
-                    let error = error.clone();
-                    let loading = loading.clone();
+        let file_handle = file_handle.clone();
+        Callback::from(move |_| {
+            let keymap_data = keymap_data.clone();
+            let original_content = original_content.clone();
+            let error = error.clone();
+            let loading = loading.clone();
+            let file_handle = file_handle.clone();
+            spawn_local(async move {
+                let options = js_sys::Object::new();
+                let types = js_sys::Array::new();
+                let type0 = js_sys::Object::new();
+                js_sys::Reflect::set(&type0, &"description".into(), &"ZMK Keymap Files".into()).unwrap();
+                let accept = js_sys::Object::new();
+                let extensions = js_sys::Array::new();
+                extensions.push(&".keymap".into());
+                js_sys::Reflect::set(&accept, &"text/plain".into(), &extensions).unwrap();
+                js_sys::Reflect::set(&type0, &"accept".into(), &accept).unwrap();
+                types.push(&type0);
+                js_sys::Reflect::set(&options, &"types".into(), &types).unwrap();
+                js_sys::Reflect::set(&options, &"multiple".into(), &false.into()).unwrap();
 
-                    let onload = Closure::wrap(Box::new(move |_e: ProgressEvent| {
-                        let content = reader_c.result().unwrap().as_string().unwrap();
-                        original_content.set(content.clone());
-                        let keymap_data = keymap_data.clone();
-                        let error = error.clone();
-                        let loading = loading.clone();
-                        
-                        loading.set(true);
-                        spawn_local(async move {
-                            let result = Request::post("/api/parse-keymap")
-                                .json(&KeymapRequest { content })
-                                .unwrap()
-                                .send()
-                                .await;
+                let picker_promise = show_open_file_picker(&options);
+                let result = wasm_bindgen_futures::JsFuture::from(picker_promise).await;
 
-                            loading.set(false);
-                            match result {
-                                Ok(resp) => {
-                                    if resp.ok() {
-                                        match resp.json::<KeymapData>().await {
-                                            Ok(data) => {
-                                                keymap_data.set(Some(data));
-                                                error.set(None);
-                                            }
-                                            Err(e) => {
-                                                error.set(Some(format!("JSON Parse error: {}", e)));
+                match result {
+                    Ok(handles) => {
+                        let handles: js_sys::Array = handles.unchecked_into();
+                        if handles.length() > 0 {
+                            let handle_val = handles.get(0);
+                            let handle: FileSystemFileHandle = handle_val.unchecked_into();
+                            file_handle.set(Some(handle.clone().unchecked_into()));
+                            
+                            loading.set(true);
+                            let file_promise = handle.get_file();
+                            let file_result = wasm_bindgen_futures::JsFuture::from(file_promise).await;
+                            
+                            match file_result {
+                                Ok(file_val) => {
+                                    let file: web_sys::File = file_val.unchecked_into();
+                                    let content_promise = file.text();
+                                    let content_result = wasm_bindgen_futures::JsFuture::from(content_promise).await;
+                                    
+                                    match content_result {
+                                        Ok(content_val) => {
+                                            let content = content_val.as_string().unwrap_or_default();
+                                            original_content.set(content.clone());
+
+                                            let parse_result = Request::post("/api/parse-keymap")
+                                                .json(&KeymapRequest { content })
+                                                .unwrap()
+                                                .send()
+                                                .await;
+
+                                            loading.set(false);
+                                            match parse_result {
+                                                Ok(resp) => {
+                                                    if resp.ok() {
+                                                        match resp.json::<KeymapData>().await {
+                                                            Ok(data) => {
+                                                                keymap_data.set(Some(data));
+                                                                error.set(None);
+                                                            }
+                                                            Err(e) => error.set(Some(format!("JSON Parse error: {}", e))),
+                                                        }
+                                                    } else {
+                                                        error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
+                                                    }
+                                                }
+                                                Err(e) => error.set(Some(format!("Network error: {}", e))),
                                             }
                                         }
-                                    } else {
-                                        error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
+                                        Err(e) => {
+                                            loading.set(false);
+                                            error.set(Some(format!("Failed to read file content: {:?}", e)));
+                                        }
                                     }
                                 }
                                 Err(e) => {
-                                    error.set(Some(format!("Network error: {}", e)));
+                                    loading.set(false);
+                                    error.set(Some(format!("Failed to get file from handle: {:?}", e)));
                                 }
                             }
-                        });
-                    }) as Box<dyn FnMut(ProgressEvent)>);
-
-                    reader.set_onload(Some(onload.as_ref().unchecked_ref()));
-                    reader.read_as_text(&file).unwrap();
-                    onload.forget();
+                        }
+                    }
+                    Err(e) => {
+                        error.set(Some(format!("File picker error: {:?}", e)));
+                    }
                 }
-            }
+            });
         })
     };
 
@@ -206,12 +265,14 @@ pub fn KeymapHome() -> Html {
         let original_content = original_content.clone();
         let error = error.clone();
         let loading = loading.clone();
+        let file_handle = file_handle.clone();
         Callback::from(move |_| {
             if let Some(data) = &*keymap_data {
                 let original_content_str = (*original_content).clone();
                 let data = data.clone();
                 let error = error.clone();
                 let loading = loading.clone();
+                let file_handle = file_handle.clone();
                 
                 loading.set(true);
                 spawn_local(async move {
@@ -221,25 +282,51 @@ pub fn KeymapHome() -> Html {
                         .send()
                         .await;
 
-                    loading.set(false);
                     match result {
                         Ok(resp) => {
                             if resp.ok() {
                                 let res = resp.json::<SaveKeymapResponse>().await.unwrap();
-                                let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&res.content))).unwrap();
-                                let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
-                                let window = web_sys::window().unwrap();
-                                let document = window.document().unwrap();
-                                let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
-                                link.set_href(&url);
-                                link.set_download("edited.keymap");
-                                link.click();
-                                web_sys::Url::revoke_object_url(&url).unwrap();
+                                
+                                // Check if we have a direct file handle
+                                if let Some(handle) = &*file_handle {
+                                    let writable_promise = handle.create_writable();
+                                    let writable_result = wasm_bindgen_futures::JsFuture::from(writable_promise).await;
+                                    
+                                    match writable_result {
+                                        Ok(writable_val) => {
+                                            let writable: FileSystemWritableFileStream = writable_val.unchecked_into();
+                                            let write_promise = writable.write(&JsValue::from_str(&res.content));
+                                            let _ = wasm_bindgen_futures::JsFuture::from(write_promise).await;
+                                            let close_promise = writable.close();
+                                            let _ = wasm_bindgen_futures::JsFuture::from(close_promise).await;
+                                            loading.set(false);
+                                            error.set(None);
+                                        }
+                                        Err(e) => {
+                                            loading.set(false);
+                                            error.set(Some(format!("Failed to create writable: {:?}", e)));
+                                        }
+                                    }
+                                } else {
+                                    // Fallback to traditional download if handle is missing
+                                    loading.set(false);
+                                    let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&res.content))).unwrap();
+                                    let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+                                    let window = web_sys::window().unwrap();
+                                    let document = window.document().unwrap();
+                                    let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
+                                    link.set_href(&url);
+                                    link.set_download("edited.keymap");
+                                    link.click();
+                                    web_sys::Url::revoke_object_url(&url).unwrap();
+                                }
                             } else {
+                                loading.set(false);
                                 error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
                             }
                         }
                         Err(e) => {
+                            loading.set(false);
                             error.set(Some(format!("Network error: {}", e)));
                         }
                     }
@@ -254,12 +341,12 @@ pub fn KeymapHome() -> Html {
             
             <div class="flex items-center space-x-4 mb-8">
                 <div>
-                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{"Upload .keymap file"}</label>
-                    <input 
-                        type="file" 
-                        oninput={on_file_input}
-                        class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-                    />
+                    <div class="flex flex-col space-y-2">
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white">{"Open keymap file"}</label>
+                        <button onclick={on_open} class="px-6 py-2.5 bg-blue-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-blue-800 active:shadow-lg transition duration-150 ease-in-out">
+                            {"Open File"}
+                        </button>
+                    </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{"Type "} <kbd class="px-1.5 py-0.5 font-sans font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">{"j"}</kbd> {" to start jump mode"}</p>
                 </div>
                 { if keymap_data.is_some() {
@@ -282,7 +369,7 @@ pub fn KeymapHome() -> Html {
             { if let Some(data) = &*keymap_data {
                 html! { <KeymapRenderer data={data.clone()} on_update={on_update_data} /> }
             } else {
-                if !*loading { html! { <div class="text-gray-500 italic">{"Please upload a keymap file to start editing."}</div> } } else { html! {} }
+                if !*loading { html! { <div class="text-gray-500 italic">{"Please open a keymap file to start editing."}</div> } } else { html! {} }
             }}
         </div>
     }

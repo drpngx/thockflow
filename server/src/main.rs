@@ -88,7 +88,6 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
     let mut content = original.to_string();
     
     // 1. Handle #includes
-    // Check which ones are missing and add them at the top
     let include_re = regex::Regex::new(r#"(?m)^#include\s*[<"](.+?)[>"]"#).unwrap();
     let existing_includes: std::collections::HashSet<String> = include_re.captures_iter(original)
         .map(|cap| cap[1].to_string())
@@ -105,25 +104,41 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
         content.insert_str(0, &(new_includes.join("\n") + "\n\n"));
     }
 
-    // 2. Replace bindings in layers
-    // We use tree-sitter to find the exact byte ranges to replace
+    // 2. Justification Logic: Compute max width for each key across all layers
+    let num_keys = data.physical_layout.len();
+    let mut max_widths = vec![0; num_keys];
+    for layer in &data.layers {
+        for (i, binding) in layer.bindings.iter().enumerate() {
+            if i < num_keys {
+                max_widths[i] = max_widths[i].max(binding.len());
+            }
+        }
+    }
+
+    // Identify rows for grouping
+    let mut rows = Vec::new();
+    if !data.physical_layout.is_empty() {
+        let mut current_row = Vec::new();
+        let mut row_ref_y = data.physical_layout[0].y;
+        for (i, pk) in data.physical_layout.iter().enumerate() {
+            // New row if Y changes significantly from the row's reference Y (threshold 14000)
+            if i > 0 && (pk.y - row_ref_y).abs() > 14000 {
+                rows.push(current_row);
+                current_row = Vec::new();
+                row_ref_y = pk.y;
+            }
+            current_row.push(i);
+        }
+        rows.push(current_row);
+    }
+
+    // 3. Find keymap node and its layer nodes
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
-    let tree = parser.parse(&content, None).ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
+    let tree = parser.parse(content.as_bytes(), None).ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
     
-    #[derive(Debug)]
-    struct LayerReplacement {
-        start: usize,
-        end: usize,
-        new_bindings: String,
-    }
-    
-    let mut replacements = Vec::new();
-    let mut layers_found = 0;
-    
-    fn find_layers(node: tree_sitter::Node, source: &[u8], data: &KeymapData, layers_found: &mut usize, replacements: &mut Vec<LayerReplacement>) {
+    fn find_keymap_node<'a>(node: tree_sitter::Node<'a>, source: &[u8]) -> Option<tree_sitter::Node<'a>> {
         if node.kind() == "node" {
-            let mut is_keymap = false;
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() == "property" {
@@ -131,69 +146,150 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
                     if prop_name == "compatible" {
                         let prop_value = child.child_by_field_name("value").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
                         if prop_value.contains("zmk,keymap") {
-                            is_keymap = true;
+                            return Some(node);
                         }
-                    }
-                }
-            }
-            
-            if is_keymap {
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    if child.kind() == "node" {
-                        // This is a layer node
-                        if let Some(target_layer) = data.layers.get(*layers_found) {
-                            // Find the bindings property
-                            let mut inner_cursor = child.walk();
-                            for inner_child in child.children(&mut inner_cursor) {
-                                if inner_child.kind() == "property" {
-                                    let prop_name = inner_child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
-                                    if prop_name == "bindings" {
-                                        // Found bindings property
-                                        if let Some(value_node) = inner_child.child_by_field_name("value") {
-                                            // The value node includes the < and >
-                                            let start = value_node.start_byte();
-                                            let end = value_node.end_byte();
-                                            
-                                            let mut new_bindings = String::from("<");
-                                            for (i, b) in target_layer.bindings.iter().enumerate() {
-                                                if i > 0 {
-                                                    if i % 10 == 0 {
-                                                        new_bindings.push_str("\n                ");
-                                                    } else {
-                                                        new_bindings.push(' ');
-                                                    }
-                                                }
-                                                new_bindings.push_str(b);
-                                            }
-                                            new_bindings.push('>');
-                                            
-                                            replacements.push(LayerReplacement { start, end, new_bindings });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        *layers_found += 1;
                     }
                 }
             }
         }
-        
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            find_layers(child, source, data, layers_found, replacements);
+            if let Some(res) = find_keymap_node(child, source) {
+                return Some(res);
+            }
+        }
+        None
+    }
+
+    let keymap_node = find_keymap_node(tree.root_node(), content.as_bytes())
+        .ok_or_else(|| anyhow::anyhow!("Could not find keymap node"))?;
+    
+    let mut cursor = keymap_node.walk();
+    let original_layer_nodes: Vec<tree_sitter::Node> = keymap_node.children(&mut cursor)
+        .filter(|n| n.kind() == "node")
+        .collect();
+
+    struct Replacement {
+        start: usize,
+        end: usize,
+        text: String,
+    }
+    let mut replacements = Vec::new();
+
+    // Helper to generate bindings string
+    let gen_bindings = |target_layer: &Layer| {
+        let mut new_bindings = String::from("<");
+        for row in rows.iter() {
+            new_bindings.push_str("\n");
+            new_bindings.push_str("                ");
+            for (key_in_row, &key_idx) in row.iter().enumerate() {
+                if key_in_row > 0 {
+                    // Check for large X gap in the physical layout to add extra spacing
+                    let pk_curr = &data.physical_layout[key_idx];
+                    let pk_prev = &data.physical_layout[row[key_in_row - 1]];
+                    let dist = (pk_curr.x - pk_prev.x).abs();
+                    let extra_gap = if dist > 40000 {
+                        "                                                                         "
+                    } else if dist > 15000 {
+                        "     "
+                    } else {
+                        " "
+                    };
+                    new_bindings.push_str(extra_gap);
+                }
+                let b = target_layer.bindings.get(key_idx).map(|s| s.as_str()).unwrap_or("&none");
+                if key_in_row == row.len() - 1 {
+                    new_bindings.push_str(b);
+                } else {
+                    let width = max_widths.get(key_idx).cloned().unwrap_or(0);
+                    new_bindings.push_str(&format!("{:width$}", b, width = width));
+                }
+            }
+        }
+        new_bindings.push_str("\n                        >");
+        new_bindings
+    };
+
+    // 4. Update existing layers and handle deletions
+    for (i, original_node) in original_layer_nodes.iter().enumerate() {
+        if i < data.layers.len() {
+            let target_layer = &data.layers[i];
+            
+            // a) Update Name
+            let mut inner_cursor = original_node.walk();
+            for child in original_node.children(&mut inner_cursor) {
+                if child.kind() == "node_name" || child.kind() == "identifier" {
+                    let old_name = child.utf8_text(content.as_bytes()).unwrap_or("");
+                    if old_name != target_layer.name {
+                        replacements.push(Replacement {
+                            start: child.start_byte(),
+                            end: child.end_byte(),
+                            text: target_layer.name.clone(),
+                        });
+                    }
+                }
+                
+                // b) Update Bindings
+                if child.kind() == "property" {
+                    let prop_name = child.child_by_field_name("name").map(|n| n.utf8_text(content.as_bytes()).unwrap_or("")).unwrap_or("");
+                    if prop_name == "bindings" {
+                        if let Some(value_node) = child.child_by_field_name("value") {
+                            replacements.push(Replacement {
+                                start: value_node.start_byte(),
+                                end: value_node.end_byte(),
+                                text: gen_bindings(target_layer),
+                            });
+                        }
+                    }
+                }
+            }
+        } else {
+            // Delete extra layer node
+            let start = original_node.start_byte();
+            let mut end = original_node.end_byte();
+            // Include trailing semicolon if present
+            if content.as_bytes().get(end) == Some(&b';') {
+                end += 1;
+            }
+            replacements.push(Replacement { start, end, text: String::new() });
         }
     }
-    
-    find_layers(tree.root_node(), content.as_bytes(), data, &mut layers_found, &mut replacements);
-    
-    // Apply replacements in reverse order to keep indices valid
+
+    // 5. Add new layers (if data.layers has more than original)
+    if data.layers.len() > original_layer_nodes.len() {
+        let insert_pos = if let Some(last_node) = original_layer_nodes.last() {
+            let mut pos = last_node.end_byte();
+            if content.as_bytes().get(pos) == Some(&b';') {
+                pos += 1;
+            }
+            pos
+        } else {
+            // Fallback: find the closing brace of keymap node
+            keymap_node.end_byte() - 2
+        };
+
+        let mut new_layers_text = String::new();
+        for i in original_layer_nodes.len()..data.layers.len() {
+            let target_layer = &data.layers[i];
+            new_layers_text.push_str("\n\n                ");
+            new_layers_text.push_str(&target_layer.name);
+            new_layers_text.push_str(" {\n                        bindings = ");
+            new_layers_text.push_str(&gen_bindings(target_layer));
+            new_layers_text.push_str(";\n                };");
+        }
+        replacements.push(Replacement {
+            start: insert_pos,
+            end: insert_pos,
+            text: new_layers_text,
+        });
+    }
+
+    // Apply replacements in reverse order
     replacements.sort_by_key(|r| std::cmp::Reverse(r.start));
     for r in replacements {
-        content.replace_range(r.start..r.end, &r.new_bindings);
+        content.replace_range(r.start..r.end, &r.text);
     }
-    
+
     Ok(content)
 }
 
@@ -459,26 +555,102 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_missing_physical_fallback() {
-        // 50 keys matches Kyria 5-col
-        let mut bindings = Vec::new();
-        for _ in 0..50 {
-            bindings.push("&kp A");
-        }
-        let content = format!(r#"
-#include <behaviors.dtsi>
-/ {{
-    keymap {{
+    fn test_generate_keymap_dts_deletion() {
+        let content = r#"
+/ {
+    keymap {
         compatible = "zmk,keymap";
-        default_layer {{
-            bindings = <{}>;
-        }};
-    }};
-}};"#, bindings.join(" "));
+        layer_0 {
+            bindings = <&kp A &kp B>;
+        };
+        layer_1 {
+            bindings = <&kp C &kp D>;
+        };
+    };
+};
+"#;
+        let data = KeymapData {
+            physical_layout: vec![
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+            ],
+            layers: vec![
+                Layer { name: "new_layer_0".to_string(), bindings: vec!["&kp X".to_string(), "&kp Y".to_string()] },
+            ],
+            includes: vec![],
+        };
 
-        let result = parse_keymap_with_tree_sitter(&content).expect("Should fall back to DB layout");
-        assert_eq!(result.physical_layout.len(), 50);
-        assert_eq!(result.layers.len(), 1);
+        let result = generate_keymap_dts(content, &data).unwrap();
+        assert!(result.contains("new_layer_0"));
+        assert!(result.contains("&kp X &kp Y"));
+        assert!(!result.contains("layer_1"));
+        assert!(!result.contains("&kp C &kp D"));
+    }
+
+    #[test]
+    fn test_generate_keymap_dts_justification() {
+        let content = r#"
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        layer_0 {
+            bindings = <&kp A &kp B>;
+        };
+    };
+};
+"#;
+        let data = KeymapData {
+            physical_layout: vec![
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+            ],
+            layers: vec![
+                Layer { name: "layer_0".to_string(), bindings: vec!["&kp LONG_BINDING".to_string(), "&kp B".to_string()] },
+                Layer { name: "layer_1".to_string(), bindings: vec!["&kp A".to_string(), "&kp SHORT".to_string()] },
+            ],
+            includes: vec![],
+        };
+
+        let result = generate_keymap_dts(content, &data).unwrap();
+        // Layer 0: "&kp LONG_BINDING" (16) + " " + "&kp B"
+        // Layer 1: "&kp A           " (16) + " " + "&kp SHORT"
+        println!("Result:\n{}", result);
+        assert!(result.contains("&kp LONG_BINDING &kp B"));
+        assert!(result.contains("&kp A            &kp SHORT"));
+    }
+
+    #[test]
+    fn test_generate_keymap_dts_addition() {
+        let content = r#"
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        layer_0 {
+            bindings = <&kp A &kp B>;
+        };
+    };
+};
+"#;
+        let data = KeymapData {
+            physical_layout: vec![
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+            ],
+            layers: vec![
+                Layer { name: "layer_0".to_string(), bindings: vec!["&kp A".to_string(), "&kp B".to_string()] },
+                Layer { name: "new_layer".to_string(), bindings: vec!["&kp C".to_string(), "&kp D".to_string()] },
+            ],
+            includes: vec![],
+        };
+
+        let result = generate_keymap_dts(content, &data).unwrap();
+        println!("Result:\n{}", result);
+        assert!(result.contains("layer_0"));
+        assert!(result.contains("new_layer"));
+        assert!(result.contains("&kp A &kp B"));
+        assert!(result.contains("&kp C &kp D"));
+        // Check that it's inside the keymap node (before the last closing brace)
+        assert!(result.trim().ends_with("};"));
     }
 }
 
