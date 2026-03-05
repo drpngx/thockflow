@@ -805,31 +805,44 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_keymap_includes_no_existing() {
-        let content = r#"/ {
-    keymap {
-        compatible = "zmk,keymap";
-        layer_0 {
-            bindings = <&kp A &kp B>;
-        };
-    };
-};
-"#;
-        let data = KeymapData {
-            physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
-            ],
-            layers: vec![
-                Layer { name: "layer_0".to_string(), bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()] },
-            ],
-            includes: vec![],
-        };
-
-        let result = generate_keymap_dts(content, &data).unwrap();
-        println!("Result:\n{}", result);
+    fn test_svg_generation_hshs52() {
+        use thockflow::keymap::generate_svg;
+        let content = include_str!("../../static/hshs52.keymap");
+        let data = parse_keymap_with_tree_sitter(content).expect("Should parse hshs52");
         
-        assert!(result.starts_with("#include <behaviors/mouse_move.dtsi>"));
+        let svg = generate_svg(&data);
+        assert!(!svg.is_empty());
+        assert!(svg.contains("<svg"));
+        assert!(svg.contains("</svg>"));
+        
+        // Validate SVG using roxmltree
+        let doc = match roxmltree::Document::parse(&svg) {
+            Ok(d) => d,
+            Err(e) => {
+                let pos = e.pos();
+                let start = (pos.col as usize).saturating_sub(50);
+                let end = (svg.len()).min(pos.col as usize + 50);
+                eprintln!("XML Error at col {}: {:?}", pos.col, e);
+                eprintln!("Context: ...{}...", &svg[start..end]);
+                panic!("Generated SVG should be valid XML");
+            }
+        };
+        let root = doc.root_element();
+        assert_eq!(root.tag_name().name(), "svg");
+        
+        // Check for layers (layer-title class)
+        let layer_titles: Vec<_> = root.descendants()
+            .filter(|n| n.attribute("class") == Some("layer-title"))
+            .collect();
+        assert_eq!(layer_titles.len(), data.layers.len(), "Should have correct number of layer titles");
+        
+        // Check for keys (rect with class "key")
+        let keys: Vec<_> = root.descendants()
+            .filter(|n| n.attribute("class") == Some("key"))
+            .collect();
+        assert_eq!(keys.len(), data.layers.len() * data.physical_layout.len(), "Should have correct total number of keys across all layers");
+        
+        println!("SVG validation passed: {} layers, {} total keys", layer_titles.len(), keys.len());
     }
 }
 

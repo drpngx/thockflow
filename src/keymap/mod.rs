@@ -145,6 +145,85 @@ pub struct KeymapData {
     pub includes: Vec<String>,
 }
 
+fn escape_xml(s: &str) -> String {
+    s.replace("&", "&amp;")
+     .replace("<", "&lt;")
+     .replace(">", "&gt;")
+     .replace("\"", "&quot;")
+     .replace("'", "&apos;")
+}
+
+pub fn generate_svg(data: &KeymapData) -> String {
+    let mut min_x = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut min_y = i32::MAX;
+    let mut max_y = i32::MIN;
+    let mut avg_w = 0.0;
+    for pk in &data.physical_layout {
+        avg_w += pk.width as f32;
+        if pk.x < min_x { min_x = pk.x; }
+        if pk.x + pk.width > max_x { max_x = pk.x + pk.width; }
+        if pk.y < min_y { min_y = pk.y; }
+        if pk.y + pk.height > max_y { max_y = pk.y + pk.height; }
+    }
+    if data.physical_layout.is_empty() { return String::new(); }
+    avg_w /= data.physical_layout.len() as f32;
+
+    let u_size = if avg_w < 500.0 { 100.0 } else { 1000.0 };
+    let size_scale = 44.0 / u_size;
+    let u_pos = if max_x.abs() > 20000 || min_x.abs() > 20000 { 19050.0 } else { u_size };
+    let pos_scale = 44.0 / u_pos;
+
+    let layer_width = (max_x - min_x) as f32 * pos_scale;
+    let layer_height = (max_y - min_y) as f32 * pos_scale;
+    let padding = 100.0;
+    
+    let total_width = layer_width + 80.0;
+    let total_height = (layer_height + padding) * data.layers.len() as f32 + 80.0;
+    
+    let mut svg = format!(r#"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="0 0 {} {}" style="background-color: #ffffff;">"#, total_width, total_height, total_width, total_height);
+    svg.push_str("<style>text { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; } .key { fill: white; stroke: #d1d5db; stroke-width: 0.5; } .label { fill: #9ca3af; font-size: 5px; } .main-text { fill: #1f2937; font-size: 8px; font-weight: bold; } .layer-title { font-size: 18px; font-weight: bold; fill: #111827; }</style>");
+
+    for (l_idx, layer) in data.layers.iter().enumerate() {
+        let y_offset = (layer_height + padding) * l_idx as f32 + 80.0;
+        svg.push_str(&format!(r#"<text x="40" y="{}" class="layer-title">{}</text>"#, y_offset - 25.0, escape_xml(&layer.name)));
+        
+        let offset_x = -(min_x as f32 * pos_scale) + 40.0;
+        let offset_y = -(min_y as f32 * pos_scale) + y_offset;
+
+        for (i, pk) in data.physical_layout.iter().enumerate() {
+            let binding = layer.bindings.get(i).cloned().unwrap_or_else(|| "".to_string());
+            let parts = get_binding_parts(&binding);
+            
+            let x = pk.x as f32 * pos_scale + offset_x;
+            let y = pk.y as f32 * pos_scale + offset_y;
+            let w = (pk.width as f32 * size_scale).max(20.0) - 4.0;
+            let h = (pk.height as f32 * size_scale).max(20.0) - 4.0;
+            let rotation = pk.rotation as f32 / 1000.0;
+            
+            svg.push_str(&format!(r#"<g transform="translate({}, {}) rotate({})">"#, x + w/2.0, y + h/2.0, rotation));
+            svg.push_str(&format!(r#"<rect x="{}" y="{}" width="{}" height="{}" rx="2" ry="2" class="key" />"#, -w/2.0, -h/2.0, w, h));
+            
+            if !parts.top_left.is_empty() {
+                svg.push_str(&format!(r#"<text x="{}" y="{}" class="label" text-anchor="start">{}</text>"#, -w/2.0 + 1.5, -h/2.0 + 4.5, escape_xml(&parts.top_left)));
+            }
+            if !parts.top_right.is_empty() {
+                let display_tr = parts.top_right.chars().take(8).collect::<String>();
+                svg.push_str(&format!(r#"<text x="0" y="{}" class="label" text-anchor="middle">{}</text>"#, -h/2.0 + 4.5, escape_xml(&display_tr)));
+            }
+            
+            let center_y = if !parts.top_right.is_empty() { 2.0 } else { 0.0 };
+            let display_center = parts.center.chars().take(12).collect::<String>();
+            svg.push_str(&format!(r#"<text x="0" y="{}" class="main-text" text-anchor="middle" dominant-baseline="middle">{}</text>"#, center_y, escape_xml(&display_center)));
+            
+            svg.push_str("</g>");
+        }
+    }
+    
+    svg.push_str("</svg>");
+    svg
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct SelectedKey {
     pub layer_index: usize,
@@ -374,6 +453,24 @@ pub fn KeymapHome() -> Html {
         });
     }
 
+    let on_download_svg = {
+        let keymap_data = keymap_data.clone();
+        Callback::from(move |_| {
+            if let Some(data) = &*keymap_data {
+                let svg_content = generate_svg(data);
+                let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&svg_content))).unwrap();
+                let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+                let window = web_sys::window().unwrap();
+                let document = window.document().unwrap();
+                let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
+                link.set_href(&url);
+                link.set_download("keymap.svg");
+                link.click();
+                web_sys::Url::revoke_object_url(&url).unwrap();
+            }
+        })
+    };
+
     html! {
         <div class="w-full flex flex-col items-center p-4">
             <h2 class="text-4xl font-display mb-8">{"ZMK Keymap Editor"}</h2>
@@ -390,9 +487,14 @@ pub fn KeymapHome() -> Html {
                 </div>
                 { if keymap_data.is_some() {
                     html! {
-                        <button onclick={on_save.clone()} class="mt-6 px-6 py-2.5 bg-green-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-green-700 hover:shadow-lg focus:bg-green-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-green-800 active:shadow-lg transition duration-150 ease-in-out">
-                            {"Save Keymap"}
-                        </button>
+                        <div class="flex space-x-2 mt-6">
+                            <button onclick={on_save.clone()} class="px-6 py-2.5 bg-green-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-green-700 hover:shadow-lg focus:bg-green-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-green-800 active:shadow-lg transition duration-150 ease-in-out">
+                                {"Save Keymap"}
+                            </button>
+                            <button onclick={on_download_svg.clone()} class="px-6 py-2.5 bg-purple-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-purple-700 hover:shadow-lg focus:bg-purple-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-purple-800 active:shadow-lg transition duration-150 ease-in-out">
+                                {"Download SVG"}
+                            </button>
+                        </div>
                     }
                 } else { html! {} }}
             </div>

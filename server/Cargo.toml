@@ -30,6 +30,7 @@ tree-sitter = "0.25"
 tree-sitter-devicetree = "0.15"
 regex = "1"
 runfiles = { version = "0.1", optional = true }
+roxmltree = "0.20"
 
 [features]
 default = []
