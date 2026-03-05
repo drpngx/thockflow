@@ -65,10 +65,13 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
     let params = &parts[1..];
 
     match behavior_raw {
-        "&kp" => BindingParts {
-            top_left: "".into(),
-            top_right: "".into(),
-            center: params.get(0).map(|&p| format_keycode(p)).unwrap_or_else(|| "&kp".to_string()),
+        "&kp" => {
+            let p = params.get(0).cloned().unwrap_or("");
+            BindingParts {
+                top_left: "".into(),
+                top_right: keycodes::get_keycode_shifted(p).map(|s| s.to_string()).unwrap_or_default(),
+                center: format_keycode(p),
+            }
         },
         "&mo" | "&to" | "&tog" => BindingParts {
             top_left: behavior.into(),
@@ -415,11 +418,17 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
 
     let layer = &props.data.layers[*current_layer];
 
+    let mut min_x = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut min_y = i32::MAX;
+    let mut max_y = i32::MIN;
     let mut avg_w = 0.0;
-    let mut max_x = 0;
     for pk in &props.data.physical_layout {
         avg_w += pk.width as f32;
-        if pk.x.abs() > max_x { max_x = pk.x.abs(); }
+        if pk.x < min_x { min_x = pk.x; }
+        if pk.x + pk.width > max_x { max_x = pk.x + pk.width; }
+        if pk.y < min_y { min_y = pk.y; }
+        if pk.y + pk.height > max_y { max_y = pk.y + pk.height; }
     }
     if !props.data.physical_layout.is_empty() {
         avg_w /= props.data.physical_layout.len() as f32;
@@ -427,8 +436,11 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
 
     let u_size = if avg_w < 500.0 { 100.0 } else { 1000.0 };
     let size_scale = 44.0 / u_size;
-    let u_pos = if max_x > 20000 { 19050.0 } else { u_size };
+    let u_pos = if max_x.abs() > 20000 || min_x.abs() > 20000 { 19050.0 } else { u_size };
     let pos_scale = 44.0 / u_pos;
+
+    let content_width_px = (max_x - min_x) as f32 * pos_scale;
+    let offset_x = -(min_x as f32 * pos_scale);
 
     let on_key_click = {
         let selected_key = selected_key.clone();
@@ -761,11 +773,12 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                     </div>
                 }
             } else { html! {} }}
-            <div class={classes!("relative", "border", "dark:border-gray-600", "p-8", "rounded-xl", "bg-gray-50", "dark:bg-gray-800", "shadow-inner", "overflow-auto", "w-full", "max-w-5xl")} style="height: 600px;">
+            <div class={classes!("relative", "border", "dark:border-gray-600", "p-8", "rounded-xl", "bg-gray-50", "dark:bg-gray-800", "shadow-inner", "overflow-auto", "w-full", "max-w-full")} style="min-height: 350px; height: 55vh;">
+                <div class="relative mx-auto" style={format!("width: {}px;", content_width_px)}>
                 { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| {
                     let binding = layer.bindings.get(i).cloned().unwrap_or_else(|| "".to_string());
                     let parts = get_binding_parts(&binding);
-                    let x = (pk.x as f32 * pos_scale) as i32 + 40; let y = (pk.y as f32 * pos_scale) as i32 + 40;
+                    let x = (pk.x as f32 * pos_scale + offset_x) as i32; let y = (pk.y as f32 * pos_scale) as i32;
                     let w = (pk.width as f32 * size_scale).max(20.0) as i32 - 4; let h = (pk.height as f32 * size_scale).max(20.0) as i32 - 4;
                     let rotation_deg = pk.rotation as f32 / 1000.0;
                     let style = format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg);
@@ -776,8 +789,8 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                     html! {
                         <div onclick={onclick} class={classes!("absolute", "bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-500", "flex", "items-center", "justify-center", "font-mono", "rounded-md", "shadow-sm", if is_quick_assign_target { vec!["ring-4", "ring-blue-500", "z-40"] } else { vec!["hover:border-blue-500"] }, "cursor-pointer", "overflow-hidden", "text-center")} style={style} title={binding.clone()}>
                             { if !parts.top_left.is_empty() { html! { <span class="absolute top-0.5 left-0.5 text-[6px] text-gray-400 leading-none">{&parts.top_left}</span> } } else { html! {} }}
-                            { if !parts.top_right.is_empty() { html! { <span class="absolute top-0.5 right-0.5 text-[6px] text-gray-400 leading-none text-right max-w-[70%] truncate">{&parts.top_right}</span> } } else { html! {} }}
-                            <span class="truncate px-1 pointer-events-none text-[10px]">{&parts.center}</span>
+                            { if !parts.top_right.is_empty() { html! { <span class="absolute top-0.5 left-0 right-0 text-[8px] text-gray-400 leading-none text-center">{&parts.top_right}</span> } } else { html! {} }}
+                            <span class={classes!("truncate", "px-1", "pointer-events-none", "text-[10px]", if !parts.top_right.is_empty() { "pt-2" } else { "" })}>{&parts.center}</span>
                             { if show_hint {
                                 let h = hint.unwrap();
                                 let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
@@ -786,6 +799,7 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                         </div>
                     }
                 })}
+                </div>
             </div>
             { if let Some(sk) = &*selected_key {
                 html! { <KeyBindingPopup data={props.data.clone()} selected_key={sk.clone()} on_close={close_popup.clone()} show_param_selection={*show_param_selection} on_toggle_param_selection={toggle_param_selection.clone()} on_update={props.on_update.clone()} /> }
@@ -931,10 +945,33 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                         match p_type {
                             ParameterType::Layer => props_data.layers.iter().enumerate().map(|(i, l)| Suggestion { value: i.to_string(), display: format!("{} ({})", i, l.name) }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect(),
                             ParameterType::Modifier => keycodes::KEY_ALIASES.iter().filter(|(&k, _)| keycodes::is_modifier(k)).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect(),
-                            ParameterType::Keycode => keycodes::KEY_ALIASES.iter().map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect(),
+                            ParameterType::Keycode => {
+                                let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
+                                let only_regular = behavior_name == "kp" || behavior_name == "kt" || behavior_name == "mt" || behavior_name == "lt";
+                                let is_tap_param = (behavior_name == "mt" || behavior_name == "lt") && p_idx == 1;
+                                keycodes::KEY_ALIASES.iter().filter(|(&k, _)| {
+                                    if is_tap_param {
+                                        keycodes::is_plain_key(k)
+                                    } else if only_regular {
+                                        keycodes::is_regular_key(k)
+                                    } else {
+                                        true
+                                    }
+                                }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect()
+                            },
                             ParameterType::Constant => {
-                                let behavior_name = behavior_meta.and_then(|m| Some(m.label.unwrap_or(m.name))).unwrap_or("");
-                                keycodes::KEY_ALIASES.iter().filter(|(&k, _)| match behavior_name { "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k), "mmv" => k.starts_with("MOVE_"), "msc" => k.starts_with("SCROLL_"), "bt" => k.starts_with("BT_"), "rgb_ug" => k.starts_with("RGB_"), "bl" => k.starts_with("BL_"), "out" => k.starts_with("OUT_"), "ext_power" => k.starts_with("EP_"), _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || k.starts_with("MOVE_") || k.starts_with("SCROLL_") || ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k) }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect()
+                                let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
+                                keycodes::KEY_ALIASES.iter().filter(|(&k, _)| match behavior_name {
+                                    "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k),
+                                    "mmv" => k.starts_with("MOVE_"),
+                                    "msc" => k.starts_with("SCROLL_"),
+                                    "bt" => k.starts_with("BT_"),
+                                    "rgb_ug" => k.starts_with("RGB_"),
+                                    "bl" => k.starts_with("BL_"),
+                                    "out" => k.starts_with("OUT_"),
+                                    "ext_power" => k.starts_with("EP_"),
+                                    _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || k.starts_with("MOVE_") || k.starts_with("SCROLL_") || ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k)
+                                }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect()
                             }
                             _ => Vec::new()
                         }
@@ -999,8 +1036,20 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                         match p_type {
                             ParameterType::Layer => html! { <div class="flex-1 flex flex-col h-full"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest">{"Select Layer"}</div> <div class="flex-1 overflow-y-auto"> { for props.data.layers.iter().enumerate().map(|(i, l)| { let is_active = current_params.get(p_idx).map(|p| *p == i.to_string()).unwrap_or(false); let val = i.to_string(); let select = select_param_value.clone(); let onclick = Callback::from(move |_| select.emit(val.clone()));
                                             html! { <div onclick={onclick} class={classes!("p-4", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", if is_active { "bg-white text-black" } else { "" })}> <div class="font-bold">{i}</div> <div class={if is_active { "text-gray-600 italic" } else { "text-gray-400 italic" }}>{&l.name}</div> </div> } })} </div> <div class="p-2 flex justify-center border-t border-gray-700"> <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center"> <span class="rotate-90 inline-block mr-1">{"Close"}</span> </button> </div> </div> },
-                            ParameterType::Keycode => { let filter_val = (*filter).clone(); let behavior_name = behavior_meta.and_then(|m| Some(m.label.unwrap_or(m.name))).unwrap_or(""); let only_mods = is_modifier_only_param(behavior_name, p_idx);
-                                html! { <div class="flex-1 flex flex-col h-full"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest"> {if only_mods { "Select Modifier" } else { "Select Keycode" }} </div> <div class="p-2 border-b border-gray-700"> <input type="text" placeholder="Search..." class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" oninput={let filter = filter.clone(); Callback::from(move |e: InputEvent| { let input: HtmlInputElement = e.target_unchecked_into(); filter.set(input.value().to_uppercase()); })} value={filter_val.clone()} /> </div> <div class="flex-1 overflow-y-auto"> { for keycodes::KEY_ALIASES.iter().filter(|(&k, _)| !only_mods || keycodes::is_modifier(k)).filter(|(&k, &v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val)).map(|(&k, &v)| {
+                            ParameterType::Keycode => { let filter_val = (*filter).clone();
+                                let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
+                                let only_mods = is_modifier_only_param(behavior_name, p_idx);
+                                let only_regular = behavior_name == "kp" || behavior_name == "kt" || behavior_name == "mt" || behavior_name == "lt";
+                                let is_tap_param = (behavior_name == "mt" || behavior_name == "lt") && p_idx == 1;
+                                html! { <div class="flex-1 flex flex-col h-full"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest"> {if only_mods { "Select Modifier" } else { "Select Keycode" }} </div> <div class="p-2 border-b border-gray-700"> <input type="text" placeholder="Search..." class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" oninput={let filter = filter.clone(); Callback::from(move |e: InputEvent| { let input: HtmlInputElement = e.target_unchecked_into(); filter.set(input.value().to_uppercase()); })} value={filter_val.clone()} /> </div> <div class="flex-1 overflow-y-auto"> { for keycodes::KEY_ALIASES.iter().filter(|(&k, _)| !only_mods || keycodes::is_modifier(k)).filter(|(&k, _)| {
+                                    if is_tap_param {
+                                        keycodes::is_plain_key(k)
+                                    } else if only_regular {
+                                        keycodes::is_regular_key(k)
+                                    } else {
+                                        true
+                                    }
+                                }).filter(|(&k, &v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val)).map(|(&k, &v)| {
                                                 let val = k.to_string(); let select = select_param_value.clone(); let is_active = current_params.get(p_idx).map(|p| *p == val).unwrap_or(false); let val_c = val.clone(); let onclick = Callback::from(move |_| select.emit(val_c.clone()));
                                                 html! { <div onclick={onclick} class={classes!("p-2", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "text-xs", if is_active { "bg-white text-black" } else { "" })}> <div class="font-bold font-mono">{val}</div> <div class={if is_active { "text-gray-600" } else { "text-gray-400" }}>{v}</div> </div> } })} </div> <div class="p-2 flex justify-center border-t border-gray-700"> <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center"> <span class="rotate-90 inline-block mr-1">{"Close"}</span> </button> </div> </div> } },
                             _ => html! { <div class="flex-1 flex flex-col items-center justify-center p-4 text-center"> <div class="text-gray-500 italic">{"Selection not implemented for this parameter type."}</div> <button onclick={props.on_toggle_param_selection.clone()} class="mt-4 text-xs text-gray-400 hover:text-white uppercase tracking-widest"> {"Close"} </button> </div> }

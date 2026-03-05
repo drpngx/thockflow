@@ -133,8 +133,8 @@ fn switch(route: Route) -> Html {
                         </div>
                     },
                     Route::Keymap => html! {
-                        <div class="w-full font-body flex px-2 flex-col items-center place-content-around">
-                            <div class="flex flex-col">
+                        <div class="w-full font-body flex px-2 flex-col items-center">
+                            <div class="w-full max-w-[1920px]">
                                 <keymap::KeymapHome />
                             </div>
                         </div>

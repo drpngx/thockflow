@@ -101,12 +101,75 @@ lazy_static! {
         m.insert("OUT_USB", "Out USB");
         m.insert("OUT_BLE", "Out BLE");
         
+        // Number Row
+        m.insert("N1", "1");
+        m.insert("N2", "2");
+        m.insert("N3", "3");
+        m.insert("N4", "4");
+        m.insert("N5", "5");
+        m.insert("N6", "6");
+        m.insert("N7", "7");
+        m.insert("N8", "8");
+        m.insert("N9", "9");
+        m.insert("N0", "0");
+        
         m
     };
 }
 
 pub fn format_keycode(code: &str) -> String {
     KEY_ALIASES.get(code).cloned().unwrap_or(code).to_string()
+}
+
+pub fn get_keycode_shifted(code: &str) -> Option<&'static str> {
+    match code {
+        "N1" => Some("!"),
+        "N2" => Some("@"),
+        "N3" => Some("#"),
+        "N4" => Some("$"),
+        "N5" => Some("%"),
+        "N6" => Some("^"),
+        "N7" => Some("&"),
+        "N8" => Some("*"),
+        "N9" => Some("("),
+        "N0" => Some(")"),
+        "MINUS" => Some("_"),
+        "EQUAL" => Some("+"),
+        "GRAVE" => Some("~"),
+        "LBKT" => Some("{"),
+        "RBKT" => Some("}"),
+        "BSLH" => Some("|"),
+        "SEMI" => Some(":"),
+        "SQT" => Some("\""),
+        "COMMA" => Some("<"),
+        "DOT" => Some(">"),
+        "SLASH" => Some("?"),
+        _ => None,
+    }
+}
+
+pub fn is_regular_key(code: &str) -> bool {
+    is_plain_key(code) || is_modifier(code)
+}
+
+pub fn is_plain_key(code: &str) -> bool {
+    if code.len() == 1 && code.chars().next().unwrap().is_ascii_alphabetic() {
+        return true;
+    }
+    if code.starts_with('N') && code.len() == 2 && code.chars().nth(1).unwrap().is_ascii_digit() {
+        return true;
+    }
+    let regular_aliases = [
+        "GRAVE", "SEMI", "SQT", "SLASH", "BSPC", "LBKT", "RBKT", "MINUS", "EQUAL", "COMMA", "DOT", "BSLH",
+        "ESC", "SPACE", "ENTER", "TAB", "LEFT", "RIGHT", "UP", "DOWN", "HOME", "END", "PG_UP", "PG_DN", "DEL", "INS",
+    ];
+    if regular_aliases.contains(&code) {
+        return true;
+    }
+    if code.starts_with('F') && code.len() > 1 && code[1..].parse::<u8>().is_ok() {
+        return true;
+    }
+    false
 }
 
 pub fn to_zmk_keycode(key: &str) -> Option<String> {
