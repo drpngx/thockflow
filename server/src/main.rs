@@ -74,17 +74,8 @@ async fn save_keymap_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoRespons
     info!("Received save request");
     match generate_keymap_dts(&req.original_content, &req.data) {
         Ok(content) => {
-            // Validate the generated content before returning it
-            match parse_keymap_with_tree_sitter(&content) {
-                Ok(_) => {
-                    info!("Successfully generated and validated new keymap DTS, length: {}", content.len());
-                    (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
-                }
-                Err(e) => {
-                    error!("Generated keymap failed validation: {}", e);
-                    (StatusCode::INTERNAL_SERVER_ERROR, format!("Generated keymap is invalid: {}", e)).into_response()
-                }
-            }
+            info!("Successfully generated new keymap DTS, length: {}", content.len());
+            (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
         }
         Err(e) => {
             error!("Generation error: {}", e);

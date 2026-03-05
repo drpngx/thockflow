@@ -16,6 +16,7 @@ extern "C" {
     #[wasm_bindgen(method, js_name = createWritable)]
     fn create_writable(this: &FileSystemFileHandle) -> js_sys::Promise;
 
+    #[derive(Clone, PartialEq)]
     #[wasm_bindgen]
     pub type FileSystemFileHandle;
 
@@ -25,6 +26,7 @@ extern "C" {
     #[wasm_bindgen(method, js_name = close)]
     fn close(this: &FileSystemWritableFileStream) -> js_sys::Promise;
 
+    #[derive(Clone, PartialEq)]
     #[wasm_bindgen]
     pub type FileSystemWritableFileStream;
 }
@@ -360,7 +362,7 @@ pub fn KeymapHome() -> Html {
                 let data = data.clone();
                 let error = error.clone();
                 let loading = loading.clone();
-                let file_handle = file_handle.clone();
+                let file_handle_val = (*file_handle).clone();
                 
                 loading.set(true);
                 spawn_local(async move {
@@ -373,44 +375,51 @@ pub fn KeymapHome() -> Html {
                     match result {
                         Ok(resp) => {
                             if resp.ok() {
-                                let res = resp.json::<SaveKeymapResponse>().await.unwrap();
-                                
-                                // Check if we have a direct file handle
-                                if let Some(handle) = &*file_handle {
-                                    let writable_promise = handle.create_writable();
-                                    let writable_result = wasm_bindgen_futures::JsFuture::from(writable_promise).await;
-                                    
-                                    match writable_result {
-                                        Ok(writable_val) => {
-                                            let writable: FileSystemWritableFileStream = writable_val.unchecked_into();
-                                            let write_promise = writable.write(&JsValue::from_str(&res.content));
-                                            let _ = wasm_bindgen_futures::JsFuture::from(write_promise).await;
-                                            let close_promise = writable.close();
-                                            let _ = wasm_bindgen_futures::JsFuture::from(close_promise).await;
+                                match resp.json::<SaveKeymapResponse>().await {
+                                    Ok(res) => {
+                                        // Check if we have a direct file handle
+                                        if let Some(handle) = file_handle_val {
+                                            let writable_promise = handle.create_writable();
+                                            let writable_result = wasm_bindgen_futures::JsFuture::from(writable_promise).await;
+                                            
+                                            match writable_result {
+                                                Ok(writable_val) => {
+                                                    let writable: FileSystemWritableFileStream = writable_val.unchecked_into();
+                                                    let write_promise = writable.write(&JsValue::from_str(&res.content));
+                                                    let _ = wasm_bindgen_futures::JsFuture::from(write_promise).await;
+                                                    let close_promise = writable.close();
+                                                    let _ = wasm_bindgen_futures::JsFuture::from(close_promise).await;
+                                                    loading.set(false);
+                                                    error.set(None);
+                                                }
+                                                Err(e) => {
+                                                    loading.set(false);
+                                                    error.set(Some(format!("Failed to create writable: {:?}", e)));
+                                                }
+                                            }
+                                        } else {
+                                            // Fallback to traditional download if handle is missing
                                             loading.set(false);
-                                            error.set(None);
-                                        }
-                                        Err(e) => {
-                                            loading.set(false);
-                                            error.set(Some(format!("Failed to create writable: {:?}", e)));
+                                            let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&res.content))).unwrap();
+                                            let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+                                            let window = web_sys::window().unwrap();
+                                            let document = window.document().unwrap();
+                                            let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
+                                            link.set_href(&url);
+                                            link.set_download("edited.keymap");
+                                            link.click();
+                                            web_sys::Url::revoke_object_url(&url).unwrap();
                                         }
                                     }
-                                } else {
-                                    // Fallback to traditional download if handle is missing
-                                    loading.set(false);
-                                    let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&res.content))).unwrap();
-                                    let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
-                                    let window = web_sys::window().unwrap();
-                                    let document = window.document().unwrap();
-                                    let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
-                                    link.set_href(&url);
-                                    link.set_download("edited.keymap");
-                                    link.click();
-                                    web_sys::Url::revoke_object_url(&url).unwrap();
+                                    Err(e) => {
+                                        loading.set(false);
+                                        error.set(Some(format!("Failed to parse server response: {}", e)));
+                                    }
                                 }
                             } else {
                                 loading.set(false);
-                                error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
+                                let error_text = resp.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                                error.set(Some(format!("Server error: {}", error_text)));
                             }
                         }
                         Err(e) => {
@@ -427,9 +436,11 @@ pub fn KeymapHome() -> Html {
         let on_open = on_open.clone();
         let on_save = on_save.clone();
         let has_data = keymap_data.is_some();
-        use_effect_with(has_data, move |&has_data| {
+        let keymap_data_val = (*keymap_data).clone();
+        use_effect_with((has_data, keymap_data_val, (*file_handle).clone()), move |(has_data, _, _)| {
             let on_open = on_open.clone();
             let on_save = on_save.clone();
+            let has_data = *has_data;
             let key_listener = Closure::wrap(Box::new(move |e: KeyboardEvent| {
                 let key = e.key().to_lowercase();
                 if (e.ctrl_key() || e.meta_key()) && key == "o" {
