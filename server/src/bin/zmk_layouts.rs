@@ -11,6 +11,7 @@ struct PhysicalKey {
     pub height: i32,
     pub x: i32,
     pub y: i32,
+    pub rotation: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -123,7 +124,7 @@ fn main() -> Result<()> {
         }
         output.push_str("        keys: &[\n");
         for k in &l.keys {
-            output.push_str(&format!("            PhysicalKey {{ width: {}, height: {}, x: {}, y: {} }},\n", k.width, k.height, k.x, k.y));
+            output.push_str(&format!("            PhysicalKey {{ width: {}, height: {}, x: {}, y: {}, rotation: {} }},\n", k.width, k.height, k.x, k.y, k.rotation));
         }
         output.push_str("        ],\n");
         output.push_str(&format!("        source_file: \"{}\",\n", l.source_file));
@@ -176,7 +177,8 @@ fn extract_layouts(
                         if val_node.kind() != "identifier" {
                             let raw_val = val_node.utf8_text(source.as_bytes()).unwrap_or("");
                             let num_re = r"\(?([\d-]+)\)?";
-                            let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re);
+                            // Format: width, height, x, y, rotation, col_offset, row_offset
+                            let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re, num_re, num_re, num_re);
                             let key_regex = regex::Regex::new(&key_re_str).unwrap();
                             for cap in key_regex.captures_iter(raw_val) {
                                 keys.push(PhysicalKey {
@@ -184,6 +186,7 @@ fn extract_layouts(
                                     height: cap[2].parse().unwrap_or(100),
                                     x: cap[3].parse().unwrap_or(0),
                                     y: cap[4].parse().unwrap_or(0),
+                                    rotation: cap[5].parse().unwrap_or(0),
                                 });
                             }
                         }

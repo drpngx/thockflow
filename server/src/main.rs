@@ -130,7 +130,8 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                 if val_node.kind() != "identifier" {
                                     let raw_val = val_node.utf8_text(source).unwrap_or("");
                                     let num_re = r"\(?([\d-]+)\)?";
-                                    let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re);
+                                    // Format: width, height, x, y, rotation, col_offset, row_offset
+                                    let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re, num_re, num_re, num_re);
                                     let key_regex = regex::Regex::new(&key_re_str).unwrap();
                                     for cap in key_regex.captures_iter(raw_val) {
                                         physical_layout.push(PhysicalKey {
@@ -138,6 +139,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                             height: cap[2].parse().unwrap_or(100),
                                             x: cap[3].parse().unwrap_or(0),
                                             y: cap[4].parse().unwrap_or(0),
+                                            rotation: cap[5].parse().unwrap_or(0),
                                         });
                                     }
                                 }
@@ -237,6 +239,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                 height: k.height,
                 x: k.x,
                 y: k.y,
+                rotation: k.rotation,
             }).collect();
         }
     }

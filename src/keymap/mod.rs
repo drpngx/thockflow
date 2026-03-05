@@ -93,6 +93,7 @@ pub struct PhysicalKey {
     pub y: i32,
     pub width: i32,
     pub height: i32,
+    pub rotation: i32,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -325,7 +326,8 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                     let w = (pk.width as f32 * size_scale).max(20.0) as i32 - 4;
                     let h = (pk.height as f32 * size_scale).max(20.0) as i32 - 4;
 
-                    let style = format!("left: {}px; top: {}px; width: {}px; height: {}px;", x, y, w, h);
+                    let rotation_deg = pk.rotation as f32 / 1000.0;
+                    let style = format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg);
                     
                     let onclick = {
                         let on_key_click = on_key_click.clone();
@@ -410,13 +412,17 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let mini_scale = 10.0 / u_pos;
 
     let preview_parts = get_binding_parts(binding);
+    let selected_pk = &props.data.physical_layout[props.selected_key.key_index];
+    let rotation_deg = selected_pk.rotation as f32 / 1000.0;
+    let preview_style = format!("transform: rotate({}deg);", rotation_deg);
+
     let tl = if !preview_parts.top_left.is_empty() {
-        html! { <span class="absolute top-1 left-1 text-[8px] text-gray-400 leading-none">{&preview_parts.top_left}</span> }
+        html! { <span class="absolute top-1 left-1 text-[8px] text-gray-400 leading-none">{preview_parts.top_left}</span> }
     } else {
         html! {}
     };
     let tr = if !preview_parts.top_right.is_empty() {
-        html! { <span class="absolute top-1 right-1 text-[8px] text-gray-400 leading-none text-right max-w-[70%] truncate">{&preview_parts.top_right}</span> }
+        html! { <span class="absolute top-1 right-1 text-[8px] text-gray-400 leading-none text-right max-w-[70%] truncate">{preview_parts.top_right}</span> }
     } else {
         html! {}
     };
@@ -434,7 +440,8 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                 let y = (pk.y as f32 * mini_scale) as i32;
                                 let w = (pk.width as f32 * mini_scale).max(4.0) as i32 - 1;
                                 let h = (pk.height as f32 * mini_scale).max(4.0) as i32 - 1;
-                                let style = format!("left: {}px; top: {}px; width: {}px; height: {}px;", x, y, w, h);
+                                let rotation_deg = pk.rotation as f32 / 1000.0;
+                                let style = format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg);
                                 let class = if is_selected { "bg-green-500" } else { "bg-gray-700" };
                                 html! { <div class={classes!("absolute", "rounded-sm", class)} style={style} /> }
                             })}
@@ -443,10 +450,10 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                         // Arrow and current binding preview
                         <div class="flex items-center ml-24 space-x-8">
                             <span class="text-2xl text-gray-400">{"→"}</span>
-                            <div class="bg-gray-800 w-16 h-16 rounded-lg border border-gray-600 flex items-center justify-center relative font-mono shadow-inner">
+                            <div class="bg-gray-800 w-16 h-16 rounded-lg border border-gray-600 flex items-center justify-center relative font-mono shadow-inner" style={preview_style}>
                                 {tl}
                                 {tr}
-                                <span class="text-xl font-bold">{&preview_parts.center}</span>
+                                <span class="text-xl font-bold">{preview_parts.center}</span>
                             </div>
                         </div>
                     </div>
