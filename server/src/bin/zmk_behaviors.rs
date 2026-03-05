@@ -1,4 +1,6 @@
 use std::fs;
+use std::collections::HashSet;
+use std::path::Path;
 use anyhow::{Result, Context};
 use tree_sitter::{Parser, Node};
 
@@ -9,19 +11,57 @@ use runfiles::Runfiles;
 enum ParameterType {
     Layer,
     Keycode,
+    Modifier,
+    Constant,
     None,
 }
 
 #[derive(Debug)]
 struct Behavior {
     name: String,
-    label: Option<String>, // handle (e.g. "mt" for "mod_tap")
+    label: Option<String>,
     display_name: Option<String>,
     binding_cells: u32,
     include_file: String,
     is_default: bool,
     compatible: Option<String>,
     parameter_metadata: Vec<ParameterType>,
+}
+
+fn parse_includes_recursively(base_dir: &Path, current_file: &Path, included_files: &mut HashSet<String>) -> Result<()> {
+    if let Ok(content) = fs::read_to_string(current_file) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with("#include") {
+                let is_angle_bracket = line.contains('<');
+                if let Some(start) = line.find('<').or_else(|| line.find('"')) {
+                    if let Some(end) = line.rfind('>').or_else(|| line.rfind('"')) {
+                        if start < end {
+                            let include_path_str = &line[start + 1..end];
+                            if let Some(filename) = Path::new(include_path_str).file_name().and_then(|n| n.to_str()) {
+                                if is_angle_bracket {
+                                    if included_files.insert(filename.to_string()) {
+                                        let search_paths = vec![
+                                            base_dir.join("dts").join(include_path_str),
+                                            base_dir.join("dts").join("behaviors").join(filename),
+                                            base_dir.join("dts").join(filename),
+                                        ];
+                                        for p in search_paths {
+                                            if p.exists() {
+                                                let _ = parse_includes_recursively(base_dir, &p, included_files);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -39,8 +79,6 @@ fn main() -> Result<()> {
         #[cfg(feature = "runfiles")]
         {
             let r = Runfiles::create()?;
-            // Try to find zmk behaviors.dtsi in runfiles
-            // Format: "zmk/app/dts/behaviors.dtsi"
             let dtsi_path = runfiles::rlocation!(r, "zmk/app/dts/behaviors.dtsi");
             
             if let Some(dtsi_path) = dtsi_path {
@@ -79,44 +117,38 @@ fn main() -> Result<()> {
     };
 
     let zmk_path = zmk_path_buf.as_path();
-    let behaviors_dtsi_path = zmk_path.join("app/dts/behaviors.dtsi");
-    let behaviors_dir = zmk_path.join("app/dts/behaviors");
+    let app_dir = zmk_path.join("app");
+    let behaviors_dtsi_path = app_dir.join("dts/behaviors.dtsi");
+    let behaviors_dir = app_dir.join("dts/behaviors");
 
     let mut behaviors = Vec::new();
 
-    // 1. Parse behaviors.dtsi to find default behaviors and includes
-    let default_behaviors_content = fs::read_to_string(&behaviors_dtsi_path)
-        .with_context(|| format!("Failed to read {}", behaviors_dtsi_path.display()))?;
-    
+    let mut included_files = HashSet::new();
+    if let Some(filename) = behaviors_dtsi_path.file_name().and_then(|n| n.to_str()) {
+        included_files.insert(filename.to_string());
+    }
+    let _ = parse_includes_recursively(&app_dir, &behaviors_dtsi_path, &mut included_files);
+
     let mut parser = Parser::new();
     parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
-    
-    // We also need to know which files are included in behaviors.dtsi
-    let mut included_files = Vec::new();
-    for line in default_behaviors_content.lines() {
-        if let Some(inc) = line.trim().strip_prefix("#include <behaviors/") {
-            if let Some(filename) = inc.strip_suffix('>') {
-                included_files.push(filename.to_string());
+
+    if behaviors_dir.exists() {
+        for entry in fs::read_dir(&behaviors_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "dtsi" || ext == "h") {
+                let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+                let is_default = included_files.contains(&filename);
+                
+                let content = fs::read_to_string(&path)?;
+                let tree = parser.parse(&content, None).context("Failed to parse DTS")?;
+                
+                let include_path = format!("behaviors/{}", filename);
+                extract_behaviors(tree.root_node(), &content, &include_path, is_default, &mut behaviors)?;
             }
         }
     }
 
-    // 2. Load all behavior DTSIs in app/dts/behaviors
-    for entry in fs::read_dir(&behaviors_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "dtsi") {
-            let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-            let is_default = included_files.contains(&filename);
-            
-            let content = fs::read_to_string(&path)?;
-            let tree = parser.parse(&content, None).context("Failed to parse DTS")?;
-            
-            extract_behaviors(tree.root_node(), &content, &filename, is_default, &mut behaviors)?;
-        }
-    }
-
-    // 3. Generate Rust code
     let mut output = String::new();
     output.push_str("// Generated by server/src/bin/zmk_behaviors.rs. DO NOT EDIT.\n");
     output.push_str("// To regenerate, run:\n");
@@ -125,6 +157,8 @@ fn main() -> Result<()> {
     output.push_str("pub enum ParameterType {\n");
     output.push_str("    Layer,\n");
     output.push_str("    Keycode,\n");
+    output.push_str("    Modifier,\n");
+    output.push_str("    Constant,\n");
     output.push_str("    None,\n");
     output.push_str("}\n\n");
     output.push_str("#[allow(dead_code)]\n");
@@ -136,6 +170,7 @@ fn main() -> Result<()> {
     output.push_str("    pub binding_cells: u32,\n");
     output.push_str("    pub include_file: &'static str,\n");
     output.push_str("    pub is_default: bool,\n");
+    output.push_str("    pub compatible: Option<&'static str>,\n");
     output.push_str("    pub parameter_metadata: &'static [ParameterType],\n");
     output.push_str("}\n\n");
     output.push_str("pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[\n");
@@ -156,6 +191,11 @@ fn main() -> Result<()> {
         output.push_str(&format!("        binding_cells: {},\n", b.binding_cells));
         output.push_str(&format!("        include_file: \"{}\",\n", b.include_file));
         output.push_str(&format!("        is_default: {},\n", b.is_default));
+        if let Some(comp) = &b.compatible {
+            output.push_str(&format!("        compatible: Some(\"{}\"),\n", comp));
+        } else {
+            output.push_str("        compatible: None,\n");
+        }
         
         output.push_str("        parameter_metadata: &[\n");
         for pt in &b.parameter_metadata {
@@ -186,7 +226,6 @@ fn extract_behaviors(
     if node.kind() == "node" {
         let mut node_name = String::new();
         let mut handle = None;
-        
         let mut identifiers = Vec::new();
         
         let mut cursor = node.walk();
@@ -205,7 +244,6 @@ fn extract_behaviors(
             node_name = identifiers[0].clone();
         }
         
-        // If we didn't find name via identifiers, try field name "name"
         if node_name.is_empty() {
             node_name = node.child_by_field_name("name")
                 .map(|n| n.utf8_text(source.as_bytes()).unwrap_or(""))
@@ -216,6 +254,7 @@ fn extract_behaviors(
         let mut display_name = None;
         let mut binding_cells = None;
         let mut compatible = None;
+        let mut bindings_behavior_labels = Vec::new();
         
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -243,6 +282,20 @@ fn extract_behaviors(
                             binding_cells = Some(num);
                         }
                     }
+                } else if prop_name == "bindings" {
+                    if let Some(value_node) = child.child_by_field_name("value") {
+                        fn find_refs(node: Node, source: &[u8], refs: &mut Vec<String>) {
+                            let text = node.utf8_text(source).unwrap_or("");
+                            if text.starts_with('&') {
+                                refs.push(text[1..].to_string());
+                            }
+                            let mut cursor = node.walk();
+                            for child in node.children(&mut cursor) {
+                                find_refs(child, source, refs);
+                            }
+                        }
+                        find_refs(value_node, source.as_bytes(), &mut bindings_behavior_labels);
+                    }
                 }
             }
         }
@@ -262,25 +315,37 @@ fn extract_behaviors(
                         parameter_metadata.push(ParameterType::Keycode);
                     }
                     "zmk,behavior-mod-tap" => {
-                        parameter_metadata.push(ParameterType::Keycode);
+                        parameter_metadata.push(ParameterType::Modifier);
                         parameter_metadata.push(ParameterType::Keycode);
                     }
+                    "zmk,behavior-sticky-key" => {
+                        parameter_metadata.push(ParameterType::Modifier);
+                    }
                     "zmk,behavior-hold-tap" => {
-                        if node_name == "layer_tap" {
-                            parameter_metadata.push(ParameterType::Layer);
-                            parameter_metadata.push(ParameterType::Keycode);
-                        } else if node_name == "mod_tap" {
-                            parameter_metadata.push(ParameterType::Keycode);
-                            parameter_metadata.push(ParameterType::Keycode);
-                        } else {
-                            for _ in 0..cells {
-                                parameter_metadata.push(ParameterType::None);
+                        for (i, label) in bindings_behavior_labels.iter().enumerate() {
+                            if i as u32 >= cells { break; }
+                            match label.as_str() {
+                                "mo" | "to" | "tog" => parameter_metadata.push(ParameterType::Layer),
+                                "sk" => parameter_metadata.push(ParameterType::Modifier),
+                                "kp" => {
+                                    if i == 0 && (node_name == "mod_tap" || handle.as_deref() == Some("mt")) {
+                                        parameter_metadata.push(ParameterType::Modifier);
+                                    } else {
+                                        parameter_metadata.push(ParameterType::Keycode);
+                                    }
+                                }
+                                _ => parameter_metadata.push(ParameterType::Keycode),
                             }
                         }
                     }
-                    "zmk,behavior-bluetooth-emulated" => {
-                         for _ in 0..cells {
-                            parameter_metadata.push(ParameterType::None);
+                    "zmk,behavior-bluetooth" => {
+                        for _ in 0..cells {
+                            parameter_metadata.push(ParameterType::Constant);
+                        }
+                    }
+                    "zmk,behavior-outputs" | "zmk,behavior-backlight" | "zmk,behavior-rgb-underglow" | "zmk,behavior-ext-power" | "zmk,behavior-input-two-axis" | "zmk,behavior-mouse-key-press" => {
+                        for _ in 0..cells {
+                            parameter_metadata.push(ParameterType::Constant);
                         }
                     }
                     _ => {
@@ -295,6 +360,10 @@ fn extract_behaviors(
                 }
             }
 
+            while parameter_metadata.len() < cells as usize {
+                parameter_metadata.push(ParameterType::None);
+            }
+
             behaviors.push(Behavior {
                 name: node_name,
                 label: handle,
@@ -302,7 +371,7 @@ fn extract_behaviors(
                 binding_cells: cells,
                 include_file: filename.to_string(),
                 is_default,
-                compatible,
+                compatible: compatible.clone(),
                 parameter_metadata,
             });
         }
@@ -314,4 +383,44 @@ fn extract_behaviors(
     }
     
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_parse_includes_not_recursive_for_quoted_local_includes() -> Result<()> {
+        let dir = tempdir()?;
+        let app_dir = dir.path().join("app");
+        let dts_dir = app_dir.join("dts");
+        let behaviors_dir = dts_dir.join("behaviors");
+        fs::create_dir_all(&behaviors_dir)?;
+
+        let behaviors_dtsi = dts_dir.join("behaviors.dtsi");
+        fs::write(&behaviors_dtsi, "#include <behaviors/mouse_keys.dtsi>")?;
+
+        let mouse_keys_dtsi = behaviors_dir.join("mouse_keys.dtsi");
+        fs::write(&mouse_keys_dtsi, "#include \"mouse_move.dtsi\"")?;
+
+        let mouse_move_dtsi = behaviors_dir.join("mouse_move.dtsi");
+        fs::write(&mouse_move_dtsi, "/ { };")?;
+
+        let mut included_files = HashSet::new();
+        included_files.insert("behaviors.dtsi".to_string());
+        parse_includes_recursively(&app_dir, &behaviors_dtsi, &mut included_files)?;
+
+        // If it's working correctly according to the user's requirement,
+        // it SHOULD NOT have mouse_move.dtsi if we only want direct/transitive 
+        // includes from behaviors.dtsi, but wait, the user says 
+        // "Understand that mouse_move.dtsi is not mouse_keys.dtsi. OK?"
+        // and "test that checks that the mouse_move is not is_default, because we know it isn't"
+        
+        // My current parser DOES find it. 
+        assert!(!included_files.contains("mouse_move.dtsi"), "mouse_move.dtsi should not be in included_files");
+        
+        Ok(())
+    }
 }

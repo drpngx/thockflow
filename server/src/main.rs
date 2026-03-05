@@ -74,8 +74,17 @@ async fn save_keymap_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoRespons
     info!("Received save request");
     match generate_keymap_dts(&req.original_content, &req.data) {
         Ok(content) => {
-            info!("Successfully generated new keymap DTS, length: {}", content.len());
-            (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
+            // Validate the generated content before returning it
+            match parse_keymap_with_tree_sitter(&content) {
+                Ok(_) => {
+                    info!("Successfully generated and validated new keymap DTS, length: {}", content.len());
+                    (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
+                }
+                Err(e) => {
+                    error!("Generated keymap failed validation: {}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, format!("Generated keymap is invalid: {}", e)).into_response()
+                }
+            }
         }
         Err(e) => {
             error!("Generation error: {}", e);
@@ -89,19 +98,46 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
     
     // 1. Handle #includes
     let include_re = regex::Regex::new(r#"(?m)^#include\s*[<"](.+?)[>"]"#).unwrap();
-    let existing_includes: std::collections::HashSet<String> = include_re.captures_iter(original)
+    let mut existing_includes: std::collections::HashSet<String> = include_re.captures_iter(original)
         .map(|cap| cap[1].to_string())
         .collect();
     
     let mut new_includes = Vec::new();
+    
+    // a) Add includes from data.includes
     for inc in &data.includes {
         if !existing_includes.contains(inc) {
             new_includes.push(format!("#include <{}>", inc));
+            existing_includes.insert(inc.clone());
+        }
+    }
+
+    // b) Add includes from non-default behaviors used in layers
+    for layer in &data.layers {
+        for binding in &layer.bindings {
+            let tokens: Vec<&str> = binding.split_whitespace().collect();
+            if let Some(token) = tokens.first() {
+                let token = token.trim_matches(|c| c == '&' || c == '<' || c == '>' || c == ';' || c == ' ');
+                if let Some(behavior) = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(token) || b.name == token) {
+                    if !behavior.is_default && !existing_includes.contains(behavior.include_file) {
+                        new_includes.push(format!("#include <{}>", behavior.include_file));
+                        existing_includes.insert(behavior.include_file.to_string());
+                    }
+                }
+            }
         }
     }
     
     if !new_includes.is_empty() {
-        content.insert_str(0, &(new_includes.join("\n") + "\n\n"));
+        let last_include_pos = include_re.find_iter(original).last().map(|m| m.end());
+        
+        if let Some(pos) = last_include_pos {
+            let mut insert_text = String::from("\n");
+            insert_text.push_str(&new_includes.join("\n"));
+            content.insert_str(pos, &insert_text);
+        } else {
+            content.insert_str(0, &(new_includes.join("\n") + "\n\n"));
+        }
     }
 
     // 2. Justification Logic: Compute max width for each key across all layers
@@ -457,6 +493,18 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
 
     traverse(root_node, content.as_bytes(), &mut physical_layout, &mut layers);
 
+    if !layers.is_empty() {
+        let first_layer_len = layers[0].bindings.len();
+        for (i, layer) in layers.iter().enumerate() {
+            if layer.bindings.len() != first_layer_len {
+                return Err(anyhow::anyhow!(
+                    "Layer '{}' (index {}) has {} bindings, but first layer has {} bindings. All layers must have the same number of keys.",
+                    layer.name, i, layer.bindings.len(), first_layer_len
+                ));
+            }
+        }
+    }
+
     if physical_layout.is_empty() && !layers.is_empty() {
         let key_count = layers[0].bindings.len();
         info!("Physical layout missing, attempting to match by key count: {}", key_count);
@@ -552,6 +600,47 @@ mod tests {
         
         assert!(data.physical_layout.len() >= 52);
         assert!(!data.layers.is_empty());
+    }
+
+    #[test]
+    fn test_zmk_behaviors_metadata() {
+        use thockflow::keymap::behaviors::{ZMK_BEHAVIORS, ParameterType};
+        
+        let lt = ZMK_BEHAVIORS.iter().find(|b| b.label == Some("lt")).expect("lt behavior missing");
+        assert_eq!(lt.binding_cells, 2);
+        assert_eq!(lt.parameter_metadata.len(), 2);
+        assert_eq!(lt.parameter_metadata[0], ParameterType::Layer);
+        assert_eq!(lt.parameter_metadata[1], ParameterType::Keycode);
+
+        let mt = ZMK_BEHAVIORS.iter().find(|b| b.label == Some("mt")).expect("mt behavior missing");
+        assert_eq!(mt.binding_cells, 2);
+        assert_eq!(mt.parameter_metadata.len(), 2);
+        assert_eq!(mt.parameter_metadata[0], ParameterType::Modifier);
+        assert_eq!(mt.parameter_metadata[1], ParameterType::Keycode);
+
+        let bt = ZMK_BEHAVIORS.iter().find(|b| b.label == Some("bt")).expect("bt behavior missing");
+        assert_eq!(bt.binding_cells, 2);
+        assert_eq!(bt.parameter_metadata[0], ParameterType::Constant);
+    }
+
+    #[test]
+    fn test_keycode_logic() {
+        use thockflow::keymap::keycodes;
+        
+        // Backspace, arrows, etc. should be regular but NOT modifiers
+        assert!(keycodes::is_regular_key("BSPC"));
+        assert!(!keycodes::is_modifier("BSPC"));
+        
+        assert!(keycodes::is_regular_key("LEFT"));
+        assert!(!keycodes::is_modifier("LEFT"));
+        
+        assert!(keycodes::is_regular_key("AC_BACK"));
+        assert!(!keycodes::is_modifier("AC_BACK"));
+        
+        // Modifiers should be modifiers
+        assert!(keycodes::is_modifier("LSHFT"));
+        assert!(keycodes::is_modifier("RCTRL"));
+        assert!(keycodes::is_modifier("MOD_LSFT"));
     }
 
     #[test]
@@ -651,6 +740,96 @@ mod tests {
         assert!(result.contains("&kp C &kp D"));
         // Check that it's inside the keymap node (before the last closing brace)
         assert!(result.trim().ends_with("};"));
+    }
+
+    #[test]
+    fn test_parse_uneven_layers() {
+        let content = r#"
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        layer_0 {
+            bindings = <&kp A &kp B>;
+        };
+        layer_1 {
+            bindings = <&kp C>;
+        };
+    };
+};
+"#;
+        let result = parse_keymap_with_tree_sitter(content);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(err.contains("All layers must have the same number of keys"));
+    }
+
+    #[test]
+    fn test_generate_keymap_includes_placement_multiple() {
+        let content = r#"#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        layer_0 {
+            bindings = <&kp A &kp B>;
+        };
+    };
+};
+"#;
+        let data = KeymapData {
+            physical_layout: vec![
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+            ],
+            layers: vec![
+                Layer { name: "layer_0".to_string(), bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()] },
+            ],
+            includes: vec!["custom.h".to_string()],
+        };
+
+        let result = generate_keymap_dts(content, &data).unwrap();
+        println!("Result:\n{}", result);
+        
+        // Should have added both custom.h and mouse_move.dtsi
+        assert!(result.contains("#include <custom.h>"));
+        assert!(result.contains("#include <behaviors/mouse_move.dtsi>"));
+        
+        // Check placement: should be after keys.h
+        let pos_keys = result.find("#include <dt-bindings/zmk/keys.h>").unwrap();
+        let pos_custom = result.find("#include <custom.h>").unwrap();
+        let pos_mmv = result.find("#include <behaviors/mouse_move.dtsi>").unwrap();
+        
+        assert!(pos_custom > pos_keys, "custom.h should be after keys.h");
+        assert!(pos_mmv > pos_keys, "mouse_move.dtsi should be after keys.h");
+    }
+
+    #[test]
+    fn test_generate_keymap_includes_no_existing() {
+        let content = r#"/ {
+    keymap {
+        compatible = "zmk,keymap";
+        layer_0 {
+            bindings = <&kp A &kp B>;
+        };
+    };
+};
+"#;
+        let data = KeymapData {
+            physical_layout: vec![
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+            ],
+            layers: vec![
+                Layer { name: "layer_0".to_string(), bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()] },
+            ],
+            includes: vec![],
+        };
+
+        let result = generate_keymap_dts(content, &data).unwrap();
+        println!("Result:\n{}", result);
+        
+        assert!(result.starts_with("#include <behaviors/mouse_move.dtsi>"));
     }
 }
 

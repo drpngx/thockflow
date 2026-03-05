@@ -73,6 +73,11 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
                 center: format_keycode(p),
             }
         },
+        "&gresc" => BindingParts {
+            top_left: "".into(),
+            top_right: "~ `".into(),
+            center: "Esc".into(),
+        },
         "&mo" | "&to" | "&tog" => BindingParts {
             top_left: behavior.into(),
             top_right: "".into(),
@@ -112,7 +117,7 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
             BindingParts {
                 top_left: behavior.into(),
                 top_right: "".into(),
-                center: params.get(0).cloned().unwrap_or("").to_string(),
+                center: params.get(0).map(|&p| format_keycode(p)).unwrap_or_default(),
             }
         }
     }
@@ -183,7 +188,8 @@ pub fn KeymapHome() -> Html {
                 js_sys::Reflect::set(&type0, &"accept".into(), &accept).unwrap();
                 types.push(&type0);
                 js_sys::Reflect::set(&options, &"types".into(), &types).unwrap();
-                js_sys::Reflect::set(&options, &"multiple".into(), &false.into()).unwrap();
+                js_sys::Reflect::set(&options, &"excludeAcceptAllOption".into(), &JsValue::from(true)).unwrap();
+                js_sys::Reflect::set(&options, &"multiple".into(), &JsValue::from(false)).unwrap();
 
                 let picker_promise = show_open_file_picker(&options);
                 let result = wasm_bindgen_futures::JsFuture::from(picker_promise).await;
@@ -338,6 +344,36 @@ pub fn KeymapHome() -> Html {
         })
     };
 
+    {
+        let on_open = on_open.clone();
+        let on_save = on_save.clone();
+        let has_data = keymap_data.is_some();
+        use_effect_with(has_data, move |&has_data| {
+            let on_open = on_open.clone();
+            let on_save = on_save.clone();
+            let key_listener = Closure::wrap(Box::new(move |e: KeyboardEvent| {
+                let key = e.key().to_lowercase();
+                if (e.ctrl_key() || e.meta_key()) && key == "o" {
+                    e.prevent_default();
+                    on_open.emit(MouseEvent::new("click").unwrap());
+                } else if (e.ctrl_key() || e.meta_key()) && key == "s" {
+                    if has_data {
+                        e.prevent_default();
+                        on_save.emit(MouseEvent::new("click").unwrap());
+                    }
+                }
+            }) as Box<dyn FnMut(KeyboardEvent)>);
+            
+            let window = web_sys::window().expect("should have a window");
+            window.add_event_listener_with_callback("keydown", key_listener.as_ref().unchecked_ref()).expect("failed to add listener");
+            move || {
+                let window = web_sys::window().expect("should have a window");
+                window.remove_event_listener_with_callback("keydown", key_listener.as_ref().unchecked_ref()).expect("failed to remove listener");
+                drop(key_listener);
+            }
+        });
+    }
+
     html! {
         <div class="w-full flex flex-col items-center p-4">
             <h2 class="text-4xl font-display mb-8">{"ZMK Keymap Editor"}</h2>
@@ -346,7 +382,7 @@ pub fn KeymapHome() -> Html {
                 <div>
                     <div class="flex flex-col space-y-2">
                         <label class="block text-sm font-medium text-gray-900 dark:text-white">{"Open keymap file"}</label>
-                        <button onclick={on_open} class="px-6 py-2.5 bg-blue-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-blue-800 active:shadow-lg transition duration-150 ease-in-out">
+                        <button onclick={on_open.clone()} class="px-6 py-2.5 bg-blue-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-blue-800 active:shadow-lg transition duration-150 ease-in-out">
                             {"Open File"}
                         </button>
                     </div>
@@ -354,7 +390,7 @@ pub fn KeymapHome() -> Html {
                 </div>
                 { if keymap_data.is_some() {
                     html! {
-                        <button onclick={on_save} class="mt-6 px-6 py-2.5 bg-green-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-green-700 hover:shadow-lg focus:bg-green-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-green-800 active:shadow-lg transition duration-150 ease-in-out">
+                        <button onclick={on_save.clone()} class="mt-6 px-6 py-2.5 bg-green-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-green-700 hover:shadow-lg focus:bg-green-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-green-800 active:shadow-lg transition duration-150 ease-in-out">
                             {"Save Keymap"}
                         </button>
                     }
@@ -370,7 +406,8 @@ pub fn KeymapHome() -> Html {
             } else { html! {} }}
 
             { if let Some(data) = &*keymap_data {
-                html! { <KeymapRenderer data={data.clone()} on_update={on_update_data} /> }
+                let on_update_data_clone = on_update_data.clone();
+                html! { <KeymapRenderer data={data.clone()} on_update={on_update_data_clone} /> }
             } else {
                 if !*loading { html! { <div class="text-gray-500 italic">{"Please open a keymap file to start editing."}</div> } } else { html! {} }
             }}
@@ -827,6 +864,51 @@ fn VirtualKeyboard(props: &VirtualKeyboardProps) -> Html {
     })} </div> })} </div> }
 }
 
+fn get_keycode_suggestions(query: &str, only_regular: bool, is_tap_param: bool, only_mods: bool) -> Vec<Suggestion> {
+    let query = query.to_uppercase();
+    let mut results = Vec::new();
+
+    if !only_mods {
+        if !only_regular || is_tap_param {
+            for c in 'A'..='Z' {
+                let k = c.to_string();
+                if k.contains(&query) {
+                    results.push(Suggestion { value: k.clone(), display: k });
+                }
+            }
+            for i in 0..=9 {
+                let k = format!("N{}", i);
+                if k.contains(&query) {
+                    results.push(Suggestion { value: k.clone(), display: k });
+                }
+            }
+        }
+        for i in 1..=24 {
+            let k = format!("F{}", i);
+            if k.contains(&query) {
+                results.push(Suggestion { value: k.clone(), display: k });
+            }
+        }
+    }
+
+    for (&k, &v) in keycodes::KEY_ALIASES.iter() {
+        if only_mods && !keycodes::is_modifier(k) { continue; }
+        let include = if is_tap_param {
+            keycodes::is_regular_key(k) && !keycodes::is_modifier(k)
+        } else if only_regular {
+            keycodes::is_regular_key(k)
+        } else {
+            true
+        };
+        if include && (k.to_uppercase().contains(&query) || v.to_uppercase().contains(&query)) {
+            let val = k.to_string();
+            let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() };
+            results.push(Suggestion { value: val, display: disp });
+        }
+    }
+    results
+}
+
 #[derive(Properties, PartialEq)]
 pub struct PopupProps { pub data: KeymapData, pub selected_key: SelectedKey, pub on_close: Callback<MouseEvent>, pub show_param_selection: bool, pub on_toggle_param_selection: Callback<MouseEvent>, pub on_update: Callback<KeymapData>, }
 
@@ -905,7 +987,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
             new_data.layers[selected_key.layer_index].bindings[selected_key.key_index] = new_binding;
             let behavior_name = current_behavior_label.strip_prefix('&').unwrap_or(&*current_behavior_label);
             if let Some(meta) = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name) {
-                if !meta.include_file.is_empty() && !new_data.includes.iter().any(|i| i == meta.include_file) { new_data.includes.push(meta.include_file.to_string()); }
+                if !meta.is_default && !meta.include_file.is_empty() && !new_data.includes.iter().any(|i| i == meta.include_file) { new_data.includes.push(meta.include_file.to_string()); }
             }
             on_update.emit(new_data); on_close.emit(e);
         })
@@ -944,28 +1026,9 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     Suggestion { value: val, display: disp }
                 }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect();
 
-                let mut kp_results: Vec<Suggestion> = Vec::new();
-                for c in 'A'..='Z' {
-                    let k = c.to_string();
-                    if k.contains(&query) {
-                        kp_results.push(Suggestion { value: format!("&kp {}", k), display: format!("&kp {}", k) });
-                    }
-                }
-                for i in 0..=9 {
-                    let k = format!("N{}", i);
-                    let v = i.to_string();
-                    if k.contains(&query) || v.contains(&query) {
-                        kp_results.push(Suggestion { value: format!("&kp {}", k), display: format!("&kp {} ({})", k, v) });
-                    }
-                }
-                for (&k, &v) in keycodes::KEY_ALIASES.iter() {
-                    if keycodes::is_regular_key(k) {
-                         if k.to_uppercase().contains(&query) || v.to_uppercase().contains(&query) {
-                             let val = format!("&kp {}", k);
-                             let disp = if k != v { format!("{} ({})", val, v) } else { val.clone() };
-                             kp_results.push(Suggestion { value: val, display: disp });
-                         }
-                    }
+                let mut kp_results = Vec::new();
+                for s in get_keycode_suggestions(&query, true, false, false) {
+                    kp_results.push(Suggestion { value: format!("&kp {}", s.value), display: format!("&kp {}", s.display) });
                 }
                 bh_results.append(&mut kp_results);
                 bh_results
@@ -975,24 +1038,17 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     if let Some(p_type) = meta.parameter_metadata.get(p_idx) {
                         match p_type {
                             ParameterType::Layer => props_data.layers.iter().enumerate().map(|(i, l)| Suggestion { value: i.to_string(), display: format!("{} ({})", i, l.name) }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect(),
-                            ParameterType::Modifier => keycodes::KEY_ALIASES.iter().filter(|(&k, _)| keycodes::is_modifier(k)).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect(),
+                            ParameterType::Modifier => get_keycode_suggestions(&query, true, false, true),
                             ParameterType::Keycode => {
                                 let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
-                                let only_regular = behavior_name == "kp" || behavior_name == "kt" || behavior_name == "mt" || behavior_name == "lt";
-                                let is_tap_param = (behavior_name == "mt" || behavior_name == "lt") && p_idx == 1;
-                                keycodes::KEY_ALIASES.iter().filter(|(&k, _)| {
-                                    if is_tap_param {
-                                        keycodes::is_plain_key(k)
-                                    } else if only_regular {
-                                        keycodes::is_regular_key(k)
-                                    } else {
-                                        true
-                                    }
-                                }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect()
+                                let is_hold_tap = behavior_meta.map(|m| m.compatible == Some("zmk,behavior-hold-tap")).unwrap_or(false);
+                                let only_regular = behavior_name == "kp" || behavior_name == "kt" || is_hold_tap;
+                                let is_tap_param = is_hold_tap && p_idx == 1;
+                                get_keycode_suggestions(&query, only_regular, is_tap_param, false)
                             },
                             ParameterType::Constant => {
                                 let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
-                                keycodes::KEY_ALIASES.iter().filter(|(&k, _)| match behavior_name {
+                                let mut results: Vec<Suggestion> = keycodes::KEY_ALIASES.iter().filter(|(&k, _)| match behavior_name {
                                     "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k),
                                     "mmv" => k.starts_with("MOVE_"),
                                     "msc" => k.starts_with("SCROLL_"),
@@ -1002,7 +1058,17 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                     "out" => k.starts_with("OUT_"),
                                     "ext_power" => k.starts_with("EP_"),
                                     _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || k.starts_with("MOVE_") || k.starts_with("SCROLL_") || ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k)
-                                }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect()
+                                }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect();
+                                
+                                if behavior_name == "bt" && p_idx == 1 {
+                                    for i in 0..5 {
+                                        let val = i.to_string();
+                                        if val.contains(&query) {
+                                            results.push(Suggestion { value: val.clone(), display: format!("Profile {}", val) });
+                                        }
+                                    }
+                                }
+                                results
                             }
                             _ => Vec::new()
                         }
@@ -1074,8 +1140,9 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                             ParameterType::Keycode => { let filter_val = (*filter).clone();
                                 let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
                                 let only_mods = is_modifier_only_param(behavior_name, p_idx);
-                                let only_regular = behavior_name == "kp" || behavior_name == "kt" || behavior_name == "mt" || behavior_name == "lt";
-                                let is_tap_param = (behavior_name == "mt" || behavior_name == "lt") && p_idx == 1;
+                                let is_hold_tap = behavior_meta.map(|m| m.compatible == Some("zmk,behavior-hold-tap")).unwrap_or(false);
+                                let only_regular = behavior_name == "kp" || behavior_name == "kt" || is_hold_tap;
+                                let is_tap_param = is_hold_tap && p_idx == 1;
                                 html! { <div class="flex-1 flex flex-col h-full"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest"> {if only_mods { "Select Modifier" } else { "Select Keycode" }} </div> <div class="p-2 border-b border-gray-700"> <input type="text" placeholder="Search..." class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" oninput={let filter = filter.clone(); Callback::from(move |e: InputEvent| { let input: HtmlInputElement = e.target_unchecked_into(); filter.set(input.value().to_uppercase()); })} value={filter_val.clone()} /> </div> <div class="flex-1 overflow-y-auto"> { for keycodes::KEY_ALIASES.iter().filter(|(&k, _)| !only_mods || keycodes::is_modifier(k)).filter(|(&k, _)| {
                                     if is_tap_param {
                                         keycodes::is_plain_key(k)

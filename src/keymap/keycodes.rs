@@ -51,9 +51,9 @@ lazy_static! {
         m.insert("SPACE", "Space");
         m.insert("ENTER", "Enter");
         m.insert("TAB", "Tab");
-        m.insert("C_MUTE", "Mute");
-        m.insert("C_VOL_UP", "Vol+");
-        m.insert("C_VOL_DN", "Vol-");
+        m.insert("C_MUTE", "Vol🔇");
+        m.insert("C_VOL_UP", "Vol↑");
+        m.insert("C_VOL_DN", "Vol↓");
         m.insert("C_PP", "Play");
         m.insert("LEFT", "←");
         m.insert("RIGHT", "→");
@@ -63,17 +63,19 @@ lazy_static! {
         m.insert("END", "End");
         
         // Mouse Emulation
-        m.insert("LCLK", "L-Click");
-        m.insert("RCLK", "R-Click");
-        m.insert("MCLK", "M-Click");
-        m.insert("MB4", "Mouse 4");
-        m.insert("MB5", "Mouse 5");
-        m.insert("MOVE_UP", "Move ↑");
-        m.insert("MOVE_DOWN", "Move ↓");
-        m.insert("MOVE_LEFT", "Move ←");
-        m.insert("MOVE_RIGHT", "Move →");
-        m.insert("SCROLL_UP", "Scroll ↑");
-        m.insert("SCROLL_DOWN", "Scroll ↓");
+        m.insert("LCLK", "🖱️🅻");
+        m.insert("RCLK", "🖱️🆁");
+        m.insert("MCLK", "🖱️🅼");
+        m.insert("MB4", "🖱️4");
+        m.insert("MB5", "🖱️5");
+        m.insert("MOVE_UP", "🖱️↑");
+        m.insert("MOVE_DOWN", "🖱️↓");
+        m.insert("MOVE_LEFT", "🖱️←");
+        m.insert("MOVE_RIGHT", "🖱️→");
+        m.insert("SCROLL_UP", "🖱️↑");
+        m.insert("SCROLL_DOWN", "🖱️↓");
+        m.insert("SCROLL_LEFT", "🖱️←");
+        m.insert("SCROLL_RIGHT", "🖱️→");
         
         // Bluetooth
         m.insert("BT_CLR", "BT Clear");
@@ -100,6 +102,10 @@ lazy_static! {
         m.insert("OUT_TOG", "Out Toggle");
         m.insert("OUT_USB", "Out USB");
         m.insert("OUT_BLE", "Out BLE");
+        
+        // Browser / Media
+        m.insert("AC_BACK", "Br←");
+        m.insert("AC_FORWARD", "Br→");
         
         // Number Row
         m.insert("N1", "1");
@@ -162,6 +168,7 @@ pub fn is_plain_key(code: &str) -> bool {
     let regular_aliases = [
         "GRAVE", "SEMI", "SQT", "SLASH", "BSPC", "LBKT", "RBKT", "MINUS", "EQUAL", "COMMA", "DOT", "BSLH",
         "ESC", "SPACE", "ENTER", "TAB", "LEFT", "RIGHT", "UP", "DOWN", "HOME", "END", "PG_UP", "PG_DN", "DEL", "INS",
+        "AC_BACK", "AC_FORWARD", "C_VOL_UP", "C_VOL_DN", "C_MUTE",
     ];
     if regular_aliases.contains(&code) {
         return true;
