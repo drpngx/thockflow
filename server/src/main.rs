@@ -45,6 +45,17 @@ struct KeymapRequest {
     content: String,
 }
 
+#[derive(Deserialize, Serialize)]
+struct SaveKeymapRequest {
+    original_content: String,
+    data: KeymapData,
+}
+
+#[derive(Serialize)]
+struct SaveKeymapResponse {
+    content: String,
+}
+
 async fn parse_keymap_api(Json(req): Json<KeymapRequest>) -> impl IntoResponse {
     info!("Received parse request, content length: {}", req.content.len());
     match parse_keymap_with_tree_sitter(&req.content) {
@@ -59,12 +70,140 @@ async fn parse_keymap_api(Json(req): Json<KeymapRequest>) -> impl IntoResponse {
     }
 }
 
+async fn save_keymap_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoResponse {
+    info!("Received save request");
+    match generate_keymap_dts(&req.original_content, &req.data) {
+        Ok(content) => {
+            info!("Successfully generated new keymap DTS, length: {}", content.len());
+            (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
+        }
+        Err(e) => {
+            error!("Generation error: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
+    }
+}
+
+fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
+    let mut content = original.to_string();
+    
+    // 1. Handle #includes
+    // Check which ones are missing and add them at the top
+    let include_re = regex::Regex::new(r#"(?m)^#include\s*[<"](.+?)[>"]"#).unwrap();
+    let existing_includes: std::collections::HashSet<String> = include_re.captures_iter(original)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    
+    let mut new_includes = Vec::new();
+    for inc in &data.includes {
+        if !existing_includes.contains(inc) {
+            new_includes.push(format!("#include <{}>", inc));
+        }
+    }
+    
+    if !new_includes.is_empty() {
+        content.insert_str(0, &(new_includes.join("\n") + "\n\n"));
+    }
+
+    // 2. Replace bindings in layers
+    // We use tree-sitter to find the exact byte ranges to replace
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
+    let tree = parser.parse(&content, None).ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
+    
+    #[derive(Debug)]
+    struct LayerReplacement {
+        start: usize,
+        end: usize,
+        new_bindings: String,
+    }
+    
+    let mut replacements = Vec::new();
+    let mut layers_found = 0;
+    
+    fn find_layers(node: tree_sitter::Node, source: &[u8], data: &KeymapData, layers_found: &mut usize, replacements: &mut Vec<LayerReplacement>) {
+        if node.kind() == "node" {
+            let mut is_keymap = false;
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if child.kind() == "property" {
+                    let prop_name = child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                    if prop_name == "compatible" {
+                        let prop_value = child.child_by_field_name("value").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                        if prop_value.contains("zmk,keymap") {
+                            is_keymap = true;
+                        }
+                    }
+                }
+            }
+            
+            if is_keymap {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "node" {
+                        // This is a layer node
+                        if let Some(target_layer) = data.layers.get(*layers_found) {
+                            // Find the bindings property
+                            let mut inner_cursor = child.walk();
+                            for inner_child in child.children(&mut inner_cursor) {
+                                if inner_child.kind() == "property" {
+                                    let prop_name = inner_child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                                    if prop_name == "bindings" {
+                                        // Found bindings property
+                                        if let Some(value_node) = inner_child.child_by_field_name("value") {
+                                            // The value node includes the < and >
+                                            let start = value_node.start_byte();
+                                            let end = value_node.end_byte();
+                                            
+                                            let mut new_bindings = String::from("<");
+                                            for (i, b) in target_layer.bindings.iter().enumerate() {
+                                                if i > 0 {
+                                                    if i % 10 == 0 {
+                                                        new_bindings.push_str("\n                ");
+                                                    } else {
+                                                        new_bindings.push(' ');
+                                                    }
+                                                }
+                                                new_bindings.push_str(b);
+                                            }
+                                            new_bindings.push('>');
+                                            
+                                            replacements.push(LayerReplacement { start, end, new_bindings });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        *layers_found += 1;
+                    }
+                }
+            }
+        }
+        
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            find_layers(child, source, data, layers_found, replacements);
+        }
+    }
+    
+    find_layers(tree.root_node(), content.as_bytes(), data, &mut layers_found, &mut replacements);
+    
+    // Apply replacements in reverse order to keep indices valid
+    replacements.sort_by_key(|r| std::cmp::Reverse(r.start));
+    for r in replacements {
+        content.replace_range(r.start..r.end, &r.new_bindings);
+    }
+    
+    Ok(content)
+}
+
 fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
     let tree = parser.parse(content, None).ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
     
     let root_node = tree.root_node();
+    // ... existing error checking ...
     if root_node.has_error() {
         // Find where the error is
         let mut error_pos = String::new();
@@ -89,6 +228,11 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
 
     let mut physical_layout = Vec::new();
     let mut layers = Vec::new();
+
+    let include_re = regex::Regex::new(r#"(?m)^#include\s*[<"](.+?)[>"]"#).unwrap();
+    let includes: Vec<String> = include_re.captures_iter(content)
+        .map(|cap| cap[1].to_string())
+        .collect();
 
     // Recursive traversal to find nodes
     fn traverse(node: tree_sitter::Node, source: &[u8], physical_layout: &mut Vec<PhysicalKey>, layers: &mut Vec<Layer>) {
@@ -251,7 +395,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         return Err(anyhow::anyhow!("Missing keymap layers (zmk,keymap compatible node)"));
     }
 
-    Ok(KeymapData { physical_layout, layers })
+    Ok(KeymapData { physical_layout, layers, includes })
 }
 
 #[cfg(test)]
@@ -414,6 +558,7 @@ fn app() -> Router {
     let route_service = RoutableService::<thockflow::Route, _, _>::new(
         get(index),
         route("/api/parse-keymap", post(parse_keymap_api))
+            .route("/api/save-keymap", post(save_keymap_api))
             .route(*APP_JS_PATH, app_wasm_serve.clone())
             .route(*APP_WASM_PATH, app_wasm_serve)
             // Serve built assets from Vite dist first

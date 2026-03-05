@@ -61,10 +61,14 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
             top_right: params.get(0).cloned().unwrap_or("").to_string(),
             center: params.get(1).map(|&p| format_keycode(p)).unwrap_or_else(|| "".to_string()),
         },
-        "&mt" => BindingParts {
-            top_left: "".into(),
-            top_right: format!("mt {}", params.get(0).map(|&p| format_keycode(p)).unwrap_or_else(|| "".to_string())),
-            center: params.get(1).map(|&p| format_keycode(p)).unwrap_or_else(|| "".to_string()),
+        "&mt" => {
+            let mod_raw = params.get(0).map(|&s| s.strip_prefix("MOD_").unwrap_or(s)).unwrap_or("");
+            let mod_short = if mod_raw.len() >= 2 { &mod_raw[..2] } else { mod_raw };
+            BindingParts {
+                top_left: "mt".into(),
+                top_right: mod_short.to_string(),
+                center: params.get(1).map(|&p| format_keycode(p)).unwrap_or_else(|| "".to_string()),
+            }
         },
         "&trans" => BindingParts {
             top_left: "".into(),
@@ -106,6 +110,7 @@ pub struct Layer {
 pub struct KeymapData {
     pub physical_layout: Vec<PhysicalKey>,
     pub layers: Vec<Layer>,
+    pub includes: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -122,11 +127,13 @@ struct KeymapRequest {
 #[function_component]
 pub fn KeymapHome() -> Html {
     let keymap_data = use_state(|| None::<KeymapData>);
+    let original_content = use_state(|| String::new());
     let error = use_state(|| None::<String>);
     let loading = use_state(|| false);
 
     let on_file_input = {
         let keymap_data = keymap_data.clone();
+        let original_content = original_content.clone();
         let error = error.clone();
         let loading = loading.clone();
         Callback::from(move |e: InputEvent| {
@@ -136,11 +143,13 @@ pub fn KeymapHome() -> Html {
                     let reader = FileReader::new().unwrap();
                     let reader_c = reader.clone();
                     let keymap_data = keymap_data.clone();
+                    let original_content = original_content.clone();
                     let error = error.clone();
                     let loading = loading.clone();
 
                     let onload = Closure::wrap(Box::new(move |_e: ProgressEvent| {
                         let content = reader_c.result().unwrap().as_string().unwrap();
+                        original_content.set(content.clone());
                         log::info!("File read successfully, content length: {}", content.len());
                         let keymap_data = keymap_data.clone();
                         let error = error.clone();
@@ -193,21 +202,89 @@ pub fn KeymapHome() -> Html {
         })
     };
 
+    let on_update_data = {
+        let keymap_data = keymap_data.clone();
+        Callback::from(move |new_data: KeymapData| {
+            keymap_data.set(Some(new_data));
+        })
+    };
+
+    let on_save = {
+        let keymap_data = keymap_data.clone();
+        let original_content = original_content.clone();
+        let error = error.clone();
+        let loading = loading.clone();
+        Callback::from(move |_| {
+            if let Some(data) = &*keymap_data {
+                let original_content_str = (*original_content).clone();
+                let data = data.clone();
+                let error = error.clone();
+                let loading = loading.clone();
+                
+                loading.set(true);
+                spawn_local(async move {
+                    log::info!("Sending save request to server...");
+                    let result = Request::post("/api/save-keymap")
+                        .json(&SaveKeymapRequest { original_content: original_content_str, data })
+                        .unwrap()
+                        .send()
+                        .await;
+
+                    loading.set(false);
+                    match result {
+                        Ok(resp) => {
+                            if resp.ok() {
+                                let res = resp.json::<SaveKeymapResponse>().await.unwrap();
+                                // Create a blob and download it
+                                let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&res.content))).unwrap();
+                                let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+                                let window = web_sys::window().unwrap();
+                                let document = window.document().unwrap();
+                                let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
+                                link.set_href(&url);
+                                link.set_download("edited.keymap");
+                                link.click();
+                                web_sys::Url::revoke_object_url(&url).unwrap();
+                            } else {
+                                error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
+                            }
+                        }
+                        Err(e) => {
+                            error.set(Some(format!("Network error: {}", e)));
+                        }
+                    }
+                });
+            }
+        })
+    };
+
     html! {
         <div class="w-full flex flex-col items-center p-4">
             <h2 class="text-4xl font-display mb-8">{"ZMK Keymap Editor"}</h2>
             
-            <div class="mb-8">
-                <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{"Upload .keymap file"}</label>
-                <input 
-                    type="file" 
-                    oninput={on_file_input}
-                    class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-                />
+            <div class="flex items-center space-x-4 mb-8">
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{"Upload .keymap file"}</label>
+                    <input 
+                        type="file" 
+                        oninput={on_file_input}
+                        class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+                    />
+                </div>
+                { if keymap_data.is_some() {
+                    html! {
+                        <button 
+                            onclick={on_save}
+                            class="mt-6 px-6 py-2.5 bg-green-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-green-700 hover:shadow-lg focus:bg-green-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-green-800 active:shadow-lg transition duration-150 ease-in-out"
+                        >
+                            {"Save Keymap"}
+                        </button>
+                    }
+                } else { html! {} }}
             </div>
 
             { if *loading {
-                html! { <div class="text-blue-500 mb-4 animate-pulse">{"Parsing keymap on server..."}</div> }
+                html! { <div class="text-blue-500 mb-4 animate-pulse">{"Processing..."}</div> }
             } else {
                 html! {}
             }}
@@ -219,7 +296,7 @@ pub fn KeymapHome() -> Html {
             }}
 
             { if let Some(data) = &*keymap_data {
-                html! { <KeymapRenderer data={data.clone()} /> }
+                html! { <KeymapRenderer data={data.clone()} on_update={on_update_data} /> }
             } else {
                 if !*loading {
                     html! { <div class="text-gray-500 italic">{"Please upload a keymap file to start editing."}</div> }
@@ -234,6 +311,7 @@ pub fn KeymapHome() -> Html {
 #[derive(Properties, PartialEq)]
 pub struct RendererProps {
     pub data: KeymapData,
+    pub on_update: Callback<KeymapData>,
 }
 
 #[function_component]
@@ -368,6 +446,7 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                         on_close={close_popup.clone()}
                         show_param_selection={*show_param_selection}
                         on_toggle_param_selection={toggle_param_selection.clone()}
+                        on_update={props.on_update.clone()}
                     />
                 }
             } else {
@@ -384,24 +463,111 @@ pub struct PopupProps {
     pub on_close: Callback<MouseEvent>,
     pub show_param_selection: bool,
     pub on_toggle_param_selection: Callback<MouseEvent>,
+    pub on_update: Callback<KeymapData>,
+}
+
+#[derive(Serialize)]
+struct SaveKeymapRequest {
+    original_content: String,
+    data: KeymapData,
+}
+
+#[derive(Deserialize)]
+struct SaveKeymapResponse {
+    content: String,
 }
 
 #[function_component]
 fn KeyBindingPopup(props: &PopupProps) -> Html {
+    let filter = use_state(|| String::new());
     let binding = &props.data.layers[props.selected_key.layer_index].bindings[props.selected_key.key_index];
     
     // Split binding into behavior and parameters
     let parts: Vec<&str> = binding.split_whitespace().collect();
-    let behavior_label = parts.get(0).cloned().unwrap_or("");
-    let params = parts[1..].to_vec();
+    let initial_behavior_label = parts.get(0).cloned().unwrap_or("");
+    let initial_params = parts[1..].iter().map(|&s| s.to_string()).collect::<Vec<String>>();
+
+    let current_behavior_label = use_state(|| initial_behavior_label.to_string());
+    let current_params = use_state(|| initial_params.clone());
+    let show_behavior_selection = use_state(|| false);
 
     // Find behavior in metadata
-    let behavior_name = behavior_label.strip_prefix('&').unwrap_or(behavior_label);
+    let behavior_name = current_behavior_label.strip_prefix('&').unwrap_or(&*current_behavior_label);
     let behavior_meta = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name);
 
     let display_name = behavior_meta.and_then(|m| m.display_name).unwrap_or(behavior_name);
 
     let selected_param_idx = use_state(|| 0usize);
+
+    let on_apply = {
+        let on_update = props.on_update.clone();
+        let data = props.data.clone();
+        let selected_key = props.selected_key.clone();
+        let current_behavior_label = current_behavior_label.clone();
+        let current_params = current_params.clone();
+        let on_close = props.on_close.clone();
+        Callback::from(move |e: MouseEvent| {
+            let mut new_data = data.clone();
+            let mut new_binding = (*current_behavior_label).clone();
+            for p in &*current_params {
+                new_binding.push(' ');
+                new_binding.push_str(p);
+            }
+            new_data.layers[selected_key.layer_index].bindings[selected_key.key_index] = new_binding;
+            
+            // Manage #includes
+            let behavior_name = current_behavior_label.strip_prefix('&').unwrap_or(&*current_behavior_label);
+            if let Some(meta) = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name) {
+                if !meta.include_file.is_empty() && !new_data.includes.iter().any(|i| i == meta.include_file) {
+                    new_data.includes.push(meta.include_file.to_string());
+                }
+            }
+            
+            on_update.emit(new_data);
+            on_close.emit(e);
+        })
+    };
+
+    let select_behavior = {
+        let current_behavior_label = current_behavior_label.clone();
+        let current_params = current_params.clone();
+        let show_behavior_selection = show_behavior_selection.clone();
+        Callback::from(move |b: &'static behaviors::ZmkBehavior| {
+            let label = b.label.unwrap_or(b.name);
+            current_behavior_label.set(format!("&{}", label));
+            
+            // Adjust params count
+            let mut new_params = (*current_params).clone();
+            if new_params.len() < b.binding_cells as usize {
+                for i in new_params.len()..(b.binding_cells as usize) {
+                    let default_val = match b.parameter_metadata.get(i) {
+                        Some(ParameterType::Layer) => "0",
+                        Some(ParameterType::Keycode) => "A",
+                        _ => "UNKNOWN",
+                    };
+                    new_params.push(default_val.to_string());
+                }
+            } else if new_params.len() > b.binding_cells as usize {
+                new_params.truncate(b.binding_cells as usize);
+            }
+            current_params.set(new_params);
+            show_behavior_selection.set(false);
+        })
+    };
+
+    let select_param_value = {
+        let current_params = current_params.clone();
+        let selected_param_idx = selected_param_idx.clone();
+        let on_toggle_param_selection = props.on_toggle_param_selection.clone();
+        Callback::from(move |val: String| {
+            let mut new_params = (*current_params).clone();
+            if let Some(p) = new_params.get_mut(*selected_param_idx) {
+                *p = val;
+            }
+            current_params.set(new_params);
+            on_toggle_param_selection.emit(MouseEvent::new("click").unwrap());
+        })
+    };
 
     // Mini-map scaling
     let mut max_x = 0;
@@ -411,7 +577,14 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let u_pos = if max_x > 20000 { 19050.0 } else if max_x > 500 { 1000.0 } else { 100.0 };
     let mini_scale = 10.0 / u_pos;
 
-    let preview_parts = get_binding_parts(binding);
+    // Use current states for preview
+    let mut current_binding_full = (*current_behavior_label).clone();
+    for p in &*current_params {
+        current_binding_full.push(' ');
+        current_binding_full.push_str(p);
+    }
+    let preview_parts = get_binding_parts(&current_binding_full);
+    
     let selected_pk = &props.data.physical_layout[props.selected_key.key_index];
     let rotation_deg = selected_pk.rotation as f32 / 1000.0;
     let preview_style = format!("transform: rotate({}deg);", rotation_deg);
@@ -464,12 +637,35 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     <div class="mb-6">
                         <div class="flex items-center space-x-4">
                             <span class="text-xl font-semibold w-24">{"Behavior"}</span>
-                            <div class="flex items-center space-x-2 bg-gray-800 px-3 py-1 rounded border border-gray-600 border-dashed">
-                                <span class="text-gray-300 font-mono">{behavior_label}</span>
+                            <div 
+                                onclick={let show = show_behavior_selection.clone(); Callback::from(move |_| show.set(!*show))}
+                                class="flex items-center space-x-2 bg-gray-800 px-3 py-1 rounded border border-gray-600 border-dashed cursor-pointer hover:bg-gray-700"
+                            >
+                                <span class="text-gray-300 font-mono">{&*current_behavior_label}</span>
                                 <span class="text-gray-500">{"|"}</span>
                                 <span class="text-gray-300">{display_name}</span>
                             </div>
                         </div>
+                        
+                        { if *show_behavior_selection {
+                            html! {
+                                <div class="mt-4 grid grid-cols-3 gap-2 max-h-48 overflow-y-auto bg-black p-2 rounded border border-gray-700">
+                                    { for ZMK_BEHAVIORS.iter().map(|b| {
+                                        let b_c = b;
+                                        let onclick = {
+                                            let select = select_behavior.clone();
+                                            Callback::from(move |_| select.emit(b_c))
+                                        };
+                                        html! {
+                                            <div onclick={onclick} class="p-2 text-xs hover:bg-gray-800 cursor-pointer rounded border border-gray-800">
+                                                <div class="font-mono text-blue-400">{"&"}{b.label.unwrap_or(b.name)}</div>
+                                                <div class="text-gray-500 truncate">{b.display_name.unwrap_or("")}</div>
+                                            </div>
+                                        }
+                                    })}
+                                </div>
+                            }
+                        } else { html! {} }}
                     </div>
 
                     // Parameters
@@ -479,7 +675,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                             html! {
                                 <div class="flex flex-col space-y-4 ml-8">
                                 { for meta.parameter_metadata.iter().enumerate().map(|(i, ptype)| {
-                                    let value = params.get(i).cloned().unwrap_or("");
+                                    let value = current_params.get(i).cloned().unwrap_or("".to_string());
                                     let label = match ptype {
                                         ParameterType::Layer => "Layer",
                                         ParameterType::Keycode => "Keycode",
@@ -489,8 +685,11 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                     let display_value = match ptype {
                                         ParameterType::Layer => {
                                             if let Ok(idx) = value.parse::<usize>() {
-                                                props.data.layers.get(idx).map(|l| l.name.as_str()).unwrap_or("unknown")
-                                            } else { "unknown" }.to_string()
+                                                props.data.layers.get(idx).map(|l| l.name.as_str()).unwrap_or(&value)
+                                            } else {
+                                                // Try to find by name
+                                                props.data.layers.iter().find(|l| l.name == value).map(|l| l.name.as_str()).unwrap_or(&value)
+                                            }.to_string()
                                         }
                                         ParameterType::Keycode => format_keycode(&value),
                                         _ => value.to_string(),
@@ -542,7 +741,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
 
                     // Actions
                     <div class="flex justify-center space-x-4">
-                        <button class="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded font-semibold transition-colors">
+                        <button onclick={on_apply} class="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded font-semibold transition-colors">
                             {"Apply"}
                         </button>
                         <button onclick={props.on_close.clone()} class="bg-gray-700 hover:bg-gray-600 text-white px-8 py-2 rounded font-semibold transition-colors">
@@ -561,9 +760,12 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                             <div class="w-64 bg-black border-l border-gray-700 flex flex-col">
                                 <div class="flex-1 overflow-y-auto">
                                     { for props.data.layers.iter().enumerate().map(|(i, l)| {
-                                        let is_active = params.get(p_idx).map(|p| *p == i.to_string()).unwrap_or(false);
+                                        let is_active = current_params.get(p_idx).map(|p| *p == i.to_string()).unwrap_or(false);
+                                        let val = i.to_string();
+                                        let select = select_param_value.clone();
+                                        let onclick = Callback::from(move |_| select.emit(val.clone()));
                                         html! {
-                                            <div class={classes!(
+                                            <div onclick={onclick} class={classes!(
                                                 "p-4", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors",
                                                 if is_active { "bg-white text-black" } else { "" }
                                             )}>
@@ -579,6 +781,55 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                     </button>
                                 </div>
                             </div>
+                        },
+                        ParameterType::Keycode => {
+                            let on_filter_input = {
+                                let filter = filter.clone();
+                                Callback::from(move |e: InputEvent| {
+                                    let input: HtmlInputElement = e.target_unchecked_into();
+                                    filter.set(input.value().to_uppercase());
+                                })
+                            };
+                            
+                            let filter_val = (*filter).clone();
+                            html! {
+                                <div class="w-64 bg-black border-l border-gray-700 flex flex-col">
+                                    <div class="p-2 border-b border-gray-700">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search keycode..." 
+                                            class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            oninput={on_filter_input}
+                                            value={filter_val.clone()}
+                                        />
+                                    </div>
+                                    <div class="flex-1 overflow-y-auto">
+                                        { for keycodes::KEY_ALIASES.iter()
+                                            .filter(|(&k, &v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val))
+                                            .map(|(&k, &v)| {
+                                            let val = k.to_string();
+                                            let select = select_param_value.clone();
+                                            let is_active = current_params.get(p_idx).map(|p| *p == val).unwrap_or(false);
+                                            let val_c = val.clone();
+                                            let onclick = Callback::from(move |_| select.emit(val_c.clone()));
+                                            html! {
+                                                <div onclick={onclick} class={classes!(
+                                                    "p-2", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "text-xs",
+                                                    if is_active { "bg-white text-black" } else { "" }
+                                                )}>
+                                                    <div class="font-bold font-mono">{val}</div>
+                                                    <div class={if is_active { "text-gray-600" } else { "text-gray-400" }}>{v}</div>
+                                                </div>
+                                            }
+                                        })}
+                                    </div>
+                                    <div class="p-2 flex justify-center border-t border-gray-700">
+                                        <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center">
+                                            <span class="rotate-90 inline-block mr-1">{"Close"}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
                         },
                         _ => html! {
                             <div class="w-64 bg-black border-l border-gray-700 flex flex-col items-center justify-center p-4 text-center">
