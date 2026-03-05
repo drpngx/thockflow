@@ -982,18 +982,16 @@ fn get_keycode_suggestions(query: &str, only_regular: bool, is_tap_param: bool, 
     let mut results = Vec::new();
 
     if !only_mods {
-        if !only_regular || is_tap_param {
-            for c in 'A'..='Z' {
-                let k = c.to_string();
-                if k.contains(&query) {
-                    results.push(Suggestion { value: k.clone(), display: k });
-                }
+        for c in 'A'..='Z' {
+            let k = c.to_string();
+            if k.contains(&query) {
+                results.push(Suggestion { value: k.clone(), display: k });
             }
-            for i in 0..=9 {
-                let k = format!("N{}", i);
-                if k.contains(&query) {
-                    results.push(Suggestion { value: k.clone(), display: k });
-                }
+        }
+        for i in 0..=9 {
+            let k = format!("N{}", i);
+            if k.contains(&query) {
+                results.push(Suggestion { value: k.clone(), display: k });
             }
         }
         for i in 1..=24 {
@@ -1130,7 +1128,14 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
         move || -> Vec<Suggestion> {
             let parts: Vec<&str> = text.split_whitespace().collect(); let has_trailing_space = text.ends_with(' ');
             let mut results: Vec<Suggestion> = if text.is_empty() || (text == "&" && !has_trailing_space) {
-                ZMK_BEHAVIORS.iter().map(|b| { let val = format!("&{}", b.label.unwrap_or(b.name)); let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() }; Suggestion { value: val, display: disp } }).collect()
+                let mut bh_results: Vec<Suggestion> = ZMK_BEHAVIORS.iter().map(|b| { let val = format!("&{}", b.label.unwrap_or(b.name)); let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() }; Suggestion { value: val, display: disp } }).collect();
+                
+                // Also include &kp suggestions for alphabetic keys when empty/&
+                for c in 'A'..='Z' {
+                    let k = c.to_string();
+                    bh_results.push(Suggestion { value: format!("&kp {}", k), display: format!("&kp {}", k) });
+                }
+                bh_results
             } else if !has_trailing_space && parts.len() == 1 {
                 let query = parts[0].to_uppercase();
                 let mut bh_results: Vec<Suggestion> = ZMK_BEHAVIORS.iter().map(|b| {
