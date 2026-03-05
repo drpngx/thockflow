@@ -1,7 +1,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary", "js_run_devserver", "js_test")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
-load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@rules_rust_wasm_bindgen//:defs.bzl", "rust_wasm_bindgen")
 load("//emsdk:emsdk.bzl", "wasmopt")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
@@ -93,6 +93,17 @@ rust_library(
         },
         "//conditions:default": {},
     }),
+    deps = all_crate_deps(
+        normal = True,
+    ),
+)
+
+rust_test(
+    name = "thockflow_test",
+    crate = ":thockflow",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+    ),
     deps = all_crate_deps(
         normal = True,
     ),

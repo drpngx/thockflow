@@ -1,4 +1,5 @@
 mod typing;
+pub mod keymap;
 
 use std::collections::HashMap;
 
@@ -19,6 +20,8 @@ pub enum Route {
     Home,
     #[at("/typing")]
     Typing,
+    #[at("/keymap")]
+    Keymap,
 }
 
 #[derive(Properties, PartialEq, Debug, Default)]
@@ -77,6 +80,11 @@ fn Navbar() -> Html {
                         {"Typing"}
                     </button>
                 </Link<Route>>
+                <Link<Route> classes="p-4 text-3xl  " to={Route::Keymap}>
+                    <button >
+                        {"Keymap"}
+                    </button>
+                </Link<Route>>
                 <a class="p-4 text-3xl" href="https://github.com/drpngx/thockflow">{"GitHub"}</a>
             </div>
         </div>
@@ -121,6 +129,13 @@ fn switch(route: Route) -> Html {
                         <div class="w-full font-body flex px-2 flex-col items-center place-content-around">
                             <div class="flex flex-col">
                                 <typing::TypingHome />
+                            </div>
+                        </div>
+                    },
+                    Route::Keymap => html! {
+                        <div class="w-full font-body flex px-2 flex-col items-center place-content-around">
+                            <div class="flex flex-col">
+                                <keymap::KeymapHome />
                             </div>
                         </div>
                     },

@@ -1,13 +1,28 @@
 load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_load", "oci_push")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
-load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("//tools:platform_transitions.bzl", "platform_passthrough")
+
+rust_binary(
+    name = "zmk_behaviors",
+    srcs = ["src/bin/zmk_behaviors.rs"],
+    crate_features = ["runfiles"],
+    data = ["@zmk//:behaviors"],
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        "//:thockflow",
+        "@rules_rust//tools/runfiles",
+    ],
+)
 
 rust_binary(
     name = "server",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),
+    compile_data = ["//:static/hshs52.keymap"],
     data = [
         "//:app_wasm",
         "//:static_files",
@@ -23,6 +38,18 @@ rust_binary(
         "//:fastbuild": [],
         "//conditions:default": [],
     }),
+    deps = all_crate_deps(
+        normal = True,
+    ) + ["//:thockflow"],
+)
+
+rust_test(
+    name = "server_test",
+    crate = ":server",
+    compile_data = ["//:static/hshs52.keymap"],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+    ),
     deps = all_crate_deps(
         normal = True,
     ) + ["//:thockflow"],

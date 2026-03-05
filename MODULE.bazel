@@ -96,6 +96,7 @@ crate_index.from_cargo(
     generate_binaries = True,
     manifests = [
         "//:Cargo.toml",
+        "//server:Cargo.toml",
     ],
 )
 use_repo(
@@ -201,4 +202,21 @@ register_toolchains(
     "//emsdk:emsdk_mac_toolchain",
     "//emsdk:emsdk_linux_toolchain",
     "//emsdk:emsdk_win_toolchain",
+)
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "zmk",
+    build_file_content = """
+filegroup(
+    name = "behaviors",
+    srcs = glob(["app/dts/behaviors.dtsi", "app/dts/behaviors/**"]),
+    visibility = ["//visibility:public"],
+)
+exports_files(glob(['**']))
+""",
+    sha256 = "edc66c6eecabcca4b06b25e041af71a3dff656a322725e6f1c63d97aa8b31732",
+    strip_prefix = "zmk-a23aa009d7a07d67fe5609caca7372e16610f238",
+    urls = ["https://github.com/zmkfirmware/zmk/archive/a23aa009d7a07d67fe5609caca7372e16610f238.zip"],
 )

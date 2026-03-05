@@ -9,6 +9,8 @@ thockflow = { path = ".." }
 axum = "0.5"
 clap = { version = "3.1.7", features = ["derive"] }
 env_logger = "0.9"
+hyper = { version = "0.14", features = ["full"] }
+log = "0.4"
 num_cpus = "1.13"
 once_cell = "1.5"
 tokio = { version = "1.15.0", features = ["full"] }
@@ -21,4 +23,14 @@ yew = { version = "0.21", features = ["ssr"] }
 yew-router = { version = "0.18" }
 futures = "0.3.21"
 lazy_static = "1.4.0"
-lambda-web = { version = "0.2.0", features = ["hyper"] }
+lambda-web = { version = "0.2.1", features = ["hyper"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tree-sitter = "0.25"
+tree-sitter-devicetree = "0.15"
+regex = "1"
+runfiles = { version = "0.1", optional = true }
+
+[features]
+default = []
+runfiles = ["dep:runfiles"]
