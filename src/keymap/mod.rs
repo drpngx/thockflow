@@ -270,6 +270,7 @@ pub fn KeymapHome() -> Html {
                         oninput={on_file_input}
                         class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
                     />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{"Type "} <kbd class="px-1.5 py-0.5 font-sans font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">{"j"}</kbd> {" to start jump mode"}</p>
                 </div>
                 { if keymap_data.is_some() {
                     html! {
@@ -319,6 +320,22 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
     let current_layer = use_state(|| 0);
     let selected_key = use_state(|| None::<SelectedKey>);
     let show_param_selection = use_state(|| false);
+    
+    // Jump mode state
+    let jump_mode_active = use_state(|| false);
+    let jump_input = use_state(|| String::new());
+    let container_ref = use_node_ref();
+
+    // Auto-focus on mount
+    {
+        let container_ref = container_ref.clone();
+        use_effect(move || {
+            if let Some(element) = container_ref.cast::<web_sys::HtmlElement>() {
+                let _ = element.focus();
+            }
+            || ()
+        });
+    }
 
     let layer = &props.data.layers[*current_layer];
 
@@ -355,12 +372,93 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
         })
     };
 
+    // Hint generation logic: spatial-aware (row-by-row)
+    // We sort indices by their physical position to assign "easier" hints to earlier keys
+    let mut key_indices: Vec<usize> = (0..props.data.physical_layout.len()).collect();
+    key_indices.sort_by(|&a, &b| {
+        let ka = &props.data.physical_layout[a];
+        let kb = &props.data.physical_layout[b];
+        // Sort by row (y) then column (x)
+        // Group by y in buckets of say 10 units to handle slight misalignments
+        let ya = ka.y / 10;
+        let yb = kb.y / 10;
+        ya.cmp(&yb).then(ka.x.cmp(&kb.x))
+    });
+
+    let hint_chars = "asdfghjklqwertyuiopzxcvbnm";
+    let mut hints = vec![String::new(); props.data.physical_layout.len()];
+    for (i, &original_idx) in key_indices.iter().enumerate() {
+        if i < hint_chars.len() * hint_chars.len() {
+            let c1 = hint_chars.chars().nth(i / hint_chars.len()).unwrap();
+            let c2 = hint_chars.chars().nth(i % hint_chars.len()).unwrap();
+            hints[original_idx] = format!("{}{}", c1, c2);
+        }
+    }
+
+    let on_keydown = {
+        let jump_mode_active = jump_mode_active.clone();
+        let jump_input = jump_input.clone();
+        let selected_key = selected_key.clone();
+        let on_key_click = on_key_click.clone();
+        let hints_c = hints.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            // If we are in a popup or input, don't handle jump keys here
+            // But KeymapRenderer only has the container focused if no popup is open?
+            // Actually, SelectedKey being Some means a popup is open.
+            if selected_key.is_some() {
+                return;
+            }
+
+            if *jump_mode_active {
+                match e.key().as_str() {
+                    "Enter" | "Escape" => {
+                        jump_mode_active.set(false);
+                        jump_input.set(String::new());
+                        e.prevent_default();
+                    }
+                    key if key.len() == 1 && hint_chars.contains(key) => {
+                        let mut new_input = (*jump_input).clone();
+                        new_input.push_str(key);
+                        
+                        // Check if we matched a hint
+                        if let Some(idx) = hints_c.iter().position(|h| h == &new_input) {
+                            on_key_click.emit(idx);
+                            jump_mode_active.set(false);
+                            jump_input.set(String::new());
+                        } else {
+                            // Check if any hint still starts with this prefix
+                            if hints_c.iter().any(|h| h.starts_with(&new_input)) {
+                                jump_input.set(new_input);
+                            } else {
+                                // Invalid second char, reset or ignore?
+                                // Ace-jump usually ignores or resets. Let's just not update if it doesn't match anything.
+                            }
+                        }
+                        e.prevent_default();
+                    }
+                    _ => {}
+                }
+            } else {
+                if e.key() == "j" {
+                    jump_mode_active.set(true);
+                    jump_input.set(String::new());
+                    e.prevent_default();
+                }
+            }
+        })
+    };
+
     let close_popup = {
         let selected_key = selected_key.clone();
         let show_param_selection = show_param_selection.clone();
+        let container_ref = container_ref.clone();
         Callback::from(move |_: MouseEvent| {
             selected_key.set(None);
             show_param_selection.set(false);
+            // Re-focus container when popup closes
+            if let Some(element) = container_ref.cast::<web_sys::HtmlElement>() {
+                let _ = element.focus();
+            }
         })
     };
 
@@ -372,7 +470,12 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
     };
 
     html! {
-        <div class="flex flex-col items-center w-full mt-4">
+        <div 
+            ref={container_ref}
+            tabindex="0"
+            onkeydown={on_keydown}
+            class="flex flex-col items-center w-full mt-4 focus:outline-none"
+        >
             <div class={classes!("flex", "flex-wrap", "justify-center", "gap-2", "mb-8", "bg-gray-100", "dark:bg-gray-800", "p-2", "rounded-2xl", "shadow-inner", "border", "border-gray-200", "dark:border-gray-700")}>
                 { for props.data.layers.iter().enumerate().map(|(i, l)| {
                     let is_active = i == *current_layer;
@@ -412,6 +515,9 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                         Callback::from(move |_| on_key_click.emit(i))
                     };
 
+                    let hint = hints.get(i);
+                    let show_hint = *jump_mode_active && hint.map(|h| h.starts_with(&*jump_input)).unwrap_or(false);
+
                     html! {
                         <div 
                             onclick={onclick}
@@ -433,6 +539,21 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                             } else { html! {} }}
 
                             <span class="truncate px-1 pointer-events-none text-[10px]">{&parts.center}</span>
+
+                            { if show_hint {
+                                let h = hint.unwrap();
+                                let (prefix, suffix) = if jump_input.is_empty() {
+                                    ("", h.as_str())
+                                } else {
+                                    (&h[..jump_input.len()], &h[jump_input.len()..])
+                                };
+                                html! {
+                                    <div class="absolute top-0 left-0 bg-yellow-400 dark:bg-yellow-600 px-0.5 z-30 font-bold text-[10px] text-black dark:text-white rounded-tl-md rounded-br-md shadow-sm pointer-events-none leading-tight border-r border-b border-yellow-500 dark:border-yellow-700">
+                                        <span class="opacity-40">{prefix}</span>
+                                        <span>{suffix}</span>
+                                    </div>
+                                }
+                            } else { html! {} }}
                         </div>
                     }
                 })}
@@ -455,6 +576,7 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
         </div>
     }
 }
+
 
 #[derive(Properties, PartialEq)]
 pub struct PopupProps {
@@ -487,7 +609,31 @@ struct Suggestion {
 fn KeyBindingPopup(props: &PopupProps) -> Html {
     let filter = use_state(|| String::new());
     let suggestion_container_ref = use_node_ref();
+    let input_ref = use_node_ref();
     let binding = &props.data.layers[props.selected_key.layer_index].bindings[props.selected_key.key_index];
+
+    // Aggressive auto-focus input when a key is selected
+    {
+        let input_ref = input_ref.clone();
+        use_effect_with(props.selected_key.clone(), move |_| {
+            let timeout_cb = Closure::wrap(Box::new(move || {
+                if let Some(input) = input_ref.cast::<web_sys::HtmlInputElement>() {
+                    let _ = input.focus();
+                    let _ = input.select();
+                }
+            }) as Box<dyn FnMut()>);
+            
+            let window = web_sys::window().expect("should have a window");
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                timeout_cb.as_ref().unchecked_ref(),
+                50, // 50ms delay to ensure DOM is ready and settled
+            );
+            
+            move || {
+                drop(timeout_cb);
+            }
+        });
+    }
     
     // Split binding into behavior and parameters
     let parts: Vec<&str> = binding.split_whitespace().collect();
@@ -950,6 +1096,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     // Text Input
                     <div class="mb-6 shrink-0">
                         <input 
+                            ref={input_ref}
                             type="text" 
                             class={classes!(
                                 "w-full", "bg-gray-900", "border", "text-2xl", "p-4", "rounded", "font-mono", "focus:outline-none",
@@ -961,7 +1108,6 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                 update.emit(input.value());
                             })}
                             onkeydown={on_keydown}
-                            autofocus=true
                         />
                         { if !is_valid {
                             html! { <div class="text-red-400 text-sm mt-1">{"Invalid binding: incomplete or incorrect parameters."}</div> }
