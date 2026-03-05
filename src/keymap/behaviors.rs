@@ -6,6 +6,8 @@
 pub enum ParameterType {
     Layer,
     Keycode,
+    Modifier,
+    Constant,
     None,
 }
 
@@ -75,18 +77,18 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
     ZmkBehavior {
         name: "mouse_scroll",
         label: Some("msc"),
-        display_name: None,
+        display_name: Some("Mouse Scroll"),
         binding_cells: 1,
         include_file: "mouse_scroll.dtsi",
         is_default: false,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
         name: "z_so_off",
         label: Some("soft_off"),
-        display_name: None,
+        display_name: Some("Soft Off"),
         binding_cells: 0,
         include_file: "soft_off.dtsi",
         is_default: true,
@@ -101,7 +103,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "outputs.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -112,7 +114,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "mouse_key_press.dtsi",
         is_default: false,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -123,7 +125,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "mod_tap.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::Keycode,
+            ParameterType::Modifier,
             ParameterType::Keycode,
         ],
     },
@@ -169,8 +171,8 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "bluetooth.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
-            ParameterType::None,
+            ParameterType::Constant,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -197,12 +199,12 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
     ZmkBehavior {
         name: "mouse_move",
         label: Some("mmv"),
-        display_name: None,
+        display_name: Some("Mouse Move"),
         binding_cells: 1,
         include_file: "mouse_move.dtsi",
         is_default: false,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -224,8 +226,8 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "backlight.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
-            ParameterType::None,
+            ParameterType::Constant,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -246,7 +248,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "ext_power.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -257,8 +259,8 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "rgb_underglow.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
-            ParameterType::None,
+            ParameterType::Constant,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -269,7 +271,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "key_toggle.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Keycode,
         ],
     },
     ZmkBehavior {
@@ -310,7 +312,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "macros.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -321,7 +323,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "macros.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Constant,
         ],
     },
     ZmkBehavior {
@@ -392,7 +394,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "sticky_key.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Modifier,
         ],
     },
     ZmkBehavior {
@@ -403,7 +405,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "sticky_key.dtsi",
         is_default: true,
         parameter_metadata: &[
-            ParameterType::None,
+            ParameterType::Layer,
         ],
     },
 ];

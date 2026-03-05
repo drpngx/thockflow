@@ -477,9 +477,16 @@ struct SaveKeymapResponse {
     content: String,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+struct Suggestion {
+    value: String,
+    display: String,
+}
+
 #[function_component]
 fn KeyBindingPopup(props: &PopupProps) -> Html {
     let filter = use_state(|| String::new());
+    let suggestion_container_ref = use_node_ref();
     let binding = &props.data.layers[props.selected_key.layer_index].bindings[props.selected_key.key_index];
     
     // Split binding into behavior and parameters
@@ -487,9 +494,14 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let initial_behavior_label = parts.get(0).cloned().unwrap_or("");
     let initial_params = parts[1..].iter().map(|&s| s.to_string()).collect::<Vec<String>>();
 
+    let current_text = use_state(|| binding.clone());
     let current_behavior_label = use_state(|| initial_behavior_label.to_string());
     let current_params = use_state(|| initial_params.clone());
     let show_behavior_selection = use_state(|| false);
+    
+    // Autocomplete / Suggestions state
+    let suggestion_index = use_state(|| 0usize);
+    let show_suggestions = use_state(|| false);
 
     // Find behavior in metadata
     let behavior_name = current_behavior_label.strip_prefix('&').unwrap_or(&*current_behavior_label);
@@ -499,6 +511,81 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
 
     let selected_param_idx = use_state(|| 0usize);
 
+    // Heuristic for "Modifier-only" parameter (for &sk and the first param of &mt)
+    let is_modifier_only_param = |behavior_name: &str, param_idx: usize| {
+        behavior_name == "sk" || (behavior_name == "mt" && param_idx == 0)
+    };
+
+    // Tricky behaviors that have variable parameter counts based on the first parameter
+    let get_expected_param_count = |behavior_label: &str, params: &[String]| -> usize {
+        let behavior_name = behavior_label.strip_prefix('&').unwrap_or(behavior_label);
+        if let Some(meta) = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name) {
+            if behavior_name == "bt" {
+                if let Some(cmd) = params.get(0) {
+                    if cmd == "BT_SEL" || cmd == "BT_DISC" {
+                        return 2;
+                    } else {
+                        return 1;
+                    }
+                }
+                return 1; // Default to 1 if no params yet
+            }
+            return meta.binding_cells as usize;
+        }
+        params.len() // Fallback
+    };
+
+    let expected_p_count = get_expected_param_count(&*current_behavior_label, &*current_params);
+
+    let is_valid = {
+        if let Some(meta) = behavior_meta {
+            if current_params.len() != expected_p_count {
+                false
+            } else {
+                let mut all_valid = true;
+                for (i, p) in current_params.iter().enumerate() {
+                    if p == "UNKNOWN" { 
+                        all_valid = false;
+                        break;
+                    }
+                    if let Some(ptype) = meta.parameter_metadata.get(i) {
+                        match ptype {
+                            ParameterType::Layer => {
+                                // Must be a number or a valid layer name
+                                if p.parse::<usize>().is_err() && !props.data.layers.iter().any(|l| &l.name == p) {
+                                    all_valid = false;
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                all_valid
+            }
+        } else {
+            false // Unknown behavior is invalid
+        }
+    };
+
+    let update_from_text = {
+        let current_text = current_text.clone();
+        let current_behavior_label = current_behavior_label.clone();
+        let current_params = current_params.clone();
+        let show_suggestions = show_suggestions.clone();
+        Callback::from(move |text: String| {
+            current_text.set(text.clone());
+            let parts: Vec<&str> = text.split_whitespace().collect();
+            let new_behavior = parts.get(0).map(|&s| s.to_string()).unwrap_or_default();
+            
+            let params = parts[1..].iter().map(|&s| s.to_string()).collect::<Vec<String>>();
+            
+            current_behavior_label.set(new_behavior);
+            current_params.set(params);
+            show_suggestions.set(true);
+        })
+    };
+
     let on_apply = {
         let on_update = props.on_update.clone();
         let data = props.data.clone();
@@ -506,7 +593,9 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
         let current_behavior_label = current_behavior_label.clone();
         let current_params = current_params.clone();
         let on_close = props.on_close.clone();
+        let is_valid = is_valid;
         Callback::from(move |e: MouseEvent| {
+            if !is_valid { return; }
             let mut new_data = data.clone();
             let mut new_binding = (*current_behavior_label).clone();
             for p in &*current_params {
@@ -531,26 +620,25 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let select_behavior = {
         let current_behavior_label = current_behavior_label.clone();
         let current_params = current_params.clone();
+        let current_text = current_text.clone();
         let show_behavior_selection = show_behavior_selection.clone();
         Callback::from(move |b: &'static behaviors::ZmkBehavior| {
-            let label = b.label.unwrap_or(b.name);
-            current_behavior_label.set(format!("&{}", label));
+            let label = format!("&{}", b.label.unwrap_or(b.name));
+            current_behavior_label.set(label.clone());
             
-            // Adjust params count
-            let mut new_params = (*current_params).clone();
-            if new_params.len() < b.binding_cells as usize {
-                for i in new_params.len()..(b.binding_cells as usize) {
-                    let default_val = match b.parameter_metadata.get(i) {
-                        Some(ParameterType::Layer) => "0",
-                        Some(ParameterType::Keycode) => "A",
-                        _ => "UNKNOWN",
-                    };
-                    new_params.push(default_val.to_string());
-                }
-            } else if new_params.len() > b.binding_cells as usize {
-                new_params.truncate(b.binding_cells as usize);
+            // For behavior selection via UI, we force NEW parameters to be UNKNOWN
+            let mut new_params = Vec::new();
+            for _ in 0..b.binding_cells {
+                new_params.push("UNKNOWN".to_string());
             }
-            current_params.set(new_params);
+            current_params.set(new_params.clone());
+            
+            let mut text = label;
+            for p in &new_params {
+                text.push(' ');
+                text.push_str(p);
+            }
+            current_text.set(text);
             show_behavior_selection.set(false);
         })
     };
@@ -558,14 +646,242 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let select_param_value = {
         let current_params = current_params.clone();
         let selected_param_idx = selected_param_idx.clone();
+        let current_text = current_text.clone();
+        let current_behavior_label = current_behavior_label.clone();
         let on_toggle_param_selection = props.on_toggle_param_selection.clone();
+        let behavior_name_str = behavior_name.to_string();
         Callback::from(move |val: String| {
             let mut new_params = (*current_params).clone();
             if let Some(p) = new_params.get_mut(*selected_param_idx) {
-                *p = val;
+                *p = val.clone();
             }
-            current_params.set(new_params);
+            
+            // Special handling for dynamic parameter counts (like &bt)
+            if behavior_name_str == "bt" && *selected_param_idx == 0 {
+                if val == "BT_SEL" || val == "BT_DISC" {
+                    if new_params.len() < 2 {
+                        new_params.push("0".to_string());
+                    }
+                } else {
+                    if new_params.len() > 1 {
+                        new_params.truncate(1);
+                    }
+                }
+            }
+            
+            current_params.set(new_params.clone());
+            
+            let mut text = (*current_behavior_label).clone();
+            for p in &new_params {
+                text.push(' ');
+                text.push_str(p);
+            }
+            current_text.set(text);
             on_toggle_param_selection.emit(MouseEvent::new("click").unwrap());
+        })
+    };
+
+    // Autocomplete logic
+    let get_suggestions = {
+        let text = (*current_text).clone();
+        let behavior_meta = behavior_meta;
+        let props_data = props.data.clone();
+        move || -> Vec<Suggestion> {
+            let parts: Vec<&str> = text.split_whitespace().collect();
+            let has_trailing_space = text.ends_with(' ');
+            
+            let mut results: Vec<Suggestion> = if text.is_empty() || (text == "&" && !has_trailing_space) {
+                ZMK_BEHAVIORS.iter().map(|b| {
+                    let val = format!("&{}", b.label.unwrap_or(b.name));
+                    let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() };
+                    Suggestion { value: val, display: disp }
+                }).collect()
+            } else if !has_trailing_space && parts.len() == 1 {
+                let query = parts[0].to_uppercase();
+                ZMK_BEHAVIORS.iter()
+                    .map(|b| {
+                        let val = format!("&{}", b.label.unwrap_or(b.name));
+                        let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() };
+                        Suggestion { value: val, display: disp }
+                    })
+                    .filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query))
+                    .collect()
+            } else {
+                let p_idx = if has_trailing_space { parts.len() - 1 } else { parts.len() - 2 };
+                let query = if has_trailing_space { "" } else { parts.last().unwrap_or(&"") }.to_uppercase();
+                
+                if let Some(meta) = behavior_meta {
+                    if let Some(p_type) = meta.parameter_metadata.get(p_idx) {
+                        match p_type {
+                            ParameterType::Layer => {
+                                props_data.layers.iter().enumerate()
+                                    .map(|(i, l)| Suggestion { value: i.to_string(), display: format!("{} ({})", i, l.name) })
+                                    .filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query))
+                                    .collect()
+                            }
+                            ParameterType::Modifier => {
+                                keycodes::KEY_ALIASES.iter()
+                                    .filter(|(&k, _)| keycodes::is_modifier(k))
+                                    .map(|(&k, &v)| {
+                                        let val = k.to_string();
+                                        let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() };
+                                        Suggestion { value: val, display: disp }
+                                    })
+                                    .filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query))
+                                    .collect()
+                            }
+                            ParameterType::Keycode => {
+                                keycodes::KEY_ALIASES.iter()
+                                    .map(|(&k, &v)| {
+                                        let val = k.to_string();
+                                        let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() };
+                                        Suggestion { value: val, display: disp }
+                                    })
+                                    .filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query))
+                                    .collect()
+                            }
+                            ParameterType::Constant => {
+                                let behavior_name = behavior_meta.and_then(|m| Some(m.label.unwrap_or(m.name))).unwrap_or("");
+                                keycodes::KEY_ALIASES.iter()
+                                    .filter(|(&k, _)| {
+                                        match behavior_name {
+                                            "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k),
+                                            "mmv" => k.starts_with("MOVE_"),
+                                            "msc" => k.starts_with("SCROLL_"),
+                                            "bt" => k.starts_with("BT_"),
+                                            "rgb_ug" => k.starts_with("RGB_"),
+                                            "bl" => k.starts_with("BL_"),
+                                            "out" => k.starts_with("OUT_"),
+                                            "ext_power" => k.starts_with("EP_"),
+                                            _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || 
+                                                 k.starts_with("MOVE_") || k.starts_with("SCROLL_") || 
+                                                 ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k)
+                                        }
+                                    })
+                                    .map(|(&k, &v)| {
+                                        let val = k.to_string();
+                                        let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() };
+                                        Suggestion { value: val, display: disp }
+                                    })
+                                    .filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query))
+                                    .collect()
+                            }
+                            _ => Vec::new()
+                        }
+                    } else { Vec::new() }
+                } else { Vec::new() }
+            };
+
+            results.sort_by(|a, b| a.display.cmp(&b.display));
+            results
+        }
+    };
+
+    let suggestions = get_suggestions();
+
+    let on_keydown = {
+        let current_text = current_text.clone();
+        let update_from_text = update_from_text.clone();
+        let on_apply = on_apply.clone();
+        let on_close = props.on_close.clone();
+        let suggestions = suggestions.clone();
+        let suggestion_index = suggestion_index.clone();
+        let show_suggestions = show_suggestions.clone();
+        let suggestion_container_ref = suggestion_container_ref.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            match e.key().as_str() {
+                "Enter" => {
+                    e.prevent_default();
+                    if *show_suggestions && !suggestions.is_empty() {
+                        let selected = &suggestions[*suggestion_index].value;
+                        let parts: Vec<&str> = (*current_text).split_whitespace().collect();
+                        let has_trailing_space = (*current_text).ends_with(' ');
+                        let mut new_text = String::new();
+                        if has_trailing_space || parts.is_empty() {
+                            new_text = format!("{}{} ", *current_text, selected);
+                        } else {
+                            for (i, p) in parts.iter().enumerate() {
+                                if i == parts.len() - 1 {
+                                    new_text.push_str(selected);
+                                } else {
+                                    new_text.push_str(p);
+                                }
+                                new_text.push(' ');
+                            }
+                        }
+                        update_from_text.emit(new_text);
+                        show_suggestions.set(false);
+                    } else {
+                        on_apply.emit(MouseEvent::new("click").unwrap());
+                    }
+                }
+                "Escape" => {
+                    on_close.emit(MouseEvent::new("click").unwrap());
+                }
+                "Tab" => {
+                    if *show_suggestions && !suggestions.is_empty() {
+                        e.prevent_default();
+                        let selected = &suggestions[*suggestion_index].value;
+                        let parts: Vec<&str> = (*current_text).split_whitespace().collect();
+                        let has_trailing_space = (*current_text).ends_with(' ');
+                        let mut new_text = String::new();
+                        if has_trailing_space || parts.is_empty() {
+                            new_text = format!("{}{} ", *current_text, selected);
+                        } else {
+                            for (i, p) in parts.iter().enumerate() {
+                                if i == parts.len() - 1 {
+                                    new_text.push_str(selected);
+                                } else {
+                                    new_text.push_str(p);
+                                }
+                                new_text.push(' ');
+                            }
+                        }
+                        update_from_text.emit(new_text);
+                        show_suggestions.set(false);
+                    }
+                }
+                "ArrowDown" => {
+                    if *show_suggestions && !suggestions.is_empty() {
+                        e.prevent_default();
+                        let next_idx = (*suggestion_index + 1) % suggestions.len();
+                        suggestion_index.set(next_idx);
+                        
+                        // Scroll into view
+                        if let Some(container) = suggestion_container_ref.cast::<web_sys::Element>() {
+                            let items = container.get_elements_by_class_name("suggestion-item");
+                            if let Some(item) = items.get_with_index(next_idx as u32) {
+                                let item_el: web_sys::Element = item.dyn_into().unwrap();
+                                item_el.scroll_into_view_with_bool(false); // Scroll to bottom if needed
+                            }
+                        }
+                    }
+                }
+                "ArrowUp" => {
+                    if *show_suggestions && !suggestions.is_empty() {
+                        e.prevent_default();
+                        let next_idx = if *suggestion_index == 0 {
+                            suggestions.len() - 1
+                        } else {
+                            *suggestion_index - 1
+                        };
+                        suggestion_index.set(next_idx);
+                        
+                        // Scroll into view
+                        if let Some(container) = suggestion_container_ref.cast::<web_sys::Element>() {
+                            let items = container.get_elements_by_class_name("suggestion-item");
+                            if let Some(item) = items.get_with_index(next_idx as u32) {
+                                let item_el: web_sys::Element = item.dyn_into().unwrap();
+                                item_el.scroll_into_view_with_bool(true); // Scroll to top if needed
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    show_suggestions.set(true);
+                    suggestion_index.set(0);
+                }
+            }
         })
     };
 
@@ -602,10 +918,10 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
 
     html! {
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div class="bg-[#1a202c] text-white rounded-lg shadow-2xl flex max-w-4xl w-full overflow-hidden border border-gray-700">
-                <div class="flex-1 p-8">
+            <div class="bg-[#1a202c] text-white rounded-lg shadow-2xl flex max-w-5xl w-full overflow-hidden border border-gray-700 h-[80vh]">
+                <div class="flex-1 p-8 overflow-y-auto flex flex-col">
                     // Keyboard mini-map
-                    <div class="flex justify-center mb-8 relative h-32 w-full">
+                    <div class="flex justify-center mb-8 relative h-32 w-full shrink-0">
                         <div class="relative">
                             { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| {
                                 let is_selected = i == props.selected_key.key_index;
@@ -631,10 +947,31 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                         </div>
                     </div>
 
-                    <div class="border-t border-gray-700 my-6"></div>
+                    // Text Input
+                    <div class="mb-6 shrink-0">
+                        <input 
+                            type="text" 
+                            class={classes!(
+                                "w-full", "bg-gray-900", "border", "text-2xl", "p-4", "rounded", "font-mono", "focus:outline-none",
+                                if is_valid { vec!["border-gray-600", "focus:border-blue-500"] } else { vec!["border-red-500", "focus:border-red-400", "text-red-200"] }
+                            )}
+                            value={(*current_text).clone()}
+                            oninput={let update = update_from_text.clone(); Callback::from(move |e: InputEvent| {
+                                let input: HtmlInputElement = e.target_unchecked_into();
+                                update.emit(input.value());
+                            })}
+                            onkeydown={on_keydown}
+                            autofocus=true
+                        />
+                        { if !is_valid {
+                            html! { <div class="text-red-400 text-sm mt-1">{"Invalid binding: incomplete or incorrect parameters."}</div> }
+                        } else { html! {} }}
+                    </div>
+
+                    <div class="border-t border-gray-700 my-6 shrink-0"></div>
 
                     // Behavior Selection
-                    <div class="mb-6">
+                    <div class="mb-6 shrink-0">
                         <div class="flex items-center space-x-4">
                             <span class="text-xl font-semibold w-24">{"Behavior"}</span>
                             <div 
@@ -669,16 +1006,19 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     </div>
 
                     // Parameters
-                    <div class="mb-10">
+                    <div class="mb-10 grow overflow-y-auto">
                         <div class="text-xl font-semibold mb-4">{"Parameters"}</div>
                         { if let Some(meta) = behavior_meta {
                             html! {
                                 <div class="flex flex-col space-y-4 ml-8">
-                                { for meta.parameter_metadata.iter().enumerate().map(|(i, ptype)| {
-                                    let value = current_params.get(i).cloned().unwrap_or("".to_string());
+                                { for (0..expected_p_count).map(|i| {
+                                    let ptype = meta.parameter_metadata.get(i).cloned().unwrap_or(ParameterType::Constant);
+                                    let value = current_params.get(i).cloned().unwrap_or("UNKNOWN".to_string());
                                     let label = match ptype {
                                         ParameterType::Layer => "Layer",
                                         ParameterType::Keycode => "Keycode",
+                                        ParameterType::Modifier => "Modifier",
+                                        ParameterType::Constant => "Constant",
                                         ParameterType::None => "None",
                                     };
                                     
@@ -691,7 +1031,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                                 props.data.layers.iter().find(|l| l.name == value).map(|l| l.name.as_str()).unwrap_or(&value)
                                             }.to_string()
                                         }
-                                        ParameterType::Keycode => format_keycode(&value),
+                                        ParameterType::Keycode | ParameterType::Constant | ParameterType::Modifier => format_keycode(&value),
                                         _ => value.to_string(),
                                     };
 
@@ -720,7 +1060,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                                 onclick={onclick}
                                                 class={classes!(
                                                     "flex", "items-center", "space-x-2", "px-3", "py-1", "rounded", "border", "cursor-pointer",
-                                                    if is_active { "bg-green-600 border-green-400" } else { "bg-gray-800 border-gray-600 border-dashed" }
+                                                    if is_active { vec!["bg-green-600", "border-green-400"] } else if value == "UNKNOWN" { vec!["bg-red-900", "border-red-500", "border-dashed"] } else { vec!["bg-gray-800", "border-gray-600", "border-dashed"] }
                                                 )}
                                             >
                                                 <span class="font-mono">{value}</span>
@@ -740,85 +1080,94 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     </div>
 
                     // Actions
-                    <div class="flex justify-center space-x-4">
-                        <button onclick={on_apply} class="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded font-semibold transition-colors">
-                            {"Apply"}
-                        </button>
+                    <div class="flex justify-between space-x-4 mt-auto shrink-0 pt-4">
                         <button onclick={props.on_close.clone()} class="bg-gray-700 hover:bg-gray-600 text-white px-8 py-2 rounded font-semibold transition-colors">
                             {"Cancel"}
+                        </button>
+                        <button 
+                            disabled={!is_valid}
+                            onclick={on_apply} 
+                            class={classes!(
+                                "px-8", "py-2", "rounded", "font-semibold", "transition-colors",
+                                if is_valid { vec!["bg-green-600", "hover:bg-green-700", "text-white"] } else { vec!["bg-gray-800", "text-gray-500", "cursor-not-allowed"] }
+                            )}
+                        >
+                            {"Apply"}
                         </button>
                     </div>
                 </div>
 
-                // Side Panel for Parameter Selection
-                { if props.show_param_selection {
-                    let p_idx = *selected_param_idx;
-                    let p_type = behavior_meta.and_then(|m| m.parameter_metadata.get(p_idx)).cloned().unwrap_or(ParameterType::None);
-                    
-                    match p_type {
-                        ParameterType::Layer => html! {
-                            <div class="w-64 bg-black border-l border-gray-700 flex flex-col">
-                                <div class="flex-1 overflow-y-auto">
-                                    { for props.data.layers.iter().enumerate().map(|(i, l)| {
-                                        let is_active = current_params.get(p_idx).map(|p| *p == i.to_string()).unwrap_or(false);
-                                        let val = i.to_string();
-                                        let select = select_param_value.clone();
-                                        let onclick = Callback::from(move |_| select.emit(val.clone()));
+                // Side Panel for Autocomplete / Parameter Selection
+                <div class="w-80 bg-black border-l border-gray-700 flex flex-col h-full">
+                    { if *show_suggestions && !suggestions.is_empty() {
+                        let text_val = (*current_text).clone();
+                        let update = update_from_text.clone();
+                        let show_sug = show_suggestions.clone();
+                        html! {
+                            <div class="flex-1 flex flex-col overflow-hidden">
+                                <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest shrink-0">{"Suggestions"}</div>
+                                <div class="flex-1 overflow-y-auto" ref={suggestion_container_ref}>
+                                    { for suggestions.iter().enumerate().map(|(i, s)| {
+                                        let is_active = i == *suggestion_index;
+                                        let val = s.value.clone();
+                                        let text_val = text_val.clone();
+                                        let update = update.clone();
+                                        let show_sug = show_sug.clone();
+                                        let onclick = Callback::from(move |_| {
+                                            let parts: Vec<&str> = text_val.split_whitespace().collect();
+                                            let has_trailing_space = text_val.ends_with(' ');
+                                            let mut new_text = String::new();
+                                            if has_trailing_space || parts.is_empty() {
+                                                new_text = format!("{}{} ", text_val, val);
+                                            } else {
+                                                for (j, p) in parts.iter().enumerate() {
+                                                    if j == parts.len() - 1 {
+                                                        new_text.push_str(&val);
+                                                    } else {
+                                                        new_text.push_str(p);
+                                                    }
+                                                    new_text.push(' ');
+                                                }
+                                            }
+                                            update.emit(new_text);
+                                            show_sug.set(false);
+                                        });
                                         html! {
-                                            <div onclick={onclick} class={classes!(
-                                                "p-4", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors",
-                                                if is_active { "bg-white text-black" } else { "" }
-                                            )}>
-                                                <div class="font-bold">{i}</div>
-                                                <div class={if is_active { "text-gray-600 italic" } else { "text-gray-400 italic" }}>{&l.name}</div>
+                                            <div 
+                                                onclick={onclick}
+                                                class={classes!(
+                                                    "suggestion-item", "p-3", "border-b", "border-gray-900", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "font-mono", "text-sm",
+                                                    if is_active { vec!["bg-blue-900", "text-white", "border-blue-700"] } else { vec!["text-gray-300"] }
+                                                )}
+                                            >
+                                                {&s.display}
                                             </div>
                                         }
                                     })}
                                 </div>
-                                <div class="p-2 flex justify-center border-t border-gray-700">
-                                    <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center">
-                                        <span class="rotate-90 inline-block mr-1">{"Close"}</span>
-                                    </button>
-                                </div>
                             </div>
-                        },
-                        ParameterType::Keycode => {
-                            let on_filter_input = {
-                                let filter = filter.clone();
-                                Callback::from(move |e: InputEvent| {
-                                    let input: HtmlInputElement = e.target_unchecked_into();
-                                    filter.set(input.value().to_uppercase());
-                                })
-                            };
-                            
-                            let filter_val = (*filter).clone();
-                            html! {
-                                <div class="w-64 bg-black border-l border-gray-700 flex flex-col">
-                                    <div class="p-2 border-b border-gray-700">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search keycode..." 
-                                            class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                                            oninput={on_filter_input}
-                                            value={filter_val.clone()}
-                                        />
-                                    </div>
+                        }
+                    } else if props.show_param_selection {
+                        let p_idx = *selected_param_idx;
+                        let p_type = behavior_meta.and_then(|m| m.parameter_metadata.get(p_idx)).cloned().unwrap_or(ParameterType::None);
+                        
+                        match p_type {
+                            ParameterType::Layer => html! {
+                                <div class="flex-1 flex flex-col h-full">
+                                    <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest">{"Select Layer"}</div>
                                     <div class="flex-1 overflow-y-auto">
-                                        { for keycodes::KEY_ALIASES.iter()
-                                            .filter(|(&k, &v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val))
-                                            .map(|(&k, &v)| {
-                                            let val = k.to_string();
+                                        { for props.data.layers.iter().enumerate().map(|(i, l)| {
+                                            let is_active = current_params.get(p_idx).map(|p| *p == i.to_string()).unwrap_or(false);
+                                            let val = i.to_string();
                                             let select = select_param_value.clone();
-                                            let is_active = current_params.get(p_idx).map(|p| *p == val).unwrap_or(false);
-                                            let val_c = val.clone();
-                                            let onclick = Callback::from(move |_| select.emit(val_c.clone()));
+                                            let onclick = Callback::from(move |_| select.emit(val.clone()));
                                             html! {
                                                 <div onclick={onclick} class={classes!(
-                                                    "p-2", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "text-xs",
+                                                    "p-4", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors",
                                                     if is_active { "bg-white text-black" } else { "" }
                                                 )}>
-                                                    <div class="font-bold font-mono">{val}</div>
-                                                    <div class={if is_active { "text-gray-600" } else { "text-gray-400" }}>{v}</div>
+                                                    <div class="font-bold">{i}</div>
+                                                    <div class={if is_active { "text-gray-600 italic" } else { "text-gray-400 italic" }}>{&l.name}</div>
                                                 </div>
                                             }
                                         })}
@@ -829,20 +1178,76 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                         </button>
                                     </div>
                                 </div>
+                            },
+                            ParameterType::Keycode => {
+                                let filter_val = (*filter).clone();
+                                let behavior_name = behavior_meta.and_then(|m| Some(m.label.unwrap_or(m.name))).unwrap_or("");
+                                let only_mods = is_modifier_only_param(behavior_name, p_idx);
+                                
+                                html! {
+                                    <div class="flex-1 flex flex-col h-full">
+                                        <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest">
+                                            {if only_mods { "Select Modifier" } else { "Select Keycode" }}
+                                        </div>
+                                        <div class="p-2 border-b border-gray-700">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Search..." 
+                                                class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                                oninput={let filter = filter.clone(); Callback::from(move |e: InputEvent| {
+                                                    let input: HtmlInputElement = e.target_unchecked_into();
+                                                    filter.set(input.value().to_uppercase());
+                                                })}
+                                                value={filter_val.clone()}
+                                            />
+                                        </div>
+                                        <div class="flex-1 overflow-y-auto">
+                                            { for keycodes::KEY_ALIASES.iter()
+                                                .filter(|(&k, _)| !only_mods || keycodes::is_modifier(k))
+                                                .filter(|(&k, &v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val))
+                                                .map(|(&k, &v)| {
+                                                let val = k.to_string();
+                                                let select = select_param_value.clone();
+                                                let is_active = current_params.get(p_idx).map(|p| *p == val).unwrap_or(false);
+                                                let val_c = val.clone();
+                                                let onclick = Callback::from(move |_| select.emit(val_c.clone()));
+                                                html! {
+                                                    <div onclick={onclick} class={classes!(
+                                                        "p-2", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "text-xs",
+                                                        if is_active { "bg-white text-black" } else { "" }
+                                                    )}>
+                                                        <div class="font-bold font-mono">{val}</div>
+                                                        <div class={if is_active { "text-gray-600" } else { "text-gray-400" }}>{v}</div>
+                                                    </div>
+                                                }
+                                            })}
+                                        </div>
+                                        <div class="p-2 flex justify-center border-t border-gray-700">
+                                            <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center">
+                                                <span class="rotate-90 inline-block mr-1">{"Close"}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            },
+                            _ => html! {
+                                <div class="flex-1 flex flex-col items-center justify-center p-4 text-center">
+                                    <div class="text-gray-500 italic">{"Selection not implemented for this parameter type."}</div>
+                                    <button onclick={props.on_toggle_param_selection.clone()} class="mt-4 text-xs text-gray-400 hover:text-white uppercase tracking-widest">
+                                        {"Close"}
+                                    </button>
+                                </div>
                             }
-                        },
-                        _ => html! {
-                            <div class="w-64 bg-black border-l border-gray-700 flex flex-col items-center justify-center p-4 text-center">
-                                <div class="text-gray-500 italic">{"Selection not implemented for this parameter type."}</div>
-                                <button onclick={props.on_toggle_param_selection.clone()} class="mt-4 text-xs text-gray-400 hover:text-white uppercase tracking-widest">
-                                    {"Close"}
-                                </button>
+                        }
+                    } else {
+                        html! {
+                            <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-600">
+                                <div class="text-4xl mb-4">{"⌨️"}</div>
+                                <div class="text-sm">{"Type to see suggestions or click a parameter to select from list."}</div>
                             </div>
                         }
-                    }
-                } else {
-                    html! {}
-                }}
+                    }}
+                </div>
             </div>
         </div>
     }

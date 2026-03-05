@@ -61,10 +61,56 @@ lazy_static! {
         m.insert("DOWN", "↓");
         m.insert("HOME", "Home");
         m.insert("END", "End");
+        
+        // Mouse Emulation
+        m.insert("LCLK", "L-Click");
+        m.insert("RCLK", "R-Click");
+        m.insert("MCLK", "M-Click");
+        m.insert("MB4", "Mouse 4");
+        m.insert("MB5", "Mouse 5");
+        m.insert("MOVE_UP", "Move ↑");
+        m.insert("MOVE_DOWN", "Move ↓");
+        m.insert("MOVE_LEFT", "Move ←");
+        m.insert("MOVE_RIGHT", "Move →");
+        m.insert("SCROLL_UP", "Scroll ↑");
+        m.insert("SCROLL_DOWN", "Scroll ↓");
+        
+        // Bluetooth
+        m.insert("BT_CLR", "BT Clear");
+        m.insert("BT_SEL", "BT Select");
+        m.insert("BT_PRV", "BT Prev");
+        m.insert("BT_NXT", "BT Next");
+        m.insert("BT_CLR_ALL", "BT Clear All");
+        m.insert("BT_DISC", "BT Disconnect");
+        
+        // RGB Underglow
+        m.insert("RGB_TOG", "RGB Toggle");
+        m.insert("RGB_HUI", "RGB Hue+");
+        m.insert("RGB_HUD", "RGB Hue-");
+        m.insert("RGB_SAI", "RGB Sat+");
+        m.insert("RGB_SAD", "RGB Sat-");
+        m.insert("RGB_BRI", "RGB Bri+");
+        m.insert("RGB_BRD", "RGB Bri-");
+        m.insert("RGB_SPI", "RGB Spd+");
+        m.insert("RGB_SPD", "RGB Spd-");
+        m.insert("RGB_EFF", "RGB Eff");
+        m.insert("RGB_COLOR_HSB", "RGB Color");
+        
+        // Outputs
+        m.insert("OUT_TOG", "Out Toggle");
+        m.insert("OUT_USB", "Out USB");
+        m.insert("OUT_BLE", "Out BLE");
+        
         m
     };
 }
 
 pub fn format_keycode(code: &str) -> String {
     KEY_ALIASES.get(code).cloned().unwrap_or(code).to_string()
+}
+
+pub fn is_modifier(code: &str) -> bool {
+    code.starts_with("L") && (code.contains("SHFT") || code.contains("CTRL") || code.contains("ALT") || code.contains("GUI")) ||
+    code.starts_with("R") && (code.contains("SHFT") || code.contains("CTRL") || code.contains("ALT") || code.contains("GUI")) ||
+    code.starts_with("MOD_")
 }
