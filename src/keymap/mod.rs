@@ -937,7 +937,38 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
             let mut results: Vec<Suggestion> = if text.is_empty() || (text == "&" && !has_trailing_space) {
                 ZMK_BEHAVIORS.iter().map(|b| { let val = format!("&{}", b.label.unwrap_or(b.name)); let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() }; Suggestion { value: val, display: disp } }).collect()
             } else if !has_trailing_space && parts.len() == 1 {
-                let query = parts[0].to_uppercase(); ZMK_BEHAVIORS.iter().map(|b| { let val = format!("&{}", b.label.unwrap_or(b.name)); let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect()
+                let query = parts[0].to_uppercase();
+                let mut bh_results: Vec<Suggestion> = ZMK_BEHAVIORS.iter().map(|b| {
+                    let val = format!("&{}", b.label.unwrap_or(b.name));
+                    let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() };
+                    Suggestion { value: val, display: disp }
+                }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect();
+
+                let mut kp_results: Vec<Suggestion> = Vec::new();
+                for c in 'A'..='Z' {
+                    let k = c.to_string();
+                    if k.contains(&query) {
+                        kp_results.push(Suggestion { value: format!("&kp {}", k), display: format!("&kp {}", k) });
+                    }
+                }
+                for i in 0..=9 {
+                    let k = format!("N{}", i);
+                    let v = i.to_string();
+                    if k.contains(&query) || v.contains(&query) {
+                        kp_results.push(Suggestion { value: format!("&kp {}", k), display: format!("&kp {} ({})", k, v) });
+                    }
+                }
+                for (&k, &v) in keycodes::KEY_ALIASES.iter() {
+                    if keycodes::is_regular_key(k) {
+                         if k.to_uppercase().contains(&query) || v.to_uppercase().contains(&query) {
+                             let val = format!("&kp {}", k);
+                             let disp = if k != v { format!("{} ({})", val, v) } else { val.clone() };
+                             kp_results.push(Suggestion { value: val, display: disp });
+                         }
+                    }
+                }
+                bh_results.append(&mut kp_results);
+                bh_results
             } else {
                 let p_idx = if has_trailing_space { parts.len() - 1 } else { parts.len() - 2 }; let query = if has_trailing_space { "" } else { parts.last().unwrap_or(&"") }.to_uppercase();
                 if let Some(meta) = behavior_meta {
@@ -989,12 +1020,14 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
             match e.key().as_str() {
                 "Enter" => { e.prevent_default(); if *show_suggestions && !suggestions.is_empty() {
                     let selected = &suggestions[*suggestion_index].value; let parts: Vec<&str> = (*current_text).split_whitespace().collect(); let has_trailing_space = (*current_text).ends_with(' ');
-                    let mut new_text = String::new(); if has_trailing_space || parts.is_empty() { new_text = format!("{}{} ", *current_text, selected); } else { for (i, p) in parts.iter().enumerate() { if i == parts.len() - 1 { new_text.push_str(selected); } else { new_text.push_str(p); } new_text.push(' '); } }
+                    let mut new_text = String::new(); if has_trailing_space || parts.is_empty() { new_text = format!("{}{}", *current_text, selected); } else { for (i, p) in parts.iter().enumerate() { if i == parts.len() - 1 { new_text.push_str(selected); } else { new_text.push_str(p); new_text.push(' '); } } }
+                    if !selected.contains(' ') { new_text.push(' '); }
                     update_from_text.emit(new_text); show_suggestions.set(false);
                 } else { on_apply.emit(MouseEvent::new("click").unwrap()); } }
                 "Escape" => { on_close.emit(MouseEvent::new("click").unwrap()); }
                 "Tab" => if *show_suggestions && !suggestions.is_empty() { e.prevent_default(); let selected = &suggestions[*suggestion_index].value; let parts: Vec<&str> = (*current_text).split_whitespace().collect(); let has_trailing_space = (*current_text).ends_with(' ');
-                    let mut new_text = String::new(); if has_trailing_space || parts.is_empty() { new_text = format!("{}{} ", *current_text, selected); } else { for (i, p) in parts.iter().enumerate() { if i == parts.len() - 1 { new_text.push_str(selected); } else { new_text.push_str(p); } new_text.push(' '); } }
+                    let mut new_text = String::new(); if has_trailing_space || parts.is_empty() { new_text = format!("{}{}", *current_text, selected); } else { for (i, p) in parts.iter().enumerate() { if i == parts.len() - 1 { new_text.push_str(selected); } else { new_text.push_str(p); new_text.push(' '); } } }
+                    if !selected.contains(' ') { new_text.push(' '); }
                     update_from_text.emit(new_text); show_suggestions.set(false); }
                 "ArrowDown" => if *show_suggestions && !suggestions.is_empty() { e.prevent_default(); let next_idx = (*suggestion_index + 1) % suggestions.len(); suggestion_index.set(next_idx); if let Some(container) = suggestion_container_ref.cast::<web_sys::Element>() { let items = container.get_elements_by_class_name("suggestion-item"); if let Some(item) = items.get_with_index(next_idx as u32) { let item_el: web_sys::Element = item.dyn_into().unwrap(); item_el.scroll_into_view_with_bool(false); } } }
                 "ArrowUp" => if *show_suggestions && !suggestions.is_empty() { e.prevent_default(); let next_idx = if *suggestion_index == 0 { suggestions.len() - 1 } else { *suggestion_index - 1 }; suggestion_index.set(next_idx); if let Some(container) = suggestion_container_ref.cast::<web_sys::Element>() { let items = container.get_elements_by_class_name("suggestion-item"); if let Some(item) = items.get_with_index(next_idx as u32) { let item_el: web_sys::Element = item.dyn_into().unwrap(); item_el.scroll_into_view_with_bool(true); } } }
@@ -1030,7 +1063,9 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     <div class="flex justify-between space-x-4 mt-auto shrink-0 pt-4"> <button onclick={props.on_close.clone()} class="bg-gray-700 hover:bg-gray-600 text-white px-8 py-2 rounded font-semibold transition-colors"> {"Cancel"} </button> <button disabled={!is_valid} onclick={on_apply} class={classes!("px-8", "py-2", "rounded", "font-semibold", "transition-colors", if is_valid { vec!["bg-green-600", "hover:bg-green-700", "text-white"] } else { vec!["bg-gray-800", "text-gray-500", "cursor-not-allowed"] })}> {"Apply"} </button> </div>
                 </div>
                 <div class="w-80 bg-black border-l border-gray-700 flex flex-col h-full"> { if *show_suggestions && !suggestions.is_empty() { let text_val = (*current_text).clone(); let update = update_from_text.clone(); let show_sug = show_suggestions.clone();
-                        html! { <div class="flex-1 flex flex-col overflow-hidden"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest shrink-0">{"Suggestions"}</div> <div class="flex-1 overflow-y-auto" ref={suggestion_container_ref}> { for suggestions.iter().enumerate().map(|(i, s)| { let is_active = i == *suggestion_index; let val = s.value.clone(); let text_val = text_val.clone(); let update = update.clone(); let show_sug = show_sug.clone(); let onclick = Callback::from(move |_| { let parts: Vec<&str> = text_val.split_whitespace().collect(); let has_trailing_space = text_val.ends_with(' '); let mut new_text = String::new(); if has_trailing_space || parts.is_empty() { new_text = format!("{}{} ", text_val, val); } else { for (j, p) in parts.iter().enumerate() { if j == parts.len() - 1 { new_text.push_str(&val); } else { new_text.push_str(p); } new_text.push(' '); } } update.emit(new_text); show_sug.set(false); });
+                        html! { <div class="flex-1 flex flex-col overflow-hidden"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest shrink-0">{"Suggestions"}</div> <div class="flex-1 overflow-y-auto" ref={suggestion_container_ref}> { for suggestions.iter().enumerate().map(|(i, s)| { let is_active = i == *suggestion_index; let val = s.value.clone(); let text_val = text_val.clone(); let update = update.clone(); let show_sug = show_sug.clone(); let onclick = Callback::from(move |_| { let parts: Vec<&str> = text_val.split_whitespace().collect(); let has_trailing_space = text_val.ends_with(' '); let mut new_text = String::new(); if has_trailing_space || parts.is_empty() { new_text = format!("{}{}", text_val, val); } else { for (j, p) in parts.iter().enumerate() { if j == parts.len() - 1 { new_text.push_str(&val); } else { new_text.push_str(p); new_text.push(' '); } } }
+                                        if !val.contains(' ') { new_text.push(' '); }
+                                        update.emit(new_text); show_sug.set(false); });
                                         html! { <div onclick={onclick} class={classes!("suggestion-item", "p-3", "border-b", "border-gray-900", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "font-mono", "text-sm", if is_active { vec!["bg-blue-900", "text-white", "border-blue-700"] } else { vec!["text-gray-300"] })}> {&s.display} </div> } })} </div> </div> }
                     } else if props.show_param_selection { let p_idx = *selected_param_idx; let p_type = behavior_meta.and_then(|m| m.parameter_metadata.get(p_idx)).cloned().unwrap_or(ParameterType::None);
                         match p_type {
