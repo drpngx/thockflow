@@ -81,7 +81,9 @@ lazy_static! {
         m.insert("BT_CLR", "BT Clear");
         m.insert("BT_SEL", "BT Select");
         m.insert("BT_PRV", "BT Prev");
+        m.insert("BT_PREV", "BT Prev");
         m.insert("BT_NXT", "BT Next");
+        m.insert("BT_NEXT", "BT Next");
         m.insert("BT_CLR_ALL", "BT Clear All");
         m.insert("BT_DISC", "BT Disconnect");
         
@@ -104,8 +106,9 @@ lazy_static! {
         m.insert("OUT_BLE", "Out BLE");
         
         // Browser / Media
-        m.insert("AC_BACK", "Br←");
-        m.insert("AC_FORWARD", "Br→");
+        m.insert("C_AC_BACK", "Br←");
+        m.insert("C_AC_FORWARD", "Br→");
+        m.insert("K_MENU", "☰");
         
         // Number Row
         m.insert("N1", "1");
@@ -168,7 +171,7 @@ pub fn is_plain_key(code: &str) -> bool {
     let regular_aliases = [
         "GRAVE", "SEMI", "SQT", "SLASH", "BSPC", "LBKT", "RBKT", "MINUS", "EQUAL", "COMMA", "DOT", "BSLH",
         "ESC", "SPACE", "ENTER", "TAB", "LEFT", "RIGHT", "UP", "DOWN", "HOME", "END", "PG_UP", "PG_DN", "DEL", "INS",
-        "AC_BACK", "AC_FORWARD", "C_VOL_UP", "C_VOL_DN", "C_MUTE",
+        "C_AC_BACK", "C_AC_FORWARD", "C_VOL_UP", "C_VOL_DN", "C_MUTE", "K_MENU",
     ];
     if regular_aliases.contains(&code) {
         return true;

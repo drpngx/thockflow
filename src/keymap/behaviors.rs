@@ -22,6 +22,8 @@ pub struct ZmkBehavior {
     pub is_default: bool,
     pub compatible: Option<&'static str>,
     pub parameter_metadata: &'static [ParameterType],
+    pub c_include: Option<&'static str>,
+    pub constants: &'static [&'static str],
 }
 
 pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
@@ -35,6 +37,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-key-repeat"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "grave_escape",
@@ -45,6 +50,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,behavior-mod-morph"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -57,6 +65,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-reset"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "bootload",
@@ -68,6 +79,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-reset"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "none",
@@ -78,6 +92,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,behavior-none"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -91,6 +108,25 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::Constant,
         ],
+        c_include: Some("dt-bindings/zmk/pointing.h"),
+        constants: &[
+            "MB1",
+            "LCLK",
+            "MB2",
+            "RCLK",
+            "MB3",
+            "MCLK",
+            "MB4",
+            "MB5",
+            "MOVE_UP",
+            "MOVE_DOWN",
+            "MOVE_LEFT",
+            "MOVE_RIGHT",
+            "SCRL_UP",
+            "SCRL_DOWN",
+            "SCRL_LEFT",
+            "SCRL_RIGHT",
+        ],
     },
     ZmkBehavior {
         name: "z_so_off",
@@ -101,6 +137,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,behavior-soft-off"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -114,6 +153,12 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::Constant,
         ],
+        c_include: Some("dt-bindings/zmk/outputs.h"),
+        constants: &[
+            "OUT_TOG",
+            "OUT_USB",
+            "OUT_BLE",
+        ],
     },
     ZmkBehavior {
         name: "mouse_key_press",
@@ -125,6 +170,25 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-mouse-key-press"),
         parameter_metadata: &[
             ParameterType::Constant,
+        ],
+        c_include: Some("dt-bindings/zmk/pointing.h"),
+        constants: &[
+            "MB1",
+            "LCLK",
+            "MB2",
+            "RCLK",
+            "MB3",
+            "MCLK",
+            "MB4",
+            "MB5",
+            "MOVE_UP",
+            "MOVE_DOWN",
+            "MOVE_LEFT",
+            "MOVE_RIGHT",
+            "SCRL_UP",
+            "SCRL_DOWN",
+            "SCRL_LEFT",
+            "SCRL_RIGHT",
         ],
     },
     ZmkBehavior {
@@ -139,6 +203,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
             ParameterType::Modifier,
             ParameterType::Keycode,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "momentary_layer",
@@ -151,6 +218,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::Layer,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "to_layer",
@@ -162,6 +232,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-to-layer"),
         parameter_metadata: &[
             ParameterType::Layer,
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -176,6 +249,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
             ParameterType::Layer,
             ParameterType::Keycode,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "bluetooth",
@@ -189,6 +265,15 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
             ParameterType::Constant,
             ParameterType::Constant,
         ],
+        c_include: Some("dt-bindings/zmk/bt.h"),
+        constants: &[
+            "BT_CLR",
+            "BT_NXT",
+            "BT_PRV",
+            "BT_SEL",
+            "BT_CLR_ALL",
+            "BT_DISC",
+        ],
     },
     ZmkBehavior {
         name: "toggle_layer",
@@ -201,6 +286,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::Layer,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "transparent",
@@ -211,6 +299,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,behavior-transparent"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -224,6 +315,25 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::Constant,
         ],
+        c_include: Some("dt-bindings/zmk/pointing.h"),
+        constants: &[
+            "MB1",
+            "LCLK",
+            "MB2",
+            "RCLK",
+            "MB3",
+            "MCLK",
+            "MB4",
+            "MB5",
+            "MOVE_UP",
+            "MOVE_DOWN",
+            "MOVE_LEFT",
+            "MOVE_RIGHT",
+            "SCRL_UP",
+            "SCRL_DOWN",
+            "SCRL_LEFT",
+            "SCRL_RIGHT",
+        ],
     },
     ZmkBehavior {
         name: "key_press",
@@ -235,6 +345,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-key-press"),
         parameter_metadata: &[
             ParameterType::Keycode,
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -249,6 +362,16 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
             ParameterType::Constant,
             ParameterType::Constant,
         ],
+        c_include: Some("dt-bindings/zmk/backlight.h"),
+        constants: &[
+            "BL_ON",
+            "BL_OFF",
+            "BL_TOG",
+            "BL_INC",
+            "BL_DEC",
+            "BL_CYCLE",
+            "BL_SET",
+        ],
     },
     ZmkBehavior {
         name: "studio_unlock",
@@ -259,6 +382,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,behavior-studio-unlock"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -271,6 +397,12 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-ext-power"),
         parameter_metadata: &[
             ParameterType::Constant,
+        ],
+        c_include: Some("dt-bindings/zmk/ext_power.h"),
+        constants: &[
+            "EP_ON",
+            "EP_OFF",
+            "EP_TOG",
         ],
     },
     ZmkBehavior {
@@ -285,6 +417,23 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
             ParameterType::Constant,
             ParameterType::Constant,
         ],
+        c_include: Some("dt-bindings/zmk/rgb.h"),
+        constants: &[
+            "RGB_TOG",
+            "RGB_ON",
+            "RGB_OFF",
+            "RGB_HUI",
+            "RGB_HUD",
+            "RGB_SAI",
+            "RGB_SAD",
+            "RGB_BRI",
+            "RGB_BRD",
+            "RGB_SPI",
+            "RGB_SPD",
+            "RGB_EFF",
+            "RGB_EFR",
+            "RGB_COLOR_HSV",
+        ],
     },
     ZmkBehavior {
         name: "key_toggle",
@@ -297,6 +446,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::None,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "macro_tap",
@@ -307,6 +459,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,macro-control-mode-tap"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -319,6 +474,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,macro-control-mode-press"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "macro_release",
@@ -329,6 +487,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,macro-control-mode-release"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -342,6 +503,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::None,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "macro_wait_time",
@@ -354,6 +518,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::None,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "macro_pause_for_release",
@@ -364,6 +531,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,macro-pause-for-release"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -376,6 +546,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,macro-param-1to1"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "macro_param_1to2",
@@ -386,6 +559,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,macro-param-1to2"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -398,6 +574,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,macro-param-2to1"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "macro_param_2to2",
@@ -409,6 +588,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,macro-param-2to2"),
         parameter_metadata: &[
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "caps_word",
@@ -419,6 +601,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         is_default: true,
         compatible: Some("zmk,behavior-caps-word"),
         parameter_metadata: &[
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
     ZmkBehavior {
@@ -432,6 +617,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         parameter_metadata: &[
             ParameterType::Modifier,
         ],
+        c_include: None,
+        constants: &[
+        ],
     },
     ZmkBehavior {
         name: "sticky_layer",
@@ -443,6 +631,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         compatible: Some("zmk,behavior-sticky-key"),
         parameter_metadata: &[
             ParameterType::Modifier,
+        ],
+        c_include: None,
+        constants: &[
         ],
     },
 ];

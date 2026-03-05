@@ -20,6 +20,9 @@ extern "C" {
     #[wasm_bindgen]
     pub type FileSystemFileHandle;
 
+    #[wasm_bindgen(method, getter)]
+    fn name(this: &FileSystemFileHandle) -> String;
+
     #[wasm_bindgen(method, js_name = write)]
     fn write(this: &FileSystemWritableFileStream, data: &JsValue) -> js_sys::Promise;
 
@@ -61,7 +64,7 @@ pub struct BindingParts {
 pub fn get_binding_parts(binding: &str) -> BindingParts {
     let parts: Vec<&str> = binding.split_whitespace().collect();
     if parts.is_empty() { return BindingParts { top_left: "".into(), top_right: "".into(), center: "".into() }; }
-    
+
     let behavior_raw = parts[0];
     let behavior = behavior_raw.strip_prefix('&').unwrap_or(behavior_raw);
     let params = &parts[1..];
@@ -113,6 +116,50 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
             top_left: "".into(),
             top_right: "".into(),
             center: "".into(),
+        },
+        "&bt" => {
+            let cmd_raw = params.get(0).unwrap_or(&"");
+            let cmd = cmd_raw.strip_prefix("BT_").unwrap_or(cmd_raw);
+            let val = params.get(1).map(|&s| s.to_string()).unwrap_or_default();
+
+            let is_single_param = ["BT_CLR", "BT_NXT", "BT_NEXT", "BT_PRV", "BT_PREV", "BT_CLR_ALL"].contains(cmd_raw);
+
+            if is_single_param || val.is_empty() {
+                let display_cmd = match *cmd_raw {
+                    "BT_CLR" => "CLR",
+                    "BT_NXT" | "BT_NEXT" => "NEXT",
+                    "BT_PRV" | "BT_PREV" => "PREV",
+                    "BT_CLR_ALL" => "CLR ALL",
+                    _ => cmd,
+                };
+                BindingParts {
+                    top_left: "bt".into(),
+                    top_right: "".into(),
+                    center: display_cmd.into(),
+                }
+            } else {
+                BindingParts {
+                    top_left: "bt".into(),
+                    top_right: cmd.into(),
+                    center: val,
+                }
+            }
+        },
+        "&out" | "&ext_power" | "&rgb_ug" | "&bl" => {
+            let cmd_raw = params.get(0).unwrap_or(&"");
+            let prefix = match behavior_raw {
+                "&out" => "OUT_",
+                "&ext_power" => "EP_",
+                "&rgb_ug" => "RGB_",
+                "&bl" => "BL_",
+                _ => "",
+            };
+            let cmd = cmd_raw.strip_prefix(prefix).unwrap_or(cmd_raw);
+            BindingParts {
+                top_left: behavior.into(),
+                top_right: "".into(),
+                center: cmd.into(),
+            }
         },
         _ => {
             // Default: behavior in TL, first param in center if it exists
@@ -179,33 +226,33 @@ pub fn generate_svg(data: &KeymapData) -> String {
     let layer_width = (max_x - min_x) as f32 * pos_scale;
     let layer_height = (max_y - min_y) as f32 * pos_scale;
     let padding = 100.0;
-    
+
     let total_width = layer_width + 80.0;
     let total_height = (layer_height + padding) * data.layers.len() as f32 + 80.0;
-    
+
     let mut svg = format!(r#"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="0 0 {} {}" style="background-color: #ffffff;">"#, total_width, total_height, total_width, total_height);
     svg.push_str("<style>text { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; } .key { fill: white; stroke: #d1d5db; stroke-width: 0.5; } .label { fill: #9ca3af; font-size: 5px; } .main-text { fill: #1f2937; font-size: 8px; font-weight: bold; } .layer-title { font-size: 18px; font-weight: bold; fill: #111827; }</style>");
 
     for (l_idx, layer) in data.layers.iter().enumerate() {
         let y_offset = (layer_height + padding) * l_idx as f32 + 80.0;
         svg.push_str(&format!(r#"<text x="40" y="{}" class="layer-title">{}</text>"#, y_offset - 25.0, escape_xml(&layer.name)));
-        
+
         let offset_x = -(min_x as f32 * pos_scale) + 40.0;
         let offset_y = -(min_y as f32 * pos_scale) + y_offset;
 
         for (i, pk) in data.physical_layout.iter().enumerate() {
             let binding = layer.bindings.get(i).cloned().unwrap_or_else(|| "".to_string());
             let parts = get_binding_parts(&binding);
-            
+
             let x = pk.x as f32 * pos_scale + offset_x;
             let y = pk.y as f32 * pos_scale + offset_y;
             let w = (pk.width as f32 * size_scale).max(20.0) - 4.0;
             let h = (pk.height as f32 * size_scale).max(20.0) - 4.0;
             let rotation = pk.rotation as f32 / 1000.0;
-            
+
             svg.push_str(&format!(r#"<g transform="translate({}, {}) rotate({})">"#, x + w/2.0, y + h/2.0, rotation));
             svg.push_str(&format!(r#"<rect x="{}" y="{}" width="{}" height="{}" rx="2" ry="2" class="key" />"#, -w/2.0, -h/2.0, w, h));
-            
+
             if !parts.top_left.is_empty() {
                 svg.push_str(&format!(r#"<text x="{}" y="{}" class="label" text-anchor="start">{}</text>"#, -w/2.0 + 1.5, -h/2.0 + 4.5, escape_xml(&parts.top_left)));
             }
@@ -213,15 +260,15 @@ pub fn generate_svg(data: &KeymapData) -> String {
                 let display_tr = parts.top_right.chars().take(8).collect::<String>();
                 svg.push_str(&format!(r#"<text x="0" y="{}" class="label" text-anchor="middle">{}</text>"#, -h/2.0 + 4.5, escape_xml(&display_tr)));
             }
-            
+
             let center_y = if !parts.top_right.is_empty() { 2.0 } else { 0.0 };
             let display_center = parts.center.chars().take(12).collect::<String>();
             svg.push_str(&format!(r#"<text x="0" y="{}" class="main-text" text-anchor="middle" dominant-baseline="middle">{}</text>"#, center_y, escape_xml(&display_center)));
-            
+
             svg.push_str("</g>");
         }
     }
-    
+
     svg.push_str("</svg>");
     svg
 }
@@ -282,17 +329,17 @@ pub fn KeymapHome() -> Html {
                             let handle_val = handles.get(0);
                             let handle: FileSystemFileHandle = handle_val.unchecked_into();
                             file_handle.set(Some(handle.clone().unchecked_into()));
-                            
+
                             loading.set(true);
                             let file_promise = handle.get_file();
                             let file_result = wasm_bindgen_futures::JsFuture::from(file_promise).await;
-                            
+
                             match file_result {
                                 Ok(file_val) => {
                                     let file: web_sys::File = file_val.unchecked_into();
                                     let content_promise = file.text();
                                     let content_result = wasm_bindgen_futures::JsFuture::from(content_promise).await;
-                                    
+
                                     match content_result {
                                         Ok(content_val) => {
                                             let content = content_val.as_string().unwrap_or_default();
@@ -363,7 +410,7 @@ pub fn KeymapHome() -> Html {
                 let error = error.clone();
                 let loading = loading.clone();
                 let file_handle_val = (*file_handle).clone();
-                
+
                 loading.set(true);
                 spawn_local(async move {
                     let result = Request::post("/api/save-keymap")
@@ -381,7 +428,7 @@ pub fn KeymapHome() -> Html {
                                         if let Some(handle) = file_handle_val {
                                             let writable_promise = handle.create_writable();
                                             let writable_result = wasm_bindgen_futures::JsFuture::from(writable_promise).await;
-                                            
+
                                             match writable_result {
                                                 Ok(writable_val) => {
                                                     let writable: FileSystemWritableFileStream = writable_val.unchecked_into();
@@ -453,7 +500,7 @@ pub fn KeymapHome() -> Html {
                     }
                 }
             }) as Box<dyn FnMut(KeyboardEvent)>);
-            
+
             let window = web_sys::window().expect("should have a window");
             window.add_event_listener_with_callback("keydown", key_listener.as_ref().unchecked_ref()).expect("failed to add listener");
             move || {
@@ -466,6 +513,7 @@ pub fn KeymapHome() -> Html {
 
     let on_download_svg = {
         let keymap_data = keymap_data.clone();
+        let file_handle = file_handle.clone();
         Callback::from(move |_| {
             if let Some(data) = &*keymap_data {
                 let svg_content = generate_svg(data);
@@ -475,7 +523,20 @@ pub fn KeymapHome() -> Html {
                 let document = window.document().unwrap();
                 let link = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
                 link.set_href(&url);
-                link.set_download("keymap.svg");
+
+                let filename = if let Some(handle) = &*file_handle {
+                    let mut name = handle.name();
+                    if name.ends_with(".keymap") {
+                        name = name.replace(".keymap", ".svg");
+                    } else {
+                        name.push_str(".svg");
+                    }
+                    name
+                } else {
+                    "keymap.svg".to_string()
+                };
+                link.set_download(&filename);
+
                 link.click();
                 web_sys::Url::revoke_object_url(&url).unwrap();
             }
@@ -485,7 +546,7 @@ pub fn KeymapHome() -> Html {
     html! {
         <div class="w-full flex flex-col items-center p-4">
             <h2 class="text-4xl font-display mb-8">{"ZMK Keymap Editor"}</h2>
-            
+
             <div class="flex items-center space-x-4 mb-8">
                 <div>
                     <div class="flex flex-col space-y-2">
@@ -547,7 +608,7 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
     let current_layer = use_state(|| 0);
     let selected_key = use_state(|| None::<SelectedKey>);
     let show_param_selection = use_state(|| false);
-    
+
     let jump_mode_active = use_state(|| false);
     let jump_input = use_state(|| String::new());
     let container_ref = use_node_ref();
@@ -744,7 +805,7 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
         let res_l = reset_layer.clone();
         let batch_t_n = update_layer_batch.clone();
         let batch_n_t = update_layer_batch.clone();
-        
+
         Callback::from(move |e: KeyboardEvent| {
             if let Some(l_idx) = *layer_menu_index {
                 match e.key().as_str() {
@@ -1129,7 +1190,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
             let parts: Vec<&str> = text.split_whitespace().collect(); let has_trailing_space = text.ends_with(' ');
             let mut results: Vec<Suggestion> = if text.is_empty() || (text == "&" && !has_trailing_space) {
                 let mut bh_results: Vec<Suggestion> = ZMK_BEHAVIORS.iter().map(|b| { let val = format!("&{}", b.label.unwrap_or(b.name)); let disp = if let Some(dn) = b.display_name { format!("{} ({})", val, dn) } else { val.clone() }; Suggestion { value: val, display: disp } }).collect();
-                
+
                 // Also include &kp suggestions for alphabetic keys when empty/&
                 for c in 'A'..='Z' {
                     let k = c.to_string();
@@ -1166,18 +1227,32 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                             },
                             ParameterType::Constant => {
                                 let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
-                                let mut results: Vec<Suggestion> = keycodes::KEY_ALIASES.iter().filter(|(&k, _)| match behavior_name {
-                                    "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k),
+                                let mut constants_list: Vec<(String, String)> = Vec::new();
+
+                                if let Some(meta) = behavior_meta {
+                                    if !meta.constants.is_empty() {
+                                        constants_list = meta.constants.iter().map(|&k| (k.to_string(), k.to_string())).collect();
+                                    }
+                                }
+                                if constants_list.is_empty() {
+                                    constants_list = keycodes::KEY_ALIASES.iter().map(|(&k, &v)| (k.to_string(), v.to_string())).collect();
+                                }
+
+                                let mut results: Vec<Suggestion> = constants_list.into_iter().filter(|(k, _)| match behavior_name {
+                                    "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k.as_str()),
                                     "mmv" => k.starts_with("MOVE_"),
-                                    "msc" => k.starts_with("SCROLL_"),
+                                    "msc" => k.starts_with("SCRL_"),
                                     "bt" => k.starts_with("BT_"),
                                     "rgb_ug" => k.starts_with("RGB_"),
                                     "bl" => k.starts_with("BL_"),
                                     "out" => k.starts_with("OUT_"),
                                     "ext_power" => k.starts_with("EP_"),
-                                    _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || k.starts_with("MOVE_") || k.starts_with("SCROLL_") || ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k)
-                                }).map(|(&k, &v)| { let val = k.to_string(); let disp = if k != v { format!("{} ({})", k, v) } else { val.clone() }; Suggestion { value: val, display: disp } }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect();
-                                
+                                    _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || k.starts_with("MOVE_") || k.starts_with("SCRL_") || ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k.as_str())
+                                }).map(|(k, v)| {
+                                    let disp = if k != v { format!("{} ({})", k, v) } else { k.clone() };
+                                    Suggestion { value: k, display: disp }
+                                }).filter(|s| s.value.to_uppercase().contains(&query) || s.display.to_uppercase().contains(&query)).collect();
+
                                 if behavior_name == "bt" && p_idx == 1 {
                                     for i in 0..5 {
                                         let val = i.to_string();
@@ -1187,8 +1262,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                     }
                                 }
                                 results
-                            }
-                            _ => Vec::new()
+                            }                            _ => Vec::new()
                         }
                     } else { Vec::new() }
                 } else { Vec::new() }
@@ -1272,6 +1346,38 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                                 }).filter(|(&k, &v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val)).map(|(&k, &v)| {
                                                 let val = k.to_string(); let select = select_param_value.clone(); let is_active = current_params.get(p_idx).map(|p| *p == val).unwrap_or(false); let val_c = val.clone(); let onclick = Callback::from(move |_| select.emit(val_c.clone()));
                                                 html! { <div onclick={onclick} class={classes!("p-2", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "text-xs", if is_active { "bg-white text-black" } else { "" })}> <div class="font-bold font-mono">{val}</div> <div class={if is_active { "text-gray-600" } else { "text-gray-400" }}>{v}</div> </div> } })} </div> <div class="p-2 flex justify-center border-t border-gray-700"> <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center"> <span class="rotate-90 inline-block mr-1">{"Close"}</span> </button> </div> </div> } },
+                            ParameterType::Constant => { let filter_val = (*filter).clone();
+                                let behavior_name = behavior_meta.map(|m| m.label.unwrap_or(m.name)).unwrap_or("");
+                                let mut constants_list: Vec<(String, String)> = Vec::new();
+                                if let Some(meta) = behavior_meta {
+                                    if !meta.constants.is_empty() {
+                                        constants_list = meta.constants.iter().map(|&k| (k.to_string(), k.to_string())).collect();
+                                    }
+                                }
+                                if constants_list.is_empty() {
+                                    constants_list = keycodes::KEY_ALIASES.iter().map(|(&k, &v)| (k.to_string(), v.to_string())).collect();
+                                }
+
+                                constants_list = constants_list.into_iter().filter(|(k, _)| match behavior_name {
+                                    "mkp" => ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k.as_str()),
+                                    "mmv" => k.starts_with("MOVE_"),
+                                    "msc" => k.starts_with("SCRL_"),
+                                    "bt" => k.starts_with("BT_"),
+                                    "rgb_ug" => k.starts_with("RGB_"),
+                                    "bl" => k.starts_with("BL_"),
+                                    "out" => k.starts_with("OUT_"),
+                                    "ext_power" => k.starts_with("EP_"),
+                                    _ => k.starts_with("BT_") || k.starts_with("RGB_") || k.starts_with("OUT_") || k.starts_with("MOVE_") || k.starts_with("SCRL_") || ["LCLK", "RCLK", "MCLK", "MB4", "MB5"].contains(&k.as_str())
+                                }).collect();
+
+                                if behavior_name == "bt" && p_idx == 1 {
+                                    for i in 0..5 { constants_list.push((i.to_string(), format!("Profile {}", i))); }
+                                }
+
+                                html! { <div class="flex-1 flex flex-col h-full"> <div class="p-4 border-b border-gray-800 text-gray-400 text-xs font-bold uppercase tracking-widest"> {"Select Constant"} </div> <div class="p-2 border-b border-gray-700"> <input type="text" placeholder="Search..." class="w-full bg-gray-900 text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" oninput={let filter = filter.clone(); Callback::from(move |e: InputEvent| { let input: HtmlInputElement = e.target_unchecked_into(); filter.set(input.value().to_uppercase()); })} value={filter_val.clone()} /> </div> <div class="flex-1 overflow-y-auto"> { for constants_list.iter().filter(|(k, v)| k.to_uppercase().contains(&filter_val) || v.to_uppercase().contains(&filter_val)).map(|(k, v)| {
+                                                let val = k.to_string(); let select = select_param_value.clone(); let is_active = current_params.get(p_idx).map(|p| *p == val).unwrap_or(false); let val_c = val.clone(); let onclick = Callback::from(move |_| select.emit(val_c.clone()));
+                                                html! { <div onclick={onclick} class={classes!("p-2", "border-b", "border-gray-800", "cursor-pointer", "hover:bg-gray-900", "transition-colors", "text-xs", if is_active { "bg-white text-black" } else { "" })}> <div class="font-bold font-mono">{val}</div> <div class={if is_active { "text-gray-600" } else { "text-gray-400" }}>{v}</div> </div> } })} </div> <div class="p-2 flex justify-center border-t border-gray-700"> <button onclick={props.on_toggle_param_selection.clone()} class="text-xs text-gray-400 hover:text-white uppercase tracking-widest py-1 flex items-center"> <span class="rotate-90 inline-block mr-1">{"Close"}</span> </button> </div> </div> }
+                            },
                             _ => html! { <div class="flex-1 flex flex-col items-center justify-center p-4 text-center"> <div class="text-gray-500 italic">{"Selection not implemented for this parameter type."}</div> <button onclick={props.on_toggle_param_selection.clone()} class="mt-4 text-xs text-gray-400 hover:text-white uppercase tracking-widest"> {"Close"} </button> </div> }
                         }
                     } else { html! { <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-600"> <div class="text-4xl mb-4">{"⌨️"}</div> <div class="text-sm">{"Type to see suggestions or click a parameter to select from list."}</div> </div> } }

@@ -26,6 +26,8 @@ struct Behavior {
     is_default: bool,
     compatible: Option<String>,
     parameter_metadata: Vec<ParameterType>,
+    c_include: Option<String>,
+    constants: Vec<String>,
 }
 
 fn parse_includes_recursively(base_dir: &Path, current_file: &Path, included_files: &mut HashSet<String>) -> Result<()> {
@@ -62,6 +64,41 @@ fn parse_includes_recursively(base_dir: &Path, current_file: &Path, included_fil
         }
     }
     Ok(())
+}
+
+fn get_c_include_and_header(comp: &str) -> Option<(&'static str, &'static str)> {
+    match comp {
+        "zmk,behavior-backlight" => Some(("dt-bindings/zmk/backlight.h", "include/dt-bindings/zmk/backlight.h")),
+        "zmk,behavior-rgb-underglow" => Some(("dt-bindings/zmk/rgb.h", "include/dt-bindings/zmk/rgb.h")),
+        "zmk,behavior-outputs" => Some(("dt-bindings/zmk/outputs.h", "include/dt-bindings/zmk/outputs.h")),
+        "zmk,behavior-bluetooth" => Some(("dt-bindings/zmk/bt.h", "include/dt-bindings/zmk/bt.h")),
+        "zmk,behavior-mouse-key-press" | "zmk,behavior-input-two-axis" => Some(("dt-bindings/zmk/pointing.h", "include/dt-bindings/zmk/pointing.h")),
+        "zmk,behavior-ext-power" => Some(("dt-bindings/zmk/ext_power.h", "include/dt-bindings/zmk/ext_power.h")),
+        _ => None,
+    }
+}
+
+fn parse_constants_from_header(zmk_path: &Path, header_rel_path: &str) -> Vec<String> {
+    let mut constants = Vec::new();
+    let header_path = zmk_path.join("app").join(header_rel_path);
+    if let Ok(content) = fs::read_to_string(header_path) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with("#define") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let macro_name = parts[1];
+                    if macro_name.contains('(') || macro_name.ends_with("_CMD") || macro_name.starts_with("ZMK_") {
+                        continue;
+                    }
+                    if macro_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                        constants.push(macro_name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    constants
 }
 
 fn main() -> Result<()> {
@@ -144,7 +181,7 @@ fn main() -> Result<()> {
                 let tree = parser.parse(&content, None).context("Failed to parse DTS")?;
                 
                 let include_path = format!("behaviors/{}", filename);
-                extract_behaviors(tree.root_node(), &content, &include_path, is_default, &mut behaviors)?;
+                extract_behaviors(tree.root_node(), &content, &include_path, is_default, &mut behaviors, zmk_path)?;
             }
         }
     }
@@ -172,6 +209,8 @@ fn main() -> Result<()> {
     output.push_str("    pub is_default: bool,\n");
     output.push_str("    pub compatible: Option<&'static str>,\n");
     output.push_str("    pub parameter_metadata: &'static [ParameterType],\n");
+    output.push_str("    pub c_include: Option<&'static str>,\n");
+    output.push_str("    pub constants: &'static [&'static str],\n");
     output.push_str("}\n\n");
     output.push_str("pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[\n");
     
@@ -203,6 +242,18 @@ fn main() -> Result<()> {
         }
         output.push_str("        ],\n");
         
+        if let Some(c_inc) = &b.c_include {
+            output.push_str(&format!("        c_include: Some(\"{}\"),\n", c_inc));
+        } else {
+            output.push_str("        c_include: None,\n");
+        }
+        
+        output.push_str("        constants: &[\n");
+        for c in &b.constants {
+            output.push_str(&format!("            \"{}\",\n", c));
+        }
+        output.push_str("        ],\n");
+        
         output.push_str("    },\n");
     }
     output.push_str("];\n");
@@ -221,7 +272,8 @@ fn extract_behaviors(
     source: &str, 
     filename: &str, 
     is_default: bool, 
-    behaviors: &mut Vec<Behavior>
+    behaviors: &mut Vec<Behavior>,
+    zmk_path: &Path
 ) -> Result<()> {
     if node.kind() == "node" {
         let mut node_name = String::new();
@@ -364,6 +416,15 @@ fn extract_behaviors(
                 parameter_metadata.push(ParameterType::None);
             }
 
+            let mut c_include = None;
+            let mut constants = Vec::new();
+            if let Some(comp) = &compatible {
+                if let Some((c_inc, header_path)) = get_c_include_and_header(comp) {
+                    c_include = Some(c_inc.to_string());
+                    constants = parse_constants_from_header(zmk_path, header_path);
+                }
+            }
+
             behaviors.push(Behavior {
                 name: node_name,
                 label: handle,
@@ -373,13 +434,15 @@ fn extract_behaviors(
                 is_default,
                 compatible: compatible.clone(),
                 parameter_metadata,
+                c_include,
+                constants,
             });
         }
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        extract_behaviors(child, source, filename, is_default, behaviors)?;
+        extract_behaviors(child, source, filename, is_default, behaviors, zmk_path)?;
     }
     
     Ok(())
@@ -422,5 +485,55 @@ mod tests {
         assert!(!included_files.contains("mouse_move.dtsi"), "mouse_move.dtsi should not be in included_files");
         
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_constants_from_header() -> Result<()> {
+        let dir = tempdir()?;
+        let app_dir = dir.path().join("app");
+        let include_dir = app_dir.join("include/dt-bindings/zmk");
+        fs::create_dir_all(&include_dir)?;
+
+        let header_path = include_dir.join("test_header.h");
+        fs::write(&header_path, "
+#define BL_ON_CMD 0
+#define BL_OFF_CMD 1
+#define BL_TOG_CMD 2
+
+#define BL_ON BL_ON_CMD 0
+#define BL_OFF BL_OFF_CMD 0
+#define BL_TOG BL_TOG_CMD 0
+#define ZMK_NOT_CONSTANT 1
+#define WITH_ARGS(x) (x)
+")?;
+
+        let constants = parse_constants_from_header(dir.path(), "include/dt-bindings/zmk/test_header.h");
+        
+        assert_eq!(constants.len(), 3);
+        assert!(constants.contains(&"BL_ON".to_string()));
+        assert!(constants.contains(&"BL_OFF".to_string()));
+        assert!(constants.contains(&"BL_TOG".to_string()));
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_c_include_and_header() {
+        assert_eq!(
+            get_c_include_and_header("zmk,behavior-backlight"),
+            Some(("dt-bindings/zmk/backlight.h", "include/dt-bindings/zmk/backlight.h"))
+        );
+        assert_eq!(
+            get_c_include_and_header("zmk,behavior-input-two-axis"),
+            Some(("dt-bindings/zmk/pointing.h", "include/dt-bindings/zmk/pointing.h"))
+        );
+        assert_eq!(
+            get_c_include_and_header("zmk,behavior-mouse-key-press"),
+            Some(("dt-bindings/zmk/pointing.h", "include/dt-bindings/zmk/pointing.h"))
+        );
+        assert_eq!(
+            get_c_include_and_header("zmk,behavior-unknown"),
+            None
+        );
     }
 }

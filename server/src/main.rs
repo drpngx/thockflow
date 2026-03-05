@@ -114,6 +114,12 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
                         new_includes.push(format!("#include <{}>", behavior.include_file));
                         existing_includes.insert(behavior.include_file.to_string());
                     }
+                    if let Some(c_inc) = behavior.c_include {
+                        if !existing_includes.contains(c_inc) {
+                            new_includes.push(format!("#include <{}>", c_inc));
+                            existing_includes.insert(c_inc.to_string());
+                        }
+                    }
                 }
             }
         }
@@ -441,27 +447,39 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                             // Improved parsing using ZMK_BEHAVIORS
                                             let tokens: Vec<&str> = raw_val.split_whitespace().collect();
                                             let mut i = 0;
-                                            while i < tokens.len() {
-                                                let token = tokens[i].trim_matches(|c| c == '<' || c == '>' || c == ';' || c == ' ');
-                                                if token.starts_with('&') {
-                                                    let behavior_name = &token[1..];
-                                                    // Find behavior
-                                                    let behavior = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name);
-                                                    let mut binding = token.to_string();
-                                                    if let Some(b) = behavior {
-                                                        let cells = b.binding_cells;
-                                                        for _ in 0..cells {
-                                                            i += 1;
-                                                            if i < tokens.len() {
-                                                                binding.push(' ');
-                                                                binding.push_str(tokens[i].trim_matches(|c| c == '>' || c == ';'));
+                                                    while i < tokens.len() {
+                                                        let token = tokens[i].trim_matches(|c| c == '<' || c == '>' || c == ';' || c == ' ');
+                                                        if token.starts_with('&') {
+                                                            let behavior_name = &token[1..];
+                                                            // Find behavior
+                                                            let behavior = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name);
+                                                            let mut binding = token.to_string();
+                                                            if let Some(b) = behavior {
+                                                                let mut cells = b.binding_cells;
+                                                                
+                                                                // Special case for &bt which can take 1 or 2 cells depending on command
+                                                                if behavior_name == "bt" {
+                                                                    if let Some(cmd) = tokens.get(i + 1) {
+                                                                        let cmd = cmd.trim_matches(|c| c == '>' || c == ';');
+                                                                        if !["BT_SEL", "BT_DISC"].contains(&cmd) {
+                                                                            cells = 1;
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                for _ in 0..cells {
+                                                                    i += 1;
+                                                                    if i < tokens.len() {
+                                                                        binding.push(' ');
+                                                                        binding.push_str(tokens[i].trim_matches(|c| c == '>' || c == ';'));
+                                                                    }
+                                                                }
                                                             }
+                                                            // info!("Parsed binding: {}", binding); // Keep this commented out if too noisy, but useful for debugging
+                                                            bindings.push(binding);
                                                         }
+                                                        i += 1;
                                                     }
-                                                    bindings.push(binding);
-                                                }
-                                                i += 1;
-                                            }
                                         }
                                     }
                                 }
@@ -624,10 +642,9 @@ mod tests {
         
         assert!(keycodes::is_regular_key("LEFT"));
         assert!(!keycodes::is_modifier("LEFT"));
-        
-        assert!(keycodes::is_regular_key("AC_BACK"));
-        assert!(!keycodes::is_modifier("AC_BACK"));
-        
+
+        assert!(keycodes::is_regular_key("C_AC_BACK"));
+        assert!(!keycodes::is_modifier("C_AC_BACK"));        
         // Modifiers should be modifiers
         assert!(keycodes::is_modifier("LSHFT"));
         assert!(keycodes::is_modifier("RCTRL"));
@@ -782,16 +799,20 @@ mod tests {
         let result = generate_keymap_dts(content, &data).unwrap();
         println!("Result:\n{}", result);
         
-        // Should have added both custom.h and mouse_move.dtsi
+        // Should have added custom.h, mouse_move.dtsi, and pointing.h
         assert!(result.contains("#include <custom.h>"));
         assert!(result.contains("#include <behaviors/mouse_move.dtsi>"));
+        assert!(result.contains("#include <dt-bindings/zmk/pointing.h>"));
         
         // Check placement: should be after keys.h
         let pos_keys = result.find("#include <dt-bindings/zmk/keys.h>").unwrap();
         let pos_custom = result.find("#include <custom.h>").unwrap();
         let pos_mmv = result.find("#include <behaviors/mouse_move.dtsi>").unwrap();
+        let pos_pointing = result.find("#include <dt-bindings/zmk/pointing.h>").unwrap();
         
         assert!(pos_custom > pos_keys, "custom.h should be after keys.h");
+        assert!(pos_mmv > pos_keys, "mouse_move.dtsi should be after keys.h");
+        assert!(pos_pointing > pos_keys, "pointing.h should be after keys.h");
         assert!(pos_mmv > pos_keys, "mouse_move.dtsi should be after keys.h");
     }
 
