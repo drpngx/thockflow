@@ -8,6 +8,8 @@ use wasm_bindgen_futures::spawn_local;
 pub mod behaviors;
 use behaviors::{ZMK_BEHAVIORS, ParameterType};
 
+pub mod layouts;
+
 pub mod keycodes;
 use keycodes::format_keycode;
 

@@ -22,6 +22,7 @@ use tower_http::services::ServeDir;
 use yew_router::Routable;
 
 use thockflow::keymap::behaviors::ZMK_BEHAVIORS;
+use thockflow::keymap::layouts::ZMK_LAYOUTS;
 
 lazy_static::lazy_static!(
     // Use the source HTML as a template
@@ -214,8 +215,34 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
 
     traverse(root_node, content.as_bytes(), &mut physical_layout, &mut layers);
 
+    if physical_layout.is_empty() && !layers.is_empty() {
+        let key_count = layers[0].bindings.len();
+        info!("Physical layout missing, attempting to match by key count: {}", key_count);
+        
+        // Find layouts with matching key count
+        let matches: Vec<_> = ZMK_LAYOUTS.iter()
+            .filter(|l| l.keys.len() == key_count)
+            .collect();
+        
+        if !matches.is_empty() {
+            // Heuristic: prioritize layouts with "default" or "6col"
+            let matched_layout = matches.iter()
+                .find(|l| l.name.contains("default") || l.display_name.map_or(false, |dn| dn.to_lowercase().contains("default")))
+                .or_else(|| matches.iter().find(|l| l.name.contains("6col")))
+                .unwrap_or(&matches[0]);
+            
+            info!("Matched layout: {} from {}", matched_layout.name, matched_layout.source_file);
+            physical_layout = matched_layout.keys.iter().map(|k| PhysicalKey {
+                width: k.width,
+                height: k.height,
+                x: k.x,
+                y: k.y,
+            }).collect();
+        }
+    }
+
     if physical_layout.is_empty() {
-        return Err(anyhow::anyhow!("Missing physical layout (zmk,physical-layout compatible node)"));
+        return Err(anyhow::anyhow!("Missing physical layout (zmk,physical-layout compatible node) and no match found in database for {} keys", layers.get(0).map_or(0, |l| l.bindings.len())));
     }
     if layers.is_empty() {
         return Err(anyhow::anyhow!("Missing keymap layers (zmk,keymap compatible node)"));
@@ -282,6 +309,29 @@ mod tests {
         
         assert!(data.physical_layout.len() >= 52);
         assert!(!data.layers.is_empty());
+    }
+
+    #[test]
+    fn test_parse_missing_physical_fallback() {
+        // 50 keys matches Kyria 5-col
+        let mut bindings = Vec::new();
+        for _ in 0..50 {
+            bindings.push("&kp A");
+        }
+        let content = format!(r#"
+#include <behaviors.dtsi>
+/ {{
+    keymap {{
+        compatible = "zmk,keymap";
+        default_layer {{
+            bindings = <{}>;
+        }};
+    }};
+}};"#, bindings.join(" "));
+
+        let result = parse_keymap_with_tree_sitter(&content).expect("Should fall back to DB layout");
+        assert_eq!(result.physical_layout.len(), 50);
+        assert_eq!(result.layers.len(), 1);
     }
 }
 

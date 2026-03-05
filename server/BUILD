@@ -19,6 +19,20 @@ rust_binary(
 )
 
 rust_binary(
+    name = "zmk_layouts",
+    srcs = ["src/bin/zmk_layouts.rs"],
+    crate_features = ["runfiles"],
+    data = ["@zmk//:app"],
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        "//:thockflow",
+        "@rules_rust//tools/runfiles",
+    ],
+)
+
+rust_binary(
     name = "server",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),

@@ -210,6 +210,11 @@ http_archive(
     name = "zmk",
     build_file_content = """
 filegroup(
+    name = "app",
+    srcs = glob(["app/**"]),
+    visibility = ["//visibility:public"],
+)
+filegroup(
     name = "behaviors",
     srcs = glob(["app/dts/behaviors.dtsi", "app/dts/behaviors/**"]),
     visibility = ["//visibility:public"],

@@ -20,7 +20,6 @@ struct Behavior {
     binding_cells: u32,
     include_file: String,
     is_default: bool,
-    #[allow(dead_code)]
     compatible: Option<String>,
     parameter_metadata: Vec<ParameterType>,
 }
