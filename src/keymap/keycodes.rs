@@ -109,6 +109,51 @@ pub fn format_keycode(code: &str) -> String {
     KEY_ALIASES.get(code).cloned().unwrap_or(code).to_string()
 }
 
+pub fn to_zmk_keycode(key: &str) -> Option<String> {
+    if key.len() == 1 {
+        let c = key.chars().next().unwrap();
+        if c.is_ascii_alphabetic() {
+            return Some(c.to_ascii_uppercase().to_string());
+        }
+        if c.is_ascii_digit() {
+            return Some(format!("N{}", c));
+        }
+        return match c {
+            ' ' => Some("SPACE".into()),
+            ',' => Some("COMMA".into()),
+            '.' => Some("DOT".into()),
+            '/' => Some("SLASH".into()),
+            ';' => Some("SEMI".into()),
+            '\'' => Some("SQT".into()),
+            '[' => Some("LBKT".into()),
+            ']' => Some("RBKT".into()),
+            '\\' => Some("BSLH".into()),
+            '-' => Some("MINUS".into()),
+            '=' => Some("EQUAL".into()),
+            '`' => Some("GRAVE".into()),
+            _ => None,
+        };
+    }
+    match key {
+        "Enter" => Some("ENTER".into()),
+        "Escape" => Some("ESC".into()),
+        "Backspace" => Some("BSPC".into()),
+        "Tab" => Some("TAB".into()),
+        "ArrowLeft" => Some("LEFT".into()),
+        "ArrowRight" => Some("RIGHT".into()),
+        "ArrowUp" => Some("UP".into()),
+        "ArrowDown" => Some("DOWN".into()),
+        "Delete" => Some("DEL".into()),
+        "Home" => Some("HOME".into()),
+        "End" => Some("END".into()),
+        "PageUp" => Some("PG_UP".into()),
+        "PageDown" => Some("PG_DN".into()),
+        "Insert" => Some("INS".into()),
+        _ if key.starts_with('F') && key.len() > 1 => Some(key.to_ascii_uppercase()),
+        _ => None,
+    }
+}
+
 pub fn is_modifier(code: &str) -> bool {
     code.starts_with("L") && (code.contains("SHFT") || code.contains("CTRL") || code.contains("ALT") || code.contains("GUI")) ||
     code.starts_with("R") && (code.contains("SHFT") || code.contains("CTRL") || code.contains("ALT") || code.contains("GUI")) ||
