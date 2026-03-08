@@ -27,8 +27,18 @@ rust_binary(
     deps = all_crate_deps(
         normal = True,
     ) + [
-        "//:thockflow",
         "@rules_rust//tools/runfiles",
+    ],
+)
+
+rust_binary(
+    name = "keymap_svg",
+    srcs = ["src/bin/keymap_svg.rs"],
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        "//:thockflow",
     ],
 )
 

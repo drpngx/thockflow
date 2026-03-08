@@ -17,6 +17,10 @@ env HTTP_LISTEN_ADDR=0.0.0.0:8081 RUST_BACKTRACE=1 RUST_LOG=info bazel run -c op
 ```
 Not a `genrule`, so that I may still watch the git diffs as they pass by.
 
+## Dump an svg
+```
+bazel run -c opt //server:keymap_svg -- ~/glove80/zmk-config/config/glove80.keymap
+```
 ## Running the rootless podman
 ```
 bazel run -c opt //server:image-nonroot-amd64-load

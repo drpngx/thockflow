@@ -13,7 +13,7 @@ use axum::{routing::get, Router, Json};
 use futures::future::BoxFuture;
 use futures::ready;
 use thockflow::ServerAppProps;
-use thockflow::keymap::{KeymapData, PhysicalKey, Layer};
+use thockflow::keymap::{KeymapData, PhysicalKey, Layer, parse_raw_bindings};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio_util::task::LocalPoolHandle;
@@ -403,7 +403,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                 if val_node.kind() != "identifier" {
                                     let raw_val = val_node.utf8_text(source).unwrap_or("");
                                     let num_re = r"\(?([\d-]+)\)?";
-                                    // Format: width, height, x, y, rotation, col_offset, row_offset
+                                    // Format: width, height, x, y, rotation, rx, ry
                                     let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re, num_re, num_re, num_re);
                                     let key_regex = regex::Regex::new(&key_re_str).unwrap();
                                     for cap in key_regex.captures_iter(raw_val) {
@@ -413,6 +413,8 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                             x: cap[3].parse().unwrap_or(0),
                                             y: cap[4].parse().unwrap_or(0),
                                             rotation: cap[5].parse().unwrap_or(0),
+                                            rx: cap[6].parse().unwrap_or(0),
+                                            ry: cap[7].parse().unwrap_or(0),
                                         });
                                     }
                                 }
@@ -443,43 +445,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                     for val_node in inner_child.children(&mut prop_cursor) {
                                         if val_node.kind() != "identifier" {
                                             let raw_val = val_node.utf8_text(source).unwrap_or("");
-                                            
-                                            // Improved parsing using ZMK_BEHAVIORS
-                                            let tokens: Vec<&str> = raw_val.split_whitespace().collect();
-                                            let mut i = 0;
-                                                    while i < tokens.len() {
-                                                        let token = tokens[i].trim_matches(|c| c == '<' || c == '>' || c == ';' || c == ' ');
-                                                        if token.starts_with('&') {
-                                                            let behavior_name = &token[1..];
-                                                            // Find behavior
-                                                            let behavior = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name);
-                                                            let mut binding = token.to_string();
-                                                            if let Some(b) = behavior {
-                                                                let mut cells = b.binding_cells;
-                                                                
-                                                                // Special case for &bt which can take 1 or 2 cells depending on command
-                                                                if behavior_name == "bt" {
-                                                                    if let Some(cmd) = tokens.get(i + 1) {
-                                                                        let cmd = cmd.trim_matches(|c| c == '>' || c == ';');
-                                                                        if !["BT_SEL", "BT_DISC"].contains(&cmd) {
-                                                                            cells = 1;
-                                                                        }
-                                                                    }
-                                                                }
-
-                                                                for _ in 0..cells {
-                                                                    i += 1;
-                                                                    if i < tokens.len() {
-                                                                        binding.push(' ');
-                                                                        binding.push_str(tokens[i].trim_matches(|c| c == '>' || c == ';'));
-                                                                    }
-                                                                }
-                                                            }
-                                                            // info!("Parsed binding: {}", binding); // Keep this commented out if too noisy, but useful for debugging
-                                                            bindings.push(binding);
-                                                        }
-                                                        i += 1;
-                                                    }
+                                            bindings.extend(parse_raw_bindings(raw_val));
                                         }
                                     }
                                 }
@@ -537,6 +503,8 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                 x: k.x,
                 y: k.y,
                 rotation: k.rotation,
+                rx: k.rx,
+                ry: k.ry,
             }).collect();
         }
     }
@@ -668,8 +636,8 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
             ],
             layers: vec![
                 Layer { name: "new_layer_0".to_string(), bindings: vec!["&kp X".to_string(), "&kp Y".to_string()] },
@@ -698,8 +666,8 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
             ],
             layers: vec![
                 Layer { name: "layer_0".to_string(), bindings: vec!["&kp LONG_BINDING".to_string(), "&kp B".to_string()] },
@@ -730,8 +698,8 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
             ],
             layers: vec![
                 Layer { name: "layer_0".to_string(), bindings: vec!["&kp A".to_string(), "&kp B".to_string()] },
@@ -787,8 +755,8 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0 },
+                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
             ],
             layers: vec![
                 Layer { name: "layer_0".to_string(), bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()] },

@@ -179,6 +179,10 @@ pub struct PhysicalKey {
     pub width: i32,
     pub height: i32,
     pub rotation: i32,
+    #[serde(default)]
+    pub rx: i32,
+    #[serde(default)]
+    pub ry: i32,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -192,6 +196,72 @@ pub struct KeymapData {
     pub physical_layout: Vec<PhysicalKey>,
     pub layers: Vec<Layer>,
     pub includes: Vec<String>,
+}
+
+/// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.
+/// ZMK C macros like RGB_TOG expand to 2 cell values from 1 token, so
+/// `binding_cells` from the DTS doesn't match the raw token count.
+pub fn raw_param_count(behavior_name: &str, first_param: Option<&str>) -> usize {
+    let behavior_name = behavior_name.strip_prefix('&').unwrap_or(behavior_name);
+    if let Some(meta) = behaviors::ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name) {
+        if meta.binding_cells == 2 {
+            if let Some(c_inc) = meta.c_include {
+                // Behaviors with C header macros: most constants pack 2 cells into 1 token.
+                // Exceptions are constants that expand to just a command (needing a user-supplied value).
+                match c_inc {
+                    "dt-bindings/zmk/bt.h" => match first_param {
+                        Some("BT_SEL") | Some("BT_DISC") => 2,
+                        _ => 1,
+                    },
+                    "dt-bindings/zmk/backlight.h" => match first_param {
+                        Some("BL_SET") => 2,
+                        _ => 1,
+                    },
+                    // rgb.h, etc.: all constants expand to CMD + 0 (2 cells from 1 token)
+                    _ => 1,
+                }
+            } else {
+                meta.binding_cells as usize
+            }
+        } else {
+            meta.binding_cells as usize
+        }
+    } else {
+        0 // Unknown behavior, assume no params
+    }
+}
+
+/// Parse raw DTS binding tokens into individual binding strings.
+/// Handles the fact that ZMK C macros pack multiple cell values into single tokens.
+pub fn parse_raw_bindings(raw: &str) -> Vec<String> {
+    let tokens: Vec<&str> = raw.split_whitespace().collect();
+    let mut bindings = Vec::new();
+    let mut i = 0;
+    while i < tokens.len() {
+        let token = tokens[i].trim_matches(|c| c == '<' || c == '>' || c == ';' || c == ' ');
+        if token.starts_with('&') {
+            let behavior_name = &token[1..];
+            let behavior = behaviors::ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name);
+            let mut binding = token.to_string();
+            if let Some(b) = behavior {
+                for _ in 0..b.binding_cells {
+                    if i + 1 < tokens.len() {
+                        let next = tokens[i + 1].trim_matches(|c| c == '>' || c == ';');
+                        // Stop consuming params if we hit another behavior reference
+                        if next.starts_with('&') {
+                            break;
+                        }
+                        i += 1;
+                        binding.push(' ');
+                        binding.push_str(next);
+                    }
+                }
+            }
+            bindings.push(binding);
+        }
+        i += 1;
+    }
+    bindings
 }
 
 fn escape_xml(s: &str) -> String {
@@ -210,10 +280,28 @@ pub fn generate_svg(data: &KeymapData) -> String {
     let mut avg_w = 0.0;
     for pk in &data.physical_layout {
         avg_w += pk.width as f32;
-        if pk.x < min_x { min_x = pk.x; }
-        if pk.x + pk.width > max_x { max_x = pk.x + pk.width; }
-        if pk.y < min_y { min_y = pk.y; }
-        if pk.y + pk.height > max_y { max_y = pk.y + pk.height; }
+        if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) {
+            // Compute rotated key corners for accurate bounding box
+            let rad = (pk.rotation as f64 / 100.0) * std::f64::consts::PI / 180.0;
+            let cos_r = rad.cos();
+            let sin_r = rad.sin();
+            let corners = [(pk.x, pk.y), (pk.x + pk.width, pk.y), (pk.x, pk.y + pk.height), (pk.x + pk.width, pk.y + pk.height)];
+            for (cx, cy) in corners {
+                let dx = (cx - pk.rx) as f64;
+                let dy = (cy - pk.ry) as f64;
+                let rx = pk.rx as f64 + dx * cos_r - dy * sin_r;
+                let ry = pk.ry as f64 + dx * sin_r + dy * cos_r;
+                if (rx as i32) < min_x { min_x = rx as i32; }
+                if (rx as i32) > max_x { max_x = rx as i32; }
+                if (ry as i32) < min_y { min_y = ry as i32; }
+                if (ry as i32) > max_y { max_y = ry as i32; }
+            }
+        } else {
+            if pk.x < min_x { min_x = pk.x; }
+            if pk.x + pk.width > max_x { max_x = pk.x + pk.width; }
+            if pk.y < min_y { min_y = pk.y; }
+            if pk.y + pk.height > max_y { max_y = pk.y + pk.height; }
+        }
     }
     if data.physical_layout.is_empty() { return String::new(); }
     avg_w /= data.physical_layout.len() as f32;
@@ -248,9 +336,17 @@ pub fn generate_svg(data: &KeymapData) -> String {
             let y = pk.y as f32 * pos_scale + offset_y;
             let w = (pk.width as f32 * size_scale).max(20.0) - 4.0;
             let h = (pk.height as f32 * size_scale).max(20.0) - 4.0;
-            let rotation = pk.rotation as f32 / 1000.0;
+            let rotation = pk.rotation as f32 / 100.0;
 
-            svg.push_str(&format!(r#"<g transform="translate({}, {}) rotate({})">"#, x + w/2.0, y + h/2.0, rotation));
+            let transform = if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) {
+                let rx_s = pk.rx as f32 * pos_scale + offset_x;
+                let ry_s = pk.ry as f32 * pos_scale + offset_y;
+                format!(r#"translate({}, {}) rotate({}) translate({}, {})"#,
+                    rx_s, ry_s, rotation, x - rx_s + w / 2.0, y - ry_s + h / 2.0)
+            } else {
+                format!(r#"translate({}, {}) rotate({})"#, x + w / 2.0, y + h / 2.0, rotation)
+            };
+            svg.push_str(&format!(r#"<g transform="{}">"#, transform));
             svg.push_str(&format!(r#"<rect x="{}" y="{}" width="{}" height="{}" rx="2" ry="2" class="key" />"#, -w/2.0, -h/2.0, w, h));
 
             if !parts.top_left.is_empty() {
@@ -991,8 +1087,14 @@ fn KeymapRenderer(props: &RendererProps) -> Html {
                     let parts = get_binding_parts(&binding);
                     let x = (pk.x as f32 * pos_scale + offset_x) as i32; let y = (pk.y as f32 * pos_scale) as i32;
                     let w = (pk.width as f32 * size_scale).max(20.0) as i32 - 4; let h = (pk.height as f32 * size_scale).max(20.0) as i32 - 4;
-                    let rotation_deg = pk.rotation as f32 / 1000.0;
-                    let style = format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg);
+                    let rotation_deg = pk.rotation as f32 / 100.0;
+                    let style = if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) {
+                        let rx_s = (pk.rx as f32 * pos_scale + offset_x) as i32;
+                        let ry_s = (pk.ry as f32 * pos_scale) as i32;
+                        format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg); transform-origin: {}px {}px;", x, y, w, h, rotation_deg, rx_s - x, ry_s - y)
+                    } else {
+                        format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg)
+                    };
                     let onclick = { let on_key_click = on_key_click.clone(); Callback::from(move |_| on_key_click.emit(i)) };
                     let hint = hints.get(i);
                     let show_hint = *jump_mode_active && hint.map(|h| h.starts_with(&*jump_input)).unwrap_or(false);
@@ -1118,12 +1220,8 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let selected_param_idx = use_state(|| 0usize);
     let is_modifier_only_param = |behavior_name: &str, param_idx: usize| behavior_name == "sk" || (behavior_name == "mt" && param_idx == 0);
     let get_expected_param_count = |behavior_label: &str, params: &[String]| -> usize {
-        let behavior_name = behavior_label.strip_prefix('&').unwrap_or(behavior_label);
-        if let Some(meta) = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(behavior_name) || b.name == behavior_name) {
-            if behavior_name == "bt" { if let Some(cmd) = params.get(0) { if cmd == "BT_SEL" || cmd == "BT_DISC" { return 2; } else { return 1; } } return 1; }
-            return meta.binding_cells as usize;
-        }
-        params.len()
+        let count = raw_param_count(behavior_label, params.get(0).map(|s| s.as_str()));
+        if count > 0 { count } else { params.len() }
     };
     let expected_p_count = get_expected_param_count(&*current_behavior_label, &*current_params);
     let is_valid = {
@@ -1299,12 +1397,12 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     let mut current_binding_full = (*current_behavior_label).clone(); for p in &*current_params { current_binding_full.push(' '); current_binding_full.push_str(p); }
     let preview_parts = get_binding_parts(&current_binding_full);
     let selected_pk = &props.data.physical_layout[props.selected_key.key_index];
-    let preview_style = format!("transform: rotate({}deg);", selected_pk.rotation as f32 / 1000.0);
+    let preview_style = format!("transform: rotate({}deg);", selected_pk.rotation as f32 / 100.0);
     html! {
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="bg-[#1a202c] text-white rounded-lg shadow-2xl flex max-w-5xl w-full overflow-hidden border border-gray-700 h-[80vh]">
                 <div class="flex-1 p-8 overflow-y-auto flex flex-col">
-                    <div class="flex justify-center mb-8 relative h-32 w-full shrink-0"> <div class="relative"> { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| { let is_selected = i == props.selected_key.key_index; let x = (pk.x as f32 * mini_scale) as i32; let y = (pk.y as f32 * mini_scale) as i32; let w = (pk.width as f32 * mini_scale).max(4.0) as i32 - 1; let h = (pk.height as f32 * mini_scale).max(4.0) as i32 - 1; let style = format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, pk.rotation as f32 / 1000.0); let class = if is_selected { "bg-green-500" } else { "bg-gray-700" }; html! { <div class={classes!("absolute", "rounded-sm", class)} style={style} /> } })} </div>
+                    <div class="flex justify-center mb-8 relative h-32 w-full shrink-0"> <div class="relative"> { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| { let is_selected = i == props.selected_key.key_index; let x = (pk.x as f32 * mini_scale) as i32; let y = (pk.y as f32 * mini_scale) as i32; let w = (pk.width as f32 * mini_scale).max(4.0) as i32 - 1; let h = (pk.height as f32 * mini_scale).max(4.0) as i32 - 1; let rotation_deg = pk.rotation as f32 / 1000.0; let style = if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) { let rx_s = (pk.rx as f32 * mini_scale) as i32; let ry_s = (pk.ry as f32 * mini_scale) as i32; format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg); transform-origin: {}px {}px;", x, y, w, h, rotation_deg, rx_s - x, ry_s - y) } else { format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg) }; let class = if is_selected { "bg-green-500" } else { "bg-gray-700" }; html! { <div class={classes!("absolute", "rounded-sm", class)} style={style} /> } })} </div>
                         <div class="flex items-center ml-24 space-x-8"> <span class="text-2xl text-gray-400">{"→"}</span> <div class="bg-gray-800 w-16 h-16 rounded-lg border border-gray-600 flex items-center justify-center relative font-mono shadow-inner" style={preview_style}> { if !preview_parts.top_left.is_empty() { html! { <span class="absolute top-1 left-1 text-[8px] text-gray-400 leading-none">{preview_parts.top_left}</span> } } else { html! {} } } { if !preview_parts.top_right.is_empty() { html! { <span class="absolute top-1 right-1 text-[8px] text-gray-400 leading-none text-right max-w-[70%] truncate">{preview_parts.top_right}</span> } } else { html! {} } } <span class="text-xl font-bold">{preview_parts.center}</span> </div> </div>
                     </div>
                     <div class="mb-6 shrink-0"> <input ref={input_ref} type="text" class={classes!("w-full", "bg-gray-900", "border", "text-2xl", "p-4", "rounded", "font-mono", "focus:outline-none", if is_valid { vec!["border-gray-600", "focus:border-blue-500"] } else { vec!["border-red-500", "focus:border-red-400", "text-red-200"] })} value={(*current_text).clone()} oninput={let update = update_from_text.clone(); Callback::from(move |e: InputEvent| { let input: HtmlInputElement = e.target_unchecked_into(); update.emit(input.value()); })} onkeydown={on_keydown} /> { if !is_valid { html! { <div class="text-red-400 text-sm mt-1">{"Invalid binding: incomplete or incorrect parameters."}</div> } } else { html! {} }} </div>
