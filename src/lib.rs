@@ -1,4 +1,5 @@
 pub mod keymap;
+pub mod kanata;
 mod typing;
 pub mod vial;
 
@@ -23,6 +24,8 @@ pub enum Route {
     Typing,
     #[at("/keymap")]
     Keymap,
+    #[at("/kanata")]
+    Kanata,
     #[at("/vial")]
     Vial,
 }
@@ -88,6 +91,11 @@ fn Navbar() -> Html {
                         {"Keymap"}
                     </button>
                 </Link<Route>>
+                <Link<Route> classes="p-4 text-3xl  " to={Route::Kanata}>
+                    <button >
+                        {"Kanata"}
+                    </button>
+                </Link<Route>>
                 <Link<Route> classes="p-4 text-3xl  " to={Route::Vial}>
                     <button >
                         {"Vial"}
@@ -144,6 +152,13 @@ fn switch(route: Route) -> Html {
                         <div class="w-full font-body flex px-2 flex-col items-center">
                             <div class="w-full max-w-[1920px]">
                                 <keymap::KeymapHome />
+                            </div>
+                        </div>
+                    },
+                    Route::Kanata => html! {
+                        <div class="w-full font-body flex px-2 flex-col items-center">
+                            <div class="w-full max-w-[1920px]">
+                                <kanata::KanataHome />
                             </div>
                         </div>
                     },

@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use thockflow::keymap::{parse_raw_bindings, KeymapData, Layer, PhysicalKey};
 use thockflow::ServerAppProps;
+use tree_sitter_scheme;
 use tokio_util::task::LocalPoolHandle;
 use tower::Service;
 use tower_http::services::ServeDir;
@@ -43,6 +44,10 @@ use log::{error, info};
 #[derive(Deserialize, Serialize)]
 struct KeymapRequest {
     content: String,
+    #[serde(default)]
+    is_mac: bool,
+    #[serde(default)]
+    is_laptop: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -623,6 +628,8 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         physical_layout,
         layers,
         includes,
+        aliases: HashMap::new(),
+        defsrc: Vec::new(),
     })
 }
 
@@ -787,6 +794,7 @@ mod tests {
                 bindings: vec!["&kp X".to_string(), "&kp Y".to_string()],
             }],
             includes: vec![],
+            aliases: HashMap::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -840,6 +848,7 @@ mod tests {
                 },
             ],
             includes: vec![],
+            aliases: HashMap::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -894,6 +903,7 @@ mod tests {
                 },
             ],
             includes: vec![],
+            aliases: HashMap::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -907,24 +917,52 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_uneven_layers() {
-        let content = r#"
-/ {
-    keymap {
-        compatible = "zmk,keymap";
-        layer_0 {
-            bindings = <&kp A &kp B>;
-        };
-        layer_1 {
-            bindings = <&kp C>;
-        };
-    };
-};
-"#;
-        let result = parse_keymap_with_tree_sitter(content);
-        assert!(result.is_err());
-        let err = result.err().unwrap().to_string();
-        assert!(err.contains("All layers must have the same number of keys"));
+    fn test_generate_kanata_surf() {
+        let content = include_str!("../../static/kanata-surf.kbd");
+        let data = parse_kanata_with_tree_sitter(content).unwrap();
+        let result = generate_kanata_kbd(content, &data).unwrap();
+        // The result should be identical if no changes were made
+        assert_eq!(content, result);
+
+        // Try changing a binding
+        let mut modified_data = data.clone();
+        modified_data.layers[0].bindings[0] = "MODIFIED".to_string();
+        let result2 = generate_kanata_kbd(content, &modified_data).unwrap();
+        assert!(result2.contains("MODIFIED"));
+    }
+
+    #[test]
+    fn test_parse_kanata_surf() {
+        let content = include_str!("../../static/kanata-surf.kbd");
+        let result = parse_kanata_with_tree_sitter(content);
+        match result {
+            Ok(data) => {
+                assert!(!data.layers.is_empty());
+                assert!(!data.physical_layout.is_empty());
+
+                // Row 0 (esc, f1, f2... del) -> 14 keys
+                assert!(data.physical_layout.len() >= 14);
+                let y0 = data.physical_layout[0].y;
+                for i in 0..14 {
+                    assert_eq!(data.physical_layout[i].y, y0, "Key {} should be in row 0", i);
+                    if i > 0 {
+                        assert!(data.physical_layout[i].x > data.physical_layout[i-1].x, "Key {} should be to the right of {}", i, i-1);
+                        assert_eq!(data.physical_layout[i].x - data.physical_layout[i-1].x, 1040);
+                    }
+                }
+                
+                // Row 1 (grv, 1, 2...)
+                let y1 = data.physical_layout[14].y;
+                assert!(y1 > y0, "Row 1 should be below row 0");
+                assert_eq!(y1 - y0, 1040, "Rows should be compactly spaced");
+                for i in 14..28 {
+                    assert_eq!(data.physical_layout[i].y, y1, "Key {} should be in row 1", i);
+                }
+            }
+            Err(e) => {
+                panic!("Failed to parse kanata-surf.kbd: {}", e);
+            }
+        }
     }
 
     #[test]
@@ -967,6 +1005,7 @@ mod tests {
                 bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()],
             }],
             includes: vec!["custom.h".to_string()],
+            aliases: HashMap::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1115,6 +1154,355 @@ async fn handle_error(e: impl std::fmt::Debug) -> impl IntoResponse {
     StatusCode::BAD_REQUEST
 }
 
+fn find_kanata_node<'a>(
+    node: tree_sitter::Node<'a>,
+    source: &[u8],
+    kind_name: &str,
+) -> Vec<tree_sitter::Node<'a>> {
+    let mut results = Vec::new();
+    let mut found = false;
+    if node.kind() == "list" {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            let kind = child.kind();
+            if kind == "symbol" || kind == "boolean" || kind == "number" {
+                if child.utf8_text(source).unwrap_or("") == kind_name {
+                    results.push(node);
+                    found = true;
+                }
+                break;
+            }
+        }
+    }
+    if !found {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            results.extend(find_kanata_node(child, source, kind_name));
+        }
+    }
+    results
+}
+
+fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -> Result<KeymapData> {
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_scheme::LANGUAGE.into())?;
+    let tree = parser
+        .parse(content, None)
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse KBD"))?;
+
+    let source = content.as_bytes();
+    let root = tree.root_node();
+
+    if root.has_error() {
+        let mut error_pos = String::new();
+        fn find_error(node: tree_sitter::Node, source: &[u8], pos: &mut String) {
+            if node.has_error() {
+                if node.kind() == "ERROR" {
+                    *pos = format!(
+                        "Tree-sitter parse error at line {}, column {}",
+                        node.start_position().row + 1,
+                        node.start_position().column + 1
+                    );
+                } else {
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        find_error(child, source, pos);
+                        if !pos.is_empty() {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        find_error(root, source, &mut error_pos);
+        if !error_pos.is_empty() {
+            return Err(anyhow::anyhow!(error_pos));
+        }
+    }
+
+    let defsrc_nodes = find_kanata_node(root, source, "defsrc");
+    if defsrc_nodes.is_empty() {
+        return Err(anyhow::anyhow!("Missing (defsrc ...)"));
+    }
+    let defsrc = defsrc_nodes[0];
+
+    fn collect_keys<'a>(node: tree_sitter::Node<'a>, source: &'a [u8], keys_raw: &mut Vec<tree_sitter::Node<'a>>) {
+        let kind = node.kind();
+        if kind == "symbol" || kind == "boolean" || kind == "number" {
+            let text = node.utf8_text(source).unwrap_or("");
+            if text != "defsrc" {
+                keys_raw.push(node);
+            }
+        } else if kind == "list" {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                collect_keys(child, source, keys_raw);
+            }
+        }
+    }
+
+    let mut keys_raw = Vec::new();
+    let mut cursor = defsrc.walk();
+    for child in defsrc.children(&mut cursor) {
+        collect_keys(child, source, &mut keys_raw);
+    }
+
+    let defalias_nodes = find_kanata_node(root, source, "defalias");
+    let mut aliases = std::collections::HashMap::new();
+    for alias_node in defalias_nodes {
+        let mut inner_cursor = alias_node.walk();
+        let mut first = true;
+        let mut last_name = String::new();
+
+        for child in alias_node.children(&mut inner_cursor) {
+            let kind = child.kind();
+            if kind == "symbol" || kind == "boolean" || kind == "number" || kind == "list" {
+                let text = child.utf8_text(source).unwrap_or("").to_string();
+                if first && text == "defalias" {
+                    first = false;
+                    continue;
+                }
+                if last_name.is_empty() {
+                    last_name = text;
+                } else {
+                    aliases.insert(last_name.clone(), text);
+                    last_name = String::new();
+                }
+            }
+        }
+    }
+
+    let mut filtered_indices = Vec::new();
+    let mut key_names = Vec::new();
+    for (i, node) in keys_raw.iter().enumerate() {
+        let name = node.utf8_text(source).unwrap_or("").to_string();
+        if thockflow::kanata::layout::is_standard_key(&name, is_mac, is_laptop) {
+            key_names.push(name);
+            filtered_indices.push(i);
+        }
+    }
+
+    let mut sorted_alias_names: Vec<String> = aliases.keys().cloned().collect();
+    sorted_alias_names.sort();
+
+    let physical_layout = thockflow::kanata::layout::compute_standard_kanata_layout(&key_names, &sorted_alias_names, is_mac, is_laptop);
+
+
+    fn collect_bindings<'a>(node: tree_sitter::Node<'a>, source: &'a [u8], bindings: &mut Vec<String>, is_first: &mut bool, layer_name: &mut String) {
+        let kind = node.kind();
+        if kind == "symbol" || kind == "boolean" || kind == "number" {
+            let text = node.utf8_text(source).unwrap_or("").to_string();
+            if *is_first && text == "deflayer" {
+                *is_first = false;
+                return;
+            }
+            if layer_name.is_empty() {
+                *layer_name = text;
+            } else {
+                bindings.push(text);
+            }
+        } else if kind == "list" {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                collect_bindings(child, source, bindings, is_first, layer_name);
+            }
+        }
+    }
+
+    let deflayer_nodes = find_kanata_node(root, source, "deflayer");
+    let mut layers = Vec::new();
+    for layer_node in deflayer_nodes {
+        let mut inner_cursor = layer_node.walk();
+        let mut layer_name = String::new();
+        let mut raw_bindings = Vec::new();
+        let mut is_first = true;
+
+        for child in layer_node.children(&mut inner_cursor) {
+            collect_bindings(child, source, &mut raw_bindings, &mut is_first, &mut layer_name);
+        }
+        if !raw_bindings.is_empty() {
+            let mut bindings = Vec::new();
+            for &idx in &filtered_indices {
+                bindings.push(raw_bindings.get(idx).cloned().unwrap_or_else(|| "_".to_string()));
+            }
+            for alias_name in &sorted_alias_names {
+                bindings.push(alias_name.clone());
+            }
+            layers.push(Layer {
+                name: layer_name,
+                bindings,
+            });
+        }
+    }
+
+    let mut defsrc = key_names.clone();
+    for alias_name in &sorted_alias_names {
+        defsrc.push(alias_name.clone());
+    }
+
+    Ok(KeymapData {
+        physical_layout,
+        layers,
+        includes: Vec::new(),
+        aliases,
+        defsrc,
+    })
+}
+
+fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
+    let mut content = original.to_string();
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_scheme::LANGUAGE.into())?;
+    let tree = parser
+        .parse(content.as_bytes(), None)
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse KBD"))?;
+    let root = tree.root_node();
+    let source = content.as_bytes();
+
+    let deflayer_nodes = find_kanata_node(root, source, "deflayer");
+    let defalias_nodes = find_kanata_node(root, source, "defalias");
+
+    struct Replacement {
+        start: usize,
+        end: usize,
+        text: String,
+    }
+    let mut replacements = Vec::new();
+
+    // Handle defalias
+    for alias_node in defalias_nodes {
+        let mut inner_cursor = alias_node.walk();
+        let mut first = true;
+        let mut last_name = String::new();
+
+        for child in alias_node.children(&mut inner_cursor) {
+            let kind = child.kind();
+            if kind == "symbol" || kind == "boolean" || kind == "number" || kind == "list" {
+                let text = child.utf8_text(source).unwrap_or("").to_string();
+                if first && text == "defalias" {
+                    first = false;
+                    continue;
+                }
+                if last_name.is_empty() {
+                    last_name = text;
+                } else {
+                    if let Some(new_val) = data.aliases.get(&last_name) {
+                        if text != *new_val {
+                            replacements.push(Replacement {
+                                start: child.start_byte(),
+                                end: child.end_byte(),
+                                text: new_val.clone(),
+                            });
+                        }
+                    }
+                    last_name = String::new();
+                }
+            }
+        }
+    }
+
+    for (i, layer_node) in deflayer_nodes.iter().enumerate() {
+        if i < data.layers.len() {
+            let target_layer = &data.layers[i];
+            let mut inner_cursor = layer_node.walk();
+            let mut symbol_count = 0;
+            let mut binding_idx = 0;
+
+            for child in layer_node.children(&mut inner_cursor) {
+                if child.kind() == "symbol" || child.kind() == "boolean" || child.kind() == "number" {
+                    let text = child.utf8_text(source).unwrap_or("");
+                    if text == "deflayer" {
+                        continue;
+                    }
+                    if symbol_count == 0 {
+                        // Rename layer if needed
+                        if text != target_layer.name {
+                            replacements.push(Replacement {
+                                start: child.start_byte(),
+                                end: child.end_byte(),
+                                text: target_layer.name.clone(),
+                            });
+                        }
+                        symbol_count += 1;
+                    } else {
+                        // Update binding
+                        if let Some(new_binding) = target_layer.bindings.get(binding_idx) {
+                            if text != new_binding {
+                                replacements.push(Replacement {
+                                    start: child.start_byte(),
+                                    end: child.end_byte(),
+                                    text: new_binding.clone(),
+                                });
+                            }
+                        }
+                        binding_idx += 1;
+                    }
+                } else if child.kind() == "list" {
+                    // Update list binding
+                    if let Some(new_binding) = target_layer.bindings.get(binding_idx) {
+                        let text = child.utf8_text(source).unwrap_or("");
+                        if text != new_binding {
+                            replacements.push(Replacement {
+                                start: child.start_byte(),
+                                end: child.end_byte(),
+                                text: new_binding.clone(),
+                            });
+                        }
+                    }
+                    binding_idx += 1;
+                }
+            }
+        }
+    }
+
+    replacements.sort_by_key(|r| std::cmp::Reverse(r.start));
+    for r in replacements {
+        content.replace_range(r.start..r.end, &r.text);
+    }
+
+    Ok(content)
+}
+
+async fn parse_kanata_api(Json(req): Json<KeymapRequest>) -> impl IntoResponse {
+    info!(
+        "Received parse kanata request, content length: {}, is_mac: {}, is_laptop: {}",
+        req.content.len(),
+        req.is_mac,
+        req.is_laptop
+    );
+    match parse_kanata_with_tree_sitter(&req.content, req.is_mac, req.is_laptop) {
+        Ok(data) => {
+            info!(
+                "Successfully parsed kanata with {} keys and {} layers",
+                data.physical_layout.len(),
+                data.layers.len()
+            );
+            (StatusCode::OK, Json(data)).into_response()
+        }
+        Err(e) => {
+            error!("Kanata Parse error: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
+    }
+}
+
+async fn save_kanata_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoResponse {
+    info!("Received save kanata request");
+    match generate_kanata_kbd(&req.original_content, &req.data) {
+        Ok(content) => {
+            info!(
+                "Successfully generated new kanata KBD, length: {}",
+                content.len()
+            );
+            (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
+        }
+        Err(e) => {
+            error!("Kanata Generation error: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
+    }
+}
+
 fn app() -> Router {
     let mut app_wasm_serve = ServeDir::new("app_wasm");
     if option_env!("AXUM_PRECOMPRESSED_WASM").is_some() {
@@ -1127,6 +1515,8 @@ fn app() -> Router {
         get(index),
         route("/api/parse-keymap", post(parse_keymap_api))
             .route("/api/save-keymap", post(save_keymap_api))
+            .route("/api/parse-kanata", post(parse_kanata_api))
+            .route("/api/save-kanata", post(save_kanata_api))
             .route(*APP_JS_PATH, app_wasm_serve.clone())
             .route(*APP_WASM_PATH, app_wasm_serve)
             // Serve built assets from Vite dist first

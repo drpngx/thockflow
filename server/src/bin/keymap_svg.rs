@@ -244,6 +244,8 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         physical_layout,
         layers,
         includes,
+        aliases: std::collections::HashMap::new(),
+        defsrc: Vec::new(),
     })
 }
 

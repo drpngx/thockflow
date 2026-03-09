@@ -35,7 +35,9 @@ web-sys = { version = "0.3.58", features = [
     "Blob",
     "Url",
     "HtmlAnchorElement",
-    "KeyboardEvent"
+    "KeyboardEvent",
+    "Navigator",
+    "BatteryManager"
 ] }
 js-sys = "0.3"
 regex = "1"

@@ -41,6 +41,14 @@ Vial:
 - TAB should move the inner tabs?
 - test matrix
 
+Tidy:
+- implement the same pretty keys everywhere
+- implement the OS pretty keys everywhere
+- share code for basic operations with Traits, at some point
+- tree-sitter goes in a sandboxed process
+- implement C-o and C-s for all tabs
+
+
 Mod-tap optimizer:
 - vial connect to read the tap terms
 - use kanata as a hardware-independent quick turnaround config instead

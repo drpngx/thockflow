@@ -28,6 +28,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tree-sitter = "0.25"
 tree-sitter-devicetree = "0.15"
+tree-sitter-scheme = "0.24.7"
+kanata-parser = "0.1100.0"
 regex = "1"
 runfiles = { version = "0.1", optional = true }
 roxmltree = "0.20"

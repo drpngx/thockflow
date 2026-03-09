@@ -8,26 +8,26 @@ use yew::prelude::*;
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = showOpenFilePicker)]
-    fn show_open_file_picker(options: &JsValue) -> js_sys::Promise;
+    pub fn show_open_file_picker(options: &JsValue) -> js_sys::Promise;
 
     #[wasm_bindgen(method, js_name = getFile)]
-    fn get_file(this: &FileSystemFileHandle) -> js_sys::Promise;
+    pub fn get_file(this: &FileSystemFileHandle) -> js_sys::Promise;
 
     #[wasm_bindgen(method, js_name = createWritable)]
-    fn create_writable(this: &FileSystemFileHandle) -> js_sys::Promise;
+    pub fn create_writable(this: &FileSystemFileHandle) -> js_sys::Promise;
 
     #[derive(Clone, PartialEq)]
     #[wasm_bindgen]
     pub type FileSystemFileHandle;
 
     #[wasm_bindgen(method, getter)]
-    fn name(this: &FileSystemFileHandle) -> String;
+    pub fn name(this: &FileSystemFileHandle) -> String;
 
     #[wasm_bindgen(method, js_name = write)]
-    fn write(this: &FileSystemWritableFileStream, data: &JsValue) -> js_sys::Promise;
+    pub fn write(this: &FileSystemWritableFileStream, data: &JsValue) -> js_sys::Promise;
 
     #[wasm_bindgen(method, js_name = close)]
-    fn close(this: &FileSystemWritableFileStream) -> js_sys::Promise;
+    pub fn close(this: &FileSystemWritableFileStream) -> js_sys::Promise;
 
     #[derive(Clone, PartialEq)]
     #[wasm_bindgen]
@@ -231,6 +231,10 @@ pub struct KeymapData {
     pub physical_layout: Vec<PhysicalKey>,
     pub layers: Vec<Layer>,
     pub includes: Vec<String>,
+    #[serde(default)]
+    pub aliases: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub defsrc: Vec<String>,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.
