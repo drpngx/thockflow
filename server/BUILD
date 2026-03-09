@@ -3,6 +3,7 @@ load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_load", "oc
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("//tools:platform_transitions.bzl", "platform_passthrough")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 rust_binary(
     name = "zmk_behaviors",
@@ -206,6 +207,30 @@ filegroup(
     name = "image-nonroot-amd64-tarball",
     srcs = [":image-nonroot-amd64-load"],
     output_group = "tarball",
+)
+
+oci_load(
+    name = "cloudflared-load",
+    image = "@cloudflared_linux_amd64",
+    repo_tags = ["cloudflare/cloudflared:latest"],
+)
+
+filegroup(
+    name = "cloudflared-tarball",
+    srcs = [":cloudflared-load"],
+    output_group = "tarball",
+)
+
+py_binary(
+    name = "serve",
+    srcs = ["serve.py"],
+    data = [
+        "//server:image-nonroot-amd64-tarball",
+        "//server:cloudflared-tarball",
+        "//:podman-compose.yaml",
+    ],
+    imports = [".."], # Helps resolve modules from the workspace root
+    deps = ["@rules_python//python/runfiles"],
 )
 
 # uses https://github.com/awslabs/amazon-ecr-credential-helper

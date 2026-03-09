@@ -11,6 +11,11 @@ or the unoptimized version:
 env HTTP_LISTEN_ADDR=0.0.0.0:8081 RUST_BACKTRACE=1 RUST_LOG=info bazel run //server:server
 ```
 
+## Exporting with my environment
+```
+envgpg -e THOCKFLOW bazel run -c opt //server:serve
+```
+
 ## Rehash the zmk behaviors file
 ```
 env HTTP_LISTEN_ADDR=0.0.0.0:8081 RUST_BACKTRACE=1 RUST_LOG=info bazel run -c opt //server:zmk_behaviors
@@ -20,11 +25,6 @@ Not a `genrule`, so that I may still watch the git diffs as they pass by.
 ## Dump an svg
 ```
 bazel run -c opt //server:keymap_svg -- ~/glove80/zmk-config/config/glove80.keymap
-```
-## Running the rootless podman
-```
-bazel run -c opt //server:image-nonroot-amd64-load
-podman-compose -f podman-compose.yaml up
 ```
 
 ## More quotes prompt

@@ -10,6 +10,8 @@ package(
     default_visibility = ["//:__subpackages__"],
 )
 
+exports_files(["podman-compose.yaml"])
+
 config_setting(
     name = "debug",
     values = {

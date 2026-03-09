@@ -1,19 +1,23 @@
-#
 services:
   thockflow:
     container_name: thockflow
-    image: thockflow:latest
+    image: localhost/thockflow:latest
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    environment:
+      - HTTP_LISTEN_ADDR=10.89.1.5:8080
     networks:
-      - thockflow_internal
+      thockflow_internal:
+        ipv4_address: 10.89.1.5
 
   cloudflared:
     container_name: cloudflared-thockflow
-    image: docker.io/cloudflare/cloudflared:latest
+    image: localhost/cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_THOCKFLOW}
     networks:
-      - thockflow
+      - thockflow_external
       - thockflow_internal
     labels:
       - "io.containers.autoupdate=registry"
@@ -21,6 +25,11 @@ services:
       - thockflow
 
 networks:
-  thockflow:
   thockflow_internal:
     internal: true
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.1.0/24
+  thockflow_external:
+    driver: bridge
