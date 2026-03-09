@@ -31,6 +31,16 @@ bazel run -c opt //server:keymap_svg -- ~/glove80/zmk-config/config/glove80.keym
 I want to generate long quotes for a typing practice. They don't have to be actual quotes. They must be about 150 words long. Please output a text file that has one such quote on each line. Please generate 20 quotes. Put each quote on a line, and no blank lines in between. I repeat, no blank lines in between the quotes. Strictly use ASCII characters, for instance with single quotes are: ', and hyphens are just a dash. Don't output any preamble or formatting, just the quotes, without blank lines between the quotes. You must make sure not to insert a blank line between the quotes. No blank line, please.
 
 ## TODO
+Vial:
+- broken mouse scroll down weird character
+- broken pre-shifted position in layout
+- layout menu with moves and quick populate
+- serialize to json
+- check the save
+- save svg
+- TAB should move the inner tabs?
+- test matrix
+
 Mod-tap optimizer:
 - vial connect to read the tap terms
 - use kanata as a hardware-independent quick turnaround config instead

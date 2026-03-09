@@ -105,6 +105,7 @@ crate_index.from_cargo(
     manifests = [
         "//:Cargo.toml",
         "//server:Cargo.toml",
+        "//vial-protocol:Cargo.toml",
     ],
 )
 use_repo(

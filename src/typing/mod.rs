@@ -1,5 +1,5 @@
-use yew::{function_component, html, Html, use_node_ref, use_effect, NodeRef};
 use web_sys::Element;
+use yew::{function_component, html, use_effect, use_node_ref, Html, NodeRef};
 
 mod matching;
 mod quotes;
@@ -12,7 +12,7 @@ use matching::{align_incremental, EditOp};
 #[function_component]
 pub fn TypingHome() -> Html {
     let game = hook::use_typing_game();
-    
+
     // Refs for smooth cursor
     let active_char_ref = use_node_ref();
     let cursor_ref = use_node_ref();
@@ -31,17 +31,20 @@ pub fn TypingHome() -> Html {
             ) {
                 let char_rect = active_char_el.get_bounding_client_rect();
                 let marker_rect = marker_el.get_bounding_client_rect();
-                
+
                 let left = char_rect.left() - marker_rect.left();
                 let top = char_rect.top() - marker_rect.top();
                 let height = char_rect.height();
-                
+
                 // Construct the full style string.
-                let style_str = format!("left: {}px; top: {}px; height: {}px; opacity: 1;", left, top, height);
+                let style_str = format!(
+                    "left: {}px; top: {}px; height: {}px; opacity: 1;",
+                    left, top, height
+                );
                 let _ = cursor_el.set_attribute("style", &style_str);
             } else if let Some(cursor_el) = cursor_ref.cast::<Element>() {
-                 // If active ref is missing (e.g. init or glitch), hide cursor.
-                 let _ = cursor_el.set_attribute("style", "opacity: 0;");
+                // If active ref is missing (e.g. init or glitch), hide cursor.
+                let _ = cursor_el.set_attribute("style", "opacity: 0;");
             }
             || ()
         });
@@ -51,7 +54,7 @@ pub fn TypingHome() -> Html {
     // We compute this even if finished to avoid conditional logic complexity inside the component body,
     // although strictly we only need it if !game.finished.
     // Optimization: check !game.finished.
-    
+
     let game_view = if !game.finished {
         let current_quote = &game.current_quote;
         let user_input = &game.user_input;
@@ -81,7 +84,8 @@ pub fn TypingHome() -> Html {
 
         // Get alignment to find cursor position
         let alignment = align_incremental(current_quote, user_input);
-        let consumed_quote_chars = alignment.iter()
+        let consumed_quote_chars = alignment
+            .iter()
             .filter(|(op, _, _)| *op != EditOp::Insert)
             .count();
 
@@ -101,22 +105,22 @@ pub fn TypingHome() -> Html {
         // Scroll offset: only advances forward, keeps cursor on line 2 (middle)
         let new_scroll = if cursor_line <= 1 { 0 } else { cursor_line - 1 };
         let current_scroll = game.scroll_offset;
-        
-        // Side effect: update scroll offset if needed. 
-        // Note: calling state setter during render is generally bad practice in React/Yew, 
-        // but here it simulates "derived state with side effect". 
+
+        // Side effect: update scroll offset if needed.
+        // Note: calling state setter during render is generally bad practice in React/Yew,
+        // but here it simulates "derived state with side effect".
         // A better approach would be to calculate visible lines based on cursor position directly without stored state,
         // but the original code used stored state to prevent scrolling backward or jumping?
         // Original code: "Scroll offset: only advances forward".
         // So we need to respect the stored state.
-        
+
         let effective_scroll = if new_scroll > current_scroll {
             game.set_scroll_offset.emit(new_scroll);
             new_scroll
         } else {
             current_scroll
         };
-        
+
         let scroll = effective_scroll;
 
         // Get the 3 lines to display
@@ -125,17 +129,25 @@ pub fn TypingHome() -> Html {
         // Build the text for visible lines with alignment coloring
         let mut visible_start_char = 0;
         for line_words in lines.iter().take(scroll) {
-            visible_start_char += line_words.iter().map(|w| w.chars().count() + 1).sum::<usize>();
+            visible_start_char += line_words
+                .iter()
+                .map(|w| w.chars().count() + 1)
+                .sum::<usize>();
         }
 
-        let mut insertions_before: std::collections::HashMap<usize, Vec<char>> = std::collections::HashMap::new();
-        let mut char_status: std::collections::HashMap<usize, (bool, Option<char>)> = std::collections::HashMap::new();
+        let mut insertions_before: std::collections::HashMap<usize, Vec<char>> =
+            std::collections::HashMap::new();
+        let mut char_status: std::collections::HashMap<usize, (bool, Option<char>)> =
+            std::collections::HashMap::new();
 
         let mut quote_pos = 0;
         for (op, _, input_char) in alignment.iter() {
             match op {
                 EditOp::Insert => {
-                    insertions_before.entry(quote_pos).or_insert_with(Vec::new).push(input_char.unwrap());
+                    insertions_before
+                        .entry(quote_pos)
+                        .or_insert_with(Vec::new)
+                        .push(input_char.unwrap());
                 }
                 EditOp::Match => {
                     char_status.insert(quote_pos, (false, None));
@@ -169,11 +181,16 @@ pub fn TypingHome() -> Html {
                         html! {}
                     };
 
-                    let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
+                    let (is_error, typed_char) =
+                        char_status.get(&pos).cloned().unwrap_or((false, None));
                     let show_cursor = pos == consumed_quote_chars;
-                    
+
                     // Attach active_char_ref if this is the cursor position
-                    let node_ref = if show_cursor { active_char_ref.clone() } else { NodeRef::default() };
+                    let node_ref = if show_cursor {
+                        active_char_ref.clone()
+                    } else {
+                        NodeRef::default()
+                    };
 
                     let class = if pos < consumed_quote_chars {
                         if is_error {
@@ -198,7 +215,7 @@ pub fn TypingHome() -> Html {
                     });
                     pos += 1;
                 }
-                
+
                 if word_idx < line_words.len() - 1 {
                     let inserts_html = if let Some(inserts) = insertions_before.get(&pos) {
                         html! {
@@ -213,9 +230,14 @@ pub fn TypingHome() -> Html {
                         html! {}
                     };
 
-                    let (is_error, typed_char) = char_status.get(&pos).cloned().unwrap_or((false, None));
+                    let (is_error, typed_char) =
+                        char_status.get(&pos).cloned().unwrap_or((false, None));
                     let show_cursor = pos == consumed_quote_chars;
-                    let node_ref = if show_cursor { active_char_ref.clone() } else { NodeRef::default() };
+                    let node_ref = if show_cursor {
+                        active_char_ref.clone()
+                    } else {
+                        NodeRef::default()
+                    };
 
                     let class = if pos < consumed_quote_chars {
                         if is_error {
@@ -246,7 +268,7 @@ pub fn TypingHome() -> Html {
                 if pos == consumed_quote_chars {
                     line_elements.push(html! { <span ref={active_char_ref.clone()} class="inline-block w-0 h-8 align-middle"></span> });
                 }
-                pos += 1; 
+                pos += 1;
             }
 
             rendered_lines.push(html! {
@@ -274,9 +296,9 @@ pub fn TypingHome() -> Html {
                  // Position Marker
                  <div ref={marker_ref} class="absolute top-0 left-0 w-0 h-0 pointer-events-none"></div>
                  // Smooth Cursor
-                 <div ref={cursor_ref} class="absolute w-0.5 bg-yellow-400 transition-all duration-100 ease-out z-10 pointer-events-none" 
+                 <div ref={cursor_ref} class="absolute w-0.5 bg-yellow-400 transition-all duration-100 ease-out z-10 pointer-events-none"
                       style="left: 0; top: 0; height: 1.5em; opacity: 1;"></div>
-                
+
                 <div class="text-4xl font-mono select-none relative z-0" style="line-height: 1.8;">
                     {rendered_text}
                 </div>

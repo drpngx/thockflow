@@ -35,11 +35,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/key_repeat.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-key-repeat"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "grave_escape",
@@ -49,11 +47,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/gresc.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-mod-morph"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "sysreset",
@@ -63,11 +59,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/reset.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-reset"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "bootload",
@@ -77,11 +71,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/reset.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-reset"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "none",
@@ -91,11 +83,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/none.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-none"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "mouse_scroll",
@@ -105,9 +95,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/mouse_scroll.dtsi",
         is_default: false,
         compatible: Some("zmk,behavior-input-two-axis"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/pointing.h"),
         constants: &[
             "MB1",
@@ -136,11 +124,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/soft_off.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-soft-off"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "outputs",
@@ -150,15 +136,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/outputs.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-outputs"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/outputs.h"),
-        constants: &[
-            "OUT_TOG",
-            "OUT_USB",
-            "OUT_BLE",
-        ],
+        constants: &["OUT_TOG", "OUT_USB", "OUT_BLE"],
     },
     ZmkBehavior {
         name: "mouse_key_press",
@@ -168,9 +148,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/mouse_key_press.dtsi",
         is_default: false,
         compatible: Some("zmk,behavior-mouse-key-press"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/pointing.h"),
         constants: &[
             "MB1",
@@ -199,13 +177,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/mod_tap.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-hold-tap"),
-        parameter_metadata: &[
-            ParameterType::Modifier,
-            ParameterType::Keycode,
-        ],
+        parameter_metadata: &[ParameterType::Modifier, ParameterType::Keycode],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "momentary_layer",
@@ -215,12 +189,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/momentary_layer.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-momentary-layer"),
-        parameter_metadata: &[
-            ParameterType::Layer,
-        ],
+        parameter_metadata: &[ParameterType::Layer],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "to_layer",
@@ -230,12 +201,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/to_layer.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-to-layer"),
-        parameter_metadata: &[
-            ParameterType::Layer,
-        ],
+        parameter_metadata: &[ParameterType::Layer],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "layer_tap",
@@ -245,13 +213,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/layer_tap.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-hold-tap"),
-        parameter_metadata: &[
-            ParameterType::Layer,
-            ParameterType::Keycode,
-        ],
+        parameter_metadata: &[ParameterType::Layer, ParameterType::Keycode],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "bluetooth",
@@ -261,10 +225,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/bluetooth.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-bluetooth"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant, ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/bt.h"),
         constants: &[
             "BT_CLR",
@@ -283,12 +244,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/toggle_layer.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-toggle-layer"),
-        parameter_metadata: &[
-            ParameterType::Layer,
-        ],
+        parameter_metadata: &[ParameterType::Layer],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "transparent",
@@ -298,11 +256,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/transparent.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-transparent"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "mouse_move",
@@ -312,9 +268,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/mouse_move.dtsi",
         is_default: false,
         compatible: Some("zmk,behavior-input-two-axis"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/pointing.h"),
         constants: &[
             "MB1",
@@ -343,12 +297,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/key_press.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-key-press"),
-        parameter_metadata: &[
-            ParameterType::Keycode,
-        ],
+        parameter_metadata: &[ParameterType::Keycode],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "bcklight",
@@ -358,19 +309,10 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/backlight.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-backlight"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant, ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/backlight.h"),
         constants: &[
-            "BL_ON",
-            "BL_OFF",
-            "BL_TOG",
-            "BL_INC",
-            "BL_DEC",
-            "BL_CYCLE",
-            "BL_SET",
+            "BL_ON", "BL_OFF", "BL_TOG", "BL_INC", "BL_DEC", "BL_CYCLE", "BL_SET",
         ],
     },
     ZmkBehavior {
@@ -381,11 +323,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/studio_unlock.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-studio-unlock"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "extpower",
@@ -395,15 +335,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/ext_power.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-ext-power"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/ext_power.h"),
-        constants: &[
-            "EP_ON",
-            "EP_OFF",
-            "EP_TOG",
-        ],
+        constants: &["EP_ON", "EP_OFF", "EP_TOG"],
     },
     ZmkBehavior {
         name: "rgb_ug",
@@ -413,10 +347,7 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/rgb_underglow.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-rgb-underglow"),
-        parameter_metadata: &[
-            ParameterType::Constant,
-            ParameterType::Constant,
-        ],
+        parameter_metadata: &[ParameterType::Constant, ParameterType::Constant],
         c_include: Some("dt-bindings/zmk/rgb.h"),
         constants: &[
             "RGB_TOG",
@@ -443,12 +374,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/key_toggle.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-key-toggle"),
-        parameter_metadata: &[
-            ParameterType::None,
-        ],
+        parameter_metadata: &[ParameterType::None],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_tap",
@@ -458,11 +386,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-control-mode-tap"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_press",
@@ -472,11 +398,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-control-mode-press"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_release",
@@ -486,11 +410,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-control-mode-release"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_tap_time",
@@ -500,12 +422,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-control-tap-time"),
-        parameter_metadata: &[
-            ParameterType::None,
-        ],
+        parameter_metadata: &[ParameterType::None],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_wait_time",
@@ -515,12 +434,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-control-wait-time"),
-        parameter_metadata: &[
-            ParameterType::None,
-        ],
+        parameter_metadata: &[ParameterType::None],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_pause_for_release",
@@ -530,11 +446,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-pause-for-release"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_param_1to1",
@@ -544,11 +458,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-param-1to1"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_param_1to2",
@@ -558,11 +470,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-param-1to2"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_param_2to1",
@@ -572,11 +482,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-param-2to1"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "macro_param_2to2",
@@ -586,11 +494,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/macros.dtsi",
         is_default: true,
         compatible: Some("zmk,macro-param-2to2"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "caps_word",
@@ -600,11 +506,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/caps_word.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-caps-word"),
-        parameter_metadata: &[
-        ],
+        parameter_metadata: &[],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "sticky_key",
@@ -614,12 +518,9 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/sticky_key.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-sticky-key"),
-        parameter_metadata: &[
-            ParameterType::Modifier,
-        ],
+        parameter_metadata: &[ParameterType::Modifier],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
     ZmkBehavior {
         name: "sticky_layer",
@@ -629,11 +530,8 @@ pub const ZMK_BEHAVIORS: &[ZmkBehavior] = &[
         include_file: "behaviors/sticky_key.dtsi",
         is_default: true,
         compatible: Some("zmk,behavior-sticky-key"),
-        parameter_metadata: &[
-            ParameterType::Modifier,
-        ],
+        parameter_metadata: &[ParameterType::Modifier],
         c_include: None,
-        constants: &[
-        ],
+        constants: &[],
     },
 ];

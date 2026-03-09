@@ -29,23 +29,23 @@ fn get_word_at_index(input: &str, index: usize) -> String {
         start -= 1;
     }
     if start < chars.len() && chars[start].is_whitespace() && start < index {
-         start += 1;
+        start += 1;
     }
-    // Correction: if we are at whitespace, maybe we want the previous word? 
+    // Correction: if we are at whitespace, maybe we want the previous word?
     // Or just empty? Let's show the word we are "in".
     // If input[index] is whitespace, maybe just return " " or "<space>".
     if chars[index].is_whitespace() {
         return "<space>".to_string();
     }
-    // If start points to whitespace (e.g. index was 0 and it was not whitespace, loop didn't run. 
-    // If index was > 0, loop ran. 
-    
+    // If start points to whitespace (e.g. index was 0 and it was not whitespace, loop didn't run.
+    // If index was > 0, loop ran.
+
     // Find end
     let mut end = index;
     while end < chars.len() && !chars[end].is_whitespace() {
         end += 1;
     }
-    
+
     chars[start..end].iter().collect()
 }
 
@@ -54,7 +54,7 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
     let keystroke_times = &props.keystroke_times;
     let start_time = props.start_time;
     let error_positions = &props.error_positions;
-    
+
     let chart_ref = use_node_ref();
     let hovered_stats = use_state(|| None::<(f64, f64, String)>);
 
@@ -86,13 +86,16 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
                 // Instantaneous speed (based on last few keystrokes, counting correct ones)
                 let window = 5.min(i + 1);
                 let window_start_idx = i.saturating_sub(window - 1);
-                let errors_in_window = error_positions.iter()
+                let errors_in_window = error_positions
+                    .iter()
                     .filter(|&&pos| pos >= window_start_idx && pos <= i)
                     .count();
                 let correct_in_window = window.saturating_sub(errors_in_window);
 
                 let instant_cpm = if i >= 1 && correct_in_window > 0 {
-                    let window_start_time = keystroke_times.get(i.saturating_sub(window)).unwrap_or(&start);
+                    let window_start_time = keystroke_times
+                        .get(i.saturating_sub(window))
+                        .unwrap_or(&start);
                     let window_elapsed = (time - window_start_time) / 1000.0 / 60.0;
                     if window_elapsed > 0.0 {
                         correct_in_window as f64 / window_elapsed
@@ -124,20 +127,20 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
                 let x = e.client_x() as f64 - rect.left();
                 let width = rect.width();
                 let pct = (x / width).max(0.0).min(1.0);
-                
+
                 let data_len = timeline_data.len();
                 if data_len > 0 {
                     let index = ((data_len as f64 * pct) as usize).min(data_len - 1);
                     if let Some((wpm, _, _, _)) = timeline_data.get(index) {
-                         // Note: using cumulative WPM here. Instantaneous might be more interesting?
-                         // The chart shows both. Let's show instant cpm and cumulative wpm as per tuple structure?
-                         // tuple is (cumulative_wpm, instant_cpm, cumulative_cpm, is_error)
-                         // Let's grab instant_cpm for CPM display, and cumulative_wpm for WPM.
-                         let (_, instant_cpm, _, _) = timeline_data[index];
-                         let wpm = *wpm; // cumulative
-                         
-                         let word = get_word_at_index(&user_input, index);
-                         hovered_stats.set(Some((wpm, instant_cpm, word)));
+                        // Note: using cumulative WPM here. Instantaneous might be more interesting?
+                        // The chart shows both. Let's show instant cpm and cumulative wpm as per tuple structure?
+                        // tuple is (cumulative_wpm, instant_cpm, cumulative_cpm, is_error)
+                        // Let's grab instant_cpm for CPM display, and cumulative_wpm for WPM.
+                        let (_, instant_cpm, _, _) = timeline_data[index];
+                        let wpm = *wpm; // cumulative
+
+                        let word = get_word_at_index(&user_input, index);
+                        hovered_stats.set(Some((wpm, instant_cpm, word)));
                     }
                 }
             }
@@ -152,8 +155,14 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
     };
 
     // Find max values for scaling the chart
-    let max_wpm = timeline_data.iter().map(|(w, _, _, _)| *w).fold(0.0f64, f64::max);
-    let max_cpm = timeline_data.iter().map(|(_, i, c, _)| i.max(*c)).fold(0.0f64, f64::max);
+    let max_wpm = timeline_data
+        .iter()
+        .map(|(w, _, _, _)| *w)
+        .fold(0.0f64, f64::max);
+    let max_cpm = timeline_data
+        .iter()
+        .map(|(_, i, c, _)| i.max(*c))
+        .fold(0.0f64, f64::max);
     let chart_max = (max_wpm.max(max_cpm / 5.0) * 1.1).max(1.0); // Add 10% headroom, min 1.0 to avoid div by zero
 
     // Calculate tick values for Y-axis
@@ -209,7 +218,7 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
             // Timeline chart
             <div class="mb-4">
                 <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">{"Speed Timeline"}</div>
-                
+
                 <div class="flex flex-row items-stretch h-32 select-none mb-1">
                     // Left Axis (WPM)
                     <div class="w-8 relative mr-1">
@@ -224,11 +233,11 @@ pub fn TypingResults(props: &TypingResultsProps) -> Html {
                     </div>
 
                     // Chart Area
-                    <div class="flex-grow relative bg-gray-200 dark:bg-gray-700 rounded overflow-hidden" 
+                    <div class="flex-grow relative bg-gray-200 dark:bg-gray-700 rounded overflow-hidden"
                          ref={chart_ref}
                          onmousemove={on_chart_mousemove}
                          onmouseleave={on_chart_mouseleave}>
-                        
+
                         // Tooltip
                         if let Some((wpm, cpm, word)) = &*hovered_stats {
                              <div class="absolute top-2 right-2 bg-white/90 dark:bg-black/80 p-2 rounded shadow text-xs pointer-events-none z-10 border border-gray-200 dark:border-gray-600">

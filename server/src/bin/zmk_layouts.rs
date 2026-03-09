@@ -1,6 +1,6 @@
+use anyhow::{Context, Result};
 use std::fs;
-use anyhow::{Result, Context};
-use tree_sitter::{Parser, Node};
+use tree_sitter::{Node, Parser};
 
 #[cfg(feature = "runfiles")]
 use runfiles::Runfiles;
@@ -26,7 +26,7 @@ struct Layout {
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    
+
     let (zmk_path_buf, output_path) = if args.len() >= 2 {
         let zmk = std::path::PathBuf::from(&args[1]);
         let out = if args.len() >= 3 {
@@ -40,14 +40,15 @@ fn main() -> Result<()> {
         {
             let r = Runfiles::create()?;
             let dtsi_path = runfiles::rlocation!(r, "zmk/app/dts/behaviors.dtsi");
-            
+
             if let Some(dtsi_path) = dtsi_path {
-                let zmk = dtsi_path.parent()
+                let zmk = dtsi_path
+                    .parent()
                     .and_then(|p| p.parent())
                     .and_then(|p| p.parent())
                     .map(|p| p.to_path_buf())
                     .context("Could not find zmk root from behaviors.dtsi path")?;
-                
+
                 let out = if let Some(ws_root) = std::env::var_os("BUILD_WORKSPACE_DIRECTORY") {
                     let mut p = std::path::PathBuf::from(ws_root);
                     p.push("src/keymap/layouts.rs");
@@ -74,7 +75,7 @@ fn main() -> Result<()> {
     parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
 
     let boards_dir = zmk_path.join("app/boards");
-    
+
     // Find all *-layouts.dtsi files
     fn find_layout_files(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> {
         if dir.is_dir() {
@@ -83,7 +84,11 @@ fn main() -> Result<()> {
                 let path = entry.path();
                 if path.is_dir() {
                     find_layout_files(&path, files)?;
-                } else if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.ends_with("-layouts.dtsi")) {
+                } else if path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map_or(false, |n| n.ends_with("-layouts.dtsi"))
+                {
                     files.push(path);
                 }
             }
@@ -96,9 +101,15 @@ fn main() -> Result<()> {
 
     for path in layout_files {
         let content = fs::read_to_string(&path)?;
-        let tree = parser.parse(&content, None).context("Failed to parse DTS")?;
-        let filename = path.strip_prefix(zmk_path).unwrap_or(&path).to_string_lossy().to_string();
-        
+        let tree = parser
+            .parse(&content, None)
+            .context("Failed to parse DTS")?;
+        let filename = path
+            .strip_prefix(zmk_path)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .to_string();
+
         extract_layouts(tree.root_node(), &content, &filename, &mut layouts)?;
     }
 
@@ -115,7 +126,7 @@ fn main() -> Result<()> {
     output.push_str("    pub source_file: &'static str,\n");
     output.push_str("}\n\n");
     output.push_str("pub const ZMK_LAYOUTS: &[ZmkLayout] = &[\n");
-    
+
     for l in &layouts {
         output.push_str("    ZmkLayout {\n");
         output.push_str(&format!("        name: \"{}\",\n", l.name));
@@ -144,32 +155,35 @@ fn main() -> Result<()> {
 }
 
 fn extract_layouts(
-    node: Node, 
-    source: &str, 
-    filename: &str, 
-    layouts: &mut Vec<Layout>
+    node: Node,
+    source: &str,
+    filename: &str,
+    layouts: &mut Vec<Layout>,
 ) -> Result<()> {
     if node.kind() == "node" {
         let mut is_layout = false;
         let mut display_name = None;
         let mut keys = Vec::new();
-        
+
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             if child.kind() == "property" {
-                let prop_name = child.child_by_field_name("name")
+                let prop_name = child
+                    .child_by_field_name("name")
                     .map(|n| n.utf8_text(source.as_bytes()).unwrap_or(""))
                     .unwrap_or("");
-                
+
                 if prop_name == "compatible" {
-                    let val = child.child_by_field_name("value")
+                    let val = child
+                        .child_by_field_name("value")
                         .map(|n| n.utf8_text(source.as_bytes()).unwrap_or(""))
                         .unwrap_or("");
                     if val.contains("zmk,physical-layout") {
                         is_layout = true;
                     }
                 } else if prop_name == "display-name" {
-                    let val = child.child_by_field_name("value")
+                    let val = child
+                        .child_by_field_name("value")
                         .map(|n| n.utf8_text(source.as_bytes()).unwrap_or(""))
                         .unwrap_or("");
                     display_name = Some(val.trim_matches('\"').to_string());
@@ -180,7 +194,10 @@ fn extract_layouts(
                             let raw_val = val_node.utf8_text(source.as_bytes()).unwrap_or("");
                             let num_re = r"\(?([\d-]+)\)?";
                             // Format: width, height, x, y, rotation, rx, ry
-                            let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re, num_re, num_re, num_re);
+                            let key_re_str = format!(
+                                r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}",
+                                num_re, num_re, num_re, num_re, num_re, num_re, num_re
+                            );
                             let key_regex = regex::Regex::new(&key_re_str).unwrap();
                             for cap in key_regex.captures_iter(raw_val) {
                                 keys.push(PhysicalKey {
@@ -198,13 +215,14 @@ fn extract_layouts(
                 }
             }
         }
-        
+
         if is_layout && !keys.is_empty() {
-            let node_name = node.child_by_field_name("name")
+            let node_name = node
+                .child_by_field_name("name")
                 .map(|n| n.utf8_text(source.as_bytes()).unwrap_or(""))
                 .unwrap_or("")
                 .to_string();
-            
+
             layouts.push(Layout {
                 name: node_name,
                 display_name,
@@ -218,6 +236,6 @@ fn extract_layouts(
     for child in node.children(&mut cursor) {
         extract_layouts(child, source, filename, layouts)?;
     }
-    
+
     Ok(())
 }

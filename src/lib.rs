@@ -1,5 +1,6 @@
-mod typing;
 pub mod keymap;
+mod typing;
+pub mod vial;
 
 use std::collections::HashMap;
 
@@ -22,6 +23,8 @@ pub enum Route {
     Typing,
     #[at("/keymap")]
     Keymap,
+    #[at("/vial")]
+    Vial,
 }
 
 #[derive(Properties, PartialEq, Debug, Default)]
@@ -32,7 +35,7 @@ pub struct AppProps {
 #[function_component]
 pub fn App(props: &AppProps) -> Html {
     let context = props.init_quote_index.map(|i| QuoteContext { index: i });
-    
+
     html! {
         <ContextProvider<Option<QuoteContext>> context={context}>
             <BrowserRouter>
@@ -55,7 +58,7 @@ pub fn ServerApp(props: &ServerAppProps) -> Html {
     history
         .push_with_query(&*props.path, &props.queries)
         .unwrap();
-        
+
     let context = props.init_quote_index.map(|i| QuoteContext { index: i });
 
     html! {
@@ -83,6 +86,11 @@ fn Navbar() -> Html {
                 <Link<Route> classes="p-4 text-3xl  " to={Route::Keymap}>
                     <button >
                         {"Keymap"}
+                    </button>
+                </Link<Route>>
+                <Link<Route> classes="p-4 text-3xl  " to={Route::Vial}>
+                    <button >
+                        {"Vial"}
                     </button>
                 </Link<Route>>
                 <a class="p-4 text-3xl" href="https://github.com/drpngx/thockflow">{"GitHub"}</a>
@@ -136,6 +144,13 @@ fn switch(route: Route) -> Html {
                         <div class="w-full font-body flex px-2 flex-col items-center">
                             <div class="w-full max-w-[1920px]">
                                 <keymap::KeymapHome />
+                            </div>
+                        </div>
+                    },
+                    Route::Vial => html! {
+                        <div class="w-full font-body flex px-2 flex-col items-center">
+                            <div class="w-full max-w-[1920px]">
+                                <vial::VialHome />
                             </div>
                         </div>
                     },

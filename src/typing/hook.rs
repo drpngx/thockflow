@@ -1,6 +1,6 @@
-use yew::prelude::*;
-use super::quotes;
 use super::matching::{align_incremental, EditOp};
+use super::quotes;
+use yew::prelude::*;
 
 pub struct TypingGameReturn {
     pub current_quote: String,
@@ -16,7 +16,7 @@ pub struct TypingGameReturn {
     #[allow(dead_code)]
     pub reset: Callback<()>,
     pub set_scroll_offset: Callback<usize>, // Expose setter
-    
+
     // Stats & Data
     pub error_count: usize,
     #[allow(dead_code)]
@@ -27,7 +27,7 @@ pub struct TypingGameReturn {
     pub end_time: Option<f64>,
     pub error_positions: Vec<usize>,
     pub key_log: String,
-    
+
     // Pre-calculated stats
     pub wpm: f64,
     pub cpm: f64,
@@ -40,7 +40,7 @@ pub struct TypingGameReturn {
 #[hook]
 pub fn use_typing_game() -> TypingGameReturn {
     let quote_context = use_context::<Option<crate::QuoteContext>>().flatten();
-    
+
     let current_quote = use_state(|| {
         if let Some(ctx) = quote_context {
             return quotes::QUOTES[ctx.index % quotes::QUOTES.len()].to_string();
@@ -56,7 +56,7 @@ pub fn use_typing_game() -> TypingGameReturn {
     let start_time = use_state(|| None::<f64>);
     let end_time = use_state(|| None::<f64>);
     let error_count = use_state(|| 0usize);
-    
+
     let keystroke_times = use_state(|| Vec::<f64>::new()); // Timestamp for each keystroke
     let error_positions = use_state(|| Vec::<usize>::new()); // Positions where errors occurred
     let total_typed_chars = use_state(|| 0usize); // Total characters typed (including errors)
@@ -161,7 +161,7 @@ pub fn use_typing_game() -> TypingGameReturn {
             // Handle backspace
             if key == "Backspace" {
                 e.prevent_default();
-                
+
                 // Log backspace
                 let mut log = (*key_log).clone();
                 if e.ctrl_key() {
@@ -269,7 +269,7 @@ pub fn use_typing_game() -> TypingGameReturn {
                         } else {
                             false
                         }
-                    },
+                    }
                     EditOp::Substitute => true,
                     EditOp::Insert => true,
                 };
@@ -288,7 +288,8 @@ pub fn use_typing_game() -> TypingGameReturn {
             current_position.set(new_position);
 
             // Check if finished - based on alignment consuming all quote characters
-            let consumed_quote_chars = alignment.iter()
+            let consumed_quote_chars = alignment
+                .iter()
                 .filter(|(op, _, _)| *op != EditOp::Insert)
                 .count();
 
@@ -296,10 +297,10 @@ pub fn use_typing_game() -> TypingGameReturn {
             // But we also want to ensure the user is at the end of their typing (implied)
             let quote_len = current_quote.chars().count();
             if consumed_quote_chars >= quote_len {
-                 finished.set(true);
-                 // Use the last keystroke time (which is `now` that we just pushed)
-                 end_time.set(Some(now));
-                 started.set(false);
+                finished.set(true);
+                // Use the last keystroke time (which is `now` that we just pushed)
+                end_time.set(Some(now));
+                started.set(false);
             }
         })
     };
@@ -316,12 +317,21 @@ pub fn use_typing_game() -> TypingGameReturn {
 
             // Count only correct characters using alignment
             let alignment = align_incremental(&current_quote, &user_input);
-            let correct_chars = alignment.iter()
+            let correct_chars = alignment
+                .iter()
                 .filter(|(op, _, _)| *op == EditOp::Match)
                 .count();
 
-            let cpm = if elapsed_min > 0.0 { correct_chars as f64 / elapsed_min } else { 0.0 };
-            let wpm = if elapsed_min > 0.0 { (correct_chars as f64 / 5.0) / elapsed_min } else { 0.0 };
+            let cpm = if elapsed_min > 0.0 {
+                correct_chars as f64 / elapsed_min
+            } else {
+                0.0
+            };
+            let wpm = if elapsed_min > 0.0 {
+                (correct_chars as f64 / 5.0) / elapsed_min
+            } else {
+                0.0
+            };
 
             let accuracy = if *total_typed_chars > 0 {
                 (1.0 - (*error_count as f64 / *total_typed_chars as f64)) * 100.0

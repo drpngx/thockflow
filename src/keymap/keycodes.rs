@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 lazy_static! {
     pub static ref KEY_ALIASES: HashMap<&'static str, &'static str> = {
@@ -61,7 +61,7 @@ lazy_static! {
         m.insert("DOWN", "↓");
         m.insert("HOME", "Home");
         m.insert("END", "End");
-        
+
         // Mouse Emulation
         m.insert("LCLK", "🖱️🅻");
         m.insert("RCLK", "🖱️🆁");
@@ -76,7 +76,7 @@ lazy_static! {
         m.insert("SCROLL_DOWN", "🖱️↓");
         m.insert("SCROLL_LEFT", "🖱️←");
         m.insert("SCROLL_RIGHT", "🖱️→");
-        
+
         // Bluetooth
         m.insert("BT_CLR", "BT Clear");
         m.insert("BT_SEL", "BT Select");
@@ -86,7 +86,7 @@ lazy_static! {
         m.insert("BT_NEXT", "BT Next");
         m.insert("BT_CLR_ALL", "BT Clear All");
         m.insert("BT_DISC", "BT Disconnect");
-        
+
         // RGB Underglow
         m.insert("RGB_TOG", "RGB Toggle");
         m.insert("RGB_HUI", "RGB Hue+");
@@ -99,17 +99,17 @@ lazy_static! {
         m.insert("RGB_SPD", "RGB Spd-");
         m.insert("RGB_EFF", "RGB Eff");
         m.insert("RGB_COLOR_HSB", "RGB Color");
-        
+
         // Outputs
         m.insert("OUT_TOG", "Out Toggle");
         m.insert("OUT_USB", "Out USB");
         m.insert("OUT_BLE", "Out BLE");
-        
+
         // Browser / Media
         m.insert("C_AC_BACK", "Br←");
         m.insert("C_AC_FORWARD", "Br→");
         m.insert("K_MENU", "☰");
-        
+
         // Number Row
         m.insert("N1", "1");
         m.insert("N2", "2");
@@ -121,7 +121,7 @@ lazy_static! {
         m.insert("N8", "8");
         m.insert("N9", "9");
         m.insert("N0", "0");
-        
+
         m
     };
 }
@@ -169,9 +169,38 @@ pub fn is_plain_key(code: &str) -> bool {
         return true;
     }
     let regular_aliases = [
-        "GRAVE", "SEMI", "SQT", "SLASH", "BSPC", "LBKT", "RBKT", "MINUS", "EQUAL", "COMMA", "DOT", "BSLH",
-        "ESC", "SPACE", "ENTER", "TAB", "LEFT", "RIGHT", "UP", "DOWN", "HOME", "END", "PG_UP", "PG_DN", "DEL", "INS",
-        "C_AC_BACK", "C_AC_FORWARD", "C_VOL_UP", "C_VOL_DN", "C_MUTE", "K_MENU",
+        "GRAVE",
+        "SEMI",
+        "SQT",
+        "SLASH",
+        "BSPC",
+        "LBKT",
+        "RBKT",
+        "MINUS",
+        "EQUAL",
+        "COMMA",
+        "DOT",
+        "BSLH",
+        "ESC",
+        "SPACE",
+        "ENTER",
+        "TAB",
+        "LEFT",
+        "RIGHT",
+        "UP",
+        "DOWN",
+        "HOME",
+        "END",
+        "PG_UP",
+        "PG_DN",
+        "DEL",
+        "INS",
+        "C_AC_BACK",
+        "C_AC_FORWARD",
+        "C_VOL_UP",
+        "C_VOL_DN",
+        "C_MUTE",
+        "K_MENU",
     ];
     if regular_aliases.contains(&code) {
         return true;
@@ -228,7 +257,15 @@ pub fn to_zmk_keycode(key: &str) -> Option<String> {
 }
 
 pub fn is_modifier(code: &str) -> bool {
-    code.starts_with("L") && (code.contains("SHFT") || code.contains("CTRL") || code.contains("ALT") || code.contains("GUI")) ||
-    code.starts_with("R") && (code.contains("SHFT") || code.contains("CTRL") || code.contains("ALT") || code.contains("GUI")) ||
-    code.starts_with("MOD_")
+    code.starts_with("L")
+        && (code.contains("SHFT")
+            || code.contains("CTRL")
+            || code.contains("ALT")
+            || code.contains("GUI"))
+        || code.starts_with("R")
+            && (code.contains("SHFT")
+                || code.contains("CTRL")
+                || code.contains("ALT")
+                || code.contains("GUI"))
+        || code.starts_with("MOD_")
 }

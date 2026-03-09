@@ -97,7 +97,9 @@ rust_library(
     }),
     deps = all_crate_deps(
         normal = True,
-    ),
+    ) + [
+        "//vial-protocol",
+    ],
 )
 
 rust_test(
@@ -108,7 +110,9 @@ rust_test(
     ),
     deps = all_crate_deps(
         normal = True,
-    ),
+    ) + [
+        "//vial-protocol",
+    ],
 )
 
 config_setting(

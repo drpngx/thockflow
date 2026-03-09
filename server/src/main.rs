@@ -7,15 +7,15 @@ use axum::body::{Body, BoxBody};
 use axum::extract::Query;
 use axum::http::{header, HeaderMap, HeaderValue, Request, Response, StatusCode};
 use axum::response::{Html, IntoResponse};
-use axum::routing::{get_service, MethodRouter, post};
+use axum::routing::{get_service, post, MethodRouter};
 use axum::Extension;
-use axum::{routing::get, Router, Json};
+use axum::{routing::get, Json, Router};
 use futures::future::BoxFuture;
 use futures::ready;
-use thockflow::ServerAppProps;
-use thockflow::keymap::{KeymapData, PhysicalKey, Layer, parse_raw_bindings};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use thockflow::keymap::{parse_raw_bindings, KeymapData, Layer, PhysicalKey};
+use thockflow::ServerAppProps;
 use tokio_util::task::LocalPoolHandle;
 use tower::Service;
 use tower_http::services::ServeDir;
@@ -38,7 +38,7 @@ lazy_static::lazy_static!(
 
 );
 
-use log::{info, error};
+use log::{error, info};
 
 #[derive(Deserialize, Serialize)]
 struct KeymapRequest {
@@ -57,10 +57,17 @@ struct SaveKeymapResponse {
 }
 
 async fn parse_keymap_api(Json(req): Json<KeymapRequest>) -> impl IntoResponse {
-    info!("Received parse request, content length: {}", req.content.len());
+    info!(
+        "Received parse request, content length: {}",
+        req.content.len()
+    );
     match parse_keymap_with_tree_sitter(&req.content) {
         Ok(data) => {
-            info!("Successfully parsed keymap with {} keys and {} layers", data.physical_layout.len(), data.layers.len());
+            info!(
+                "Successfully parsed keymap with {} keys and {} layers",
+                data.physical_layout.len(),
+                data.layers.len()
+            );
             (StatusCode::OK, Json(data)).into_response()
         }
         Err(e) => {
@@ -74,7 +81,10 @@ async fn save_keymap_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoRespons
     info!("Received save request");
     match generate_keymap_dts(&req.original_content, &req.data) {
         Ok(content) => {
-            info!("Successfully generated new keymap DTS, length: {}", content.len());
+            info!(
+                "Successfully generated new keymap DTS, length: {}",
+                content.len()
+            );
             (StatusCode::OK, Json(SaveKeymapResponse { content })).into_response()
         }
         Err(e) => {
@@ -86,15 +96,16 @@ async fn save_keymap_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoRespons
 
 fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
     let mut content = original.to_string();
-    
+
     // 1. Handle #includes
     let include_re = regex::Regex::new(r#"(?m)^#include\s*[<"](.+?)[>"]"#).unwrap();
-    let mut existing_includes: std::collections::HashSet<String> = include_re.captures_iter(original)
+    let mut existing_includes: std::collections::HashSet<String> = include_re
+        .captures_iter(original)
         .map(|cap| cap[1].to_string())
         .collect();
-    
+
     let mut new_includes = Vec::new();
-    
+
     // a) Add includes from data.includes
     for inc in &data.includes {
         if !existing_includes.contains(inc) {
@@ -108,8 +119,12 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
         for binding in &layer.bindings {
             let tokens: Vec<&str> = binding.split_whitespace().collect();
             if let Some(token) = tokens.first() {
-                let token = token.trim_matches(|c| c == '&' || c == '<' || c == '>' || c == ';' || c == ' ');
-                if let Some(behavior) = ZMK_BEHAVIORS.iter().find(|b| b.label == Some(token) || b.name == token) {
+                let token = token
+                    .trim_matches(|c| c == '&' || c == '<' || c == '>' || c == ';' || c == ' ');
+                if let Some(behavior) = ZMK_BEHAVIORS
+                    .iter()
+                    .find(|b| b.label == Some(token) || b.name == token)
+                {
                     if !behavior.is_default && !existing_includes.contains(behavior.include_file) {
                         new_includes.push(format!("#include <{}>", behavior.include_file));
                         existing_includes.insert(behavior.include_file.to_string());
@@ -124,10 +139,10 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
             }
         }
     }
-    
+
     if !new_includes.is_empty() {
         let last_include_pos = include_re.find_iter(original).last().map(|m| m.end());
-        
+
         if let Some(pos) = last_include_pos {
             let mut insert_text = String::from("\n");
             insert_text.push_str(&new_includes.join("\n"));
@@ -168,16 +183,27 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
     // 3. Find keymap node and its layer nodes
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
-    let tree = parser.parse(content.as_bytes(), None).ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
-    
-    fn find_keymap_node<'a>(node: tree_sitter::Node<'a>, source: &[u8]) -> Option<tree_sitter::Node<'a>> {
+    let tree = parser
+        .parse(content.as_bytes(), None)
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
+
+    fn find_keymap_node<'a>(
+        node: tree_sitter::Node<'a>,
+        source: &[u8],
+    ) -> Option<tree_sitter::Node<'a>> {
         if node.kind() == "node" {
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() == "property" {
-                    let prop_name = child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                    let prop_name = child
+                        .child_by_field_name("name")
+                        .map(|n| n.utf8_text(source).unwrap_or(""))
+                        .unwrap_or("");
                     if prop_name == "compatible" {
-                        let prop_value = child.child_by_field_name("value").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                        let prop_value = child
+                            .child_by_field_name("value")
+                            .map(|n| n.utf8_text(source).unwrap_or(""))
+                            .unwrap_or("");
                         if prop_value.contains("zmk,keymap") {
                             return Some(node);
                         }
@@ -196,9 +222,10 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
 
     let keymap_node = find_keymap_node(tree.root_node(), content.as_bytes())
         .ok_or_else(|| anyhow::anyhow!("Could not find keymap node"))?;
-    
+
     let mut cursor = keymap_node.walk();
-    let original_layer_nodes: Vec<tree_sitter::Node> = keymap_node.children(&mut cursor)
+    let original_layer_nodes: Vec<tree_sitter::Node> = keymap_node
+        .children(&mut cursor)
         .filter(|n| n.kind() == "node")
         .collect();
 
@@ -230,7 +257,11 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
                     };
                     new_bindings.push_str(extra_gap);
                 }
-                let b = target_layer.bindings.get(key_idx).map(|s| s.as_str()).unwrap_or("&none");
+                let b = target_layer
+                    .bindings
+                    .get(key_idx)
+                    .map(|s| s.as_str())
+                    .unwrap_or("&none");
                 if key_in_row == row.len() - 1 {
                     new_bindings.push_str(b);
                 } else {
@@ -247,7 +278,7 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
     for (i, original_node) in original_layer_nodes.iter().enumerate() {
         if i < data.layers.len() {
             let target_layer = &data.layers[i];
-            
+
             // a) Update Name
             let mut inner_cursor = original_node.walk();
             for child in original_node.children(&mut inner_cursor) {
@@ -261,10 +292,13 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
                         });
                     }
                 }
-                
+
                 // b) Update Bindings
                 if child.kind() == "property" {
-                    let prop_name = child.child_by_field_name("name").map(|n| n.utf8_text(content.as_bytes()).unwrap_or("")).unwrap_or("");
+                    let prop_name = child
+                        .child_by_field_name("name")
+                        .map(|n| n.utf8_text(content.as_bytes()).unwrap_or(""))
+                        .unwrap_or("");
                     if prop_name == "bindings" {
                         if let Some(value_node) = child.child_by_field_name("value") {
                             replacements.push(Replacement {
@@ -284,7 +318,11 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
             if content.as_bytes().get(end) == Some(&b';') {
                 end += 1;
             }
-            replacements.push(Replacement { start, end, text: String::new() });
+            replacements.push(Replacement {
+                start,
+                end,
+                text: String::new(),
+            });
         }
     }
 
@@ -329,8 +367,10 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
 fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_devicetree::LANGUAGE.into())?;
-    let tree = parser.parse(content, None).ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
-    
+    let tree = parser
+        .parse(content, None)
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse DTS"))?;
+
     let root_node = tree.root_node();
     // ... existing error checking ...
     if root_node.has_error() {
@@ -339,12 +379,18 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         fn find_error(node: tree_sitter::Node, source: &[u8], pos: &mut String) {
             if node.has_error() {
                 if node.kind() == "ERROR" {
-                    *pos = format!("Tree-sitter parse error at line {}, column {}", node.start_position().row + 1, node.start_position().column + 1);
+                    *pos = format!(
+                        "Tree-sitter parse error at line {}, column {}",
+                        node.start_position().row + 1,
+                        node.start_position().column + 1
+                    );
                 } else {
                     let mut cursor = node.walk();
                     for child in node.children(&mut cursor) {
                         find_error(child, source, pos);
-                        if !pos.is_empty() { return; }
+                        if !pos.is_empty() {
+                            return;
+                        }
                     }
                 }
             }
@@ -359,16 +405,25 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
     let mut layers = Vec::new();
 
     let include_re = regex::Regex::new(r#"(?m)^#include\s*[<"](.+?)[>"]"#).unwrap();
-    let includes: Vec<String> = include_re.captures_iter(content)
+    let includes: Vec<String> = include_re
+        .captures_iter(content)
         .map(|cap| cap[1].to_string())
         .collect();
 
     // Recursive traversal to find nodes
-    fn traverse(node: tree_sitter::Node, source: &[u8], physical_layout: &mut Vec<PhysicalKey>, layers: &mut Vec<Layer>) {
+    fn traverse(
+        node: tree_sitter::Node,
+        source: &[u8],
+        physical_layout: &mut Vec<PhysicalKey>,
+        layers: &mut Vec<Layer>,
+    ) {
         if node.kind() == "node" {
-            let node_name = node.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+            let node_name = node
+                .child_by_field_name("name")
+                .map(|n| n.utf8_text(source).unwrap_or(""))
+                .unwrap_or("");
             info!("Visiting node: {}", node_name);
-            
+
             // Check properties for "compatible"
             let mut is_phys = false;
             let mut is_keymap = false;
@@ -376,9 +431,15 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() == "property" {
-                    let prop_name = child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                    let prop_name = child
+                        .child_by_field_name("name")
+                        .map(|n| n.utf8_text(source).unwrap_or(""))
+                        .unwrap_or("");
                     if prop_name == "compatible" {
-                        let prop_value = child.child_by_field_name("value").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                        let prop_value = child
+                            .child_by_field_name("value")
+                            .map(|n| n.utf8_text(source).unwrap_or(""))
+                            .unwrap_or("");
                         info!("  Found compatible property: {}", prop_value);
                         if prop_value.contains("zmk,physical-layout") {
                             is_phys = true;
@@ -395,7 +456,10 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind() == "property" {
-                        let prop_name = child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                        let prop_name = child
+                            .child_by_field_name("name")
+                            .map(|n| n.utf8_text(source).unwrap_or(""))
+                            .unwrap_or("");
                         if prop_name == "keys" {
                             info!("  Parsing keys property...");
                             let mut cursor = child.walk();
@@ -404,7 +468,10 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                     let raw_val = val_node.utf8_text(source).unwrap_or("");
                                     let num_re = r"\(?([\d-]+)\)?";
                                     // Format: width, height, x, y, rotation, rx, ry
-                                    let key_re_str = format!(r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}", num_re, num_re, num_re, num_re, num_re, num_re, num_re);
+                                    let key_re_str = format!(
+                                        r"&key_physical_attrs\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}\s+{}",
+                                        num_re, num_re, num_re, num_re, num_re, num_re, num_re
+                                    );
                                     let key_regex = regex::Regex::new(&key_re_str).unwrap();
                                     for cap in key_regex.captures_iter(raw_val) {
                                         physical_layout.push(PhysicalKey {
@@ -433,13 +500,19 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                         let mut bindings = Vec::new();
                         let mut inner_cursor = child.walk();
                         for inner_child in child.children(&mut inner_cursor) {
-                            if inner_child.kind() == "node_name" || inner_child.kind() == "identifier" {
+                            if inner_child.kind() == "node_name"
+                                || inner_child.kind() == "identifier"
+                            {
                                 if layer_name.is_empty() {
-                                    layer_name = inner_child.utf8_text(source).unwrap_or("").to_string();
+                                    layer_name =
+                                        inner_child.utf8_text(source).unwrap_or("").to_string();
                                 }
                             }
                             if inner_child.kind() == "property" {
-                                let prop_name = inner_child.child_by_field_name("name").map(|n| n.utf8_text(source).unwrap_or("")).unwrap_or("");
+                                let prop_name = inner_child
+                                    .child_by_field_name("name")
+                                    .map(|n| n.utf8_text(source).unwrap_or(""))
+                                    .unwrap_or("");
                                 if prop_name == "bindings" {
                                     let mut prop_cursor = inner_child.walk();
                                     for val_node in inner_child.children(&mut prop_cursor) {
@@ -452,8 +525,15 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                             }
                         }
                         if !bindings.is_empty() {
-                            info!("  Found layer: {} with {} bindings", layer_name, bindings.len());
-                            layers.push(Layer { name: layer_name, bindings });
+                            info!(
+                                "  Found layer: {} with {} bindings",
+                                layer_name,
+                                bindings.len()
+                            );
+                            layers.push(Layer {
+                                name: layer_name,
+                                bindings,
+                            });
                         }
                     }
                 }
@@ -466,7 +546,12 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         }
     }
 
-    traverse(root_node, content.as_bytes(), &mut physical_layout, &mut layers);
+    traverse(
+        root_node,
+        content.as_bytes(),
+        &mut physical_layout,
+        &mut layers,
+    );
 
     if !layers.is_empty() {
         let first_layer_len = layers[0].bindings.len();
@@ -482,30 +567,46 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
 
     if physical_layout.is_empty() && !layers.is_empty() {
         let key_count = layers[0].bindings.len();
-        info!("Physical layout missing, attempting to match by key count: {}", key_count);
-        
+        info!(
+            "Physical layout missing, attempting to match by key count: {}",
+            key_count
+        );
+
         // Find layouts with matching key count
-        let matches: Vec<_> = ZMK_LAYOUTS.iter()
+        let matches: Vec<_> = ZMK_LAYOUTS
+            .iter()
             .filter(|l| l.keys.len() == key_count)
             .collect();
-        
+
         if !matches.is_empty() {
             // Heuristic: prioritize layouts with "default" or "6col"
-            let matched_layout = matches.iter()
-                .find(|l| l.name.contains("default") || l.display_name.map_or(false, |dn| dn.to_lowercase().contains("default")))
+            let matched_layout = matches
+                .iter()
+                .find(|l| {
+                    l.name.contains("default")
+                        || l.display_name
+                            .map_or(false, |dn| dn.to_lowercase().contains("default"))
+                })
                 .or_else(|| matches.iter().find(|l| l.name.contains("6col")))
                 .unwrap_or(&matches[0]);
-            
-            info!("Matched layout: {} from {}", matched_layout.name, matched_layout.source_file);
-            physical_layout = matched_layout.keys.iter().map(|k| PhysicalKey {
-                width: k.width,
-                height: k.height,
-                x: k.x,
-                y: k.y,
-                rotation: k.rotation,
-                rx: k.rx,
-                ry: k.ry,
-            }).collect();
+
+            info!(
+                "Matched layout: {} from {}",
+                matched_layout.name, matched_layout.source_file
+            );
+            physical_layout = matched_layout
+                .keys
+                .iter()
+                .map(|k| PhysicalKey {
+                    width: k.width,
+                    height: k.height,
+                    x: k.x,
+                    y: k.y,
+                    rotation: k.rotation,
+                    rx: k.rx,
+                    ry: k.ry,
+                })
+                .collect();
         }
     }
 
@@ -513,10 +614,16 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         return Err(anyhow::anyhow!("Missing physical layout (zmk,physical-layout compatible node) and no match found in database for {} keys", layers.get(0).map_or(0, |l| l.bindings.len())));
     }
     if layers.is_empty() {
-        return Err(anyhow::anyhow!("Missing keymap layers (zmk,keymap compatible node)"));
+        return Err(anyhow::anyhow!(
+            "Missing keymap layers (zmk,keymap compatible node)"
+        ));
     }
 
-    Ok(KeymapData { physical_layout, layers, includes })
+    Ok(KeymapData {
+        physical_layout,
+        layers,
+        includes,
+    })
 }
 
 #[cfg(test)]
@@ -528,21 +635,29 @@ mod tests {
     fn test_parse_hshs52_file() {
         let content = include_str!("../../static/hshs52.keymap");
         let result = parse_keymap_with_tree_sitter(content).expect("Should parse successfully");
-        
+
         // Hillside 52 should have 52 keys
-        assert!(result.physical_layout.len() >= 52, "Expected at least 52 layout keys, got {}", result.physical_layout.len());
+        assert!(
+            result.physical_layout.len() >= 52,
+            "Expected at least 52 layout keys, got {}",
+            result.physical_layout.len()
+        );
         assert!(result.layers.len() > 0, "Expected at least one layer");
-        
+
         // Check some bindings to see if they were grouped correctly
         let first_layer = &result.layers[0];
         assert!(first_layer.bindings.contains(&"&kp GRAVE".to_string()));
-        
+
         // Check 2-argument binding (bt)
         let adj_layer = &result.layers[5]; // Assuming adj_layer is at index 5
         assert!(adj_layer.name == "adj_layer");
         assert!(adj_layer.bindings.contains(&"&bt BT_SEL 0".to_string()));
-        
-        println!("Successfully parsed {} keys and {} layers", result.physical_layout.len(), result.layers.len());
+
+        println!(
+            "Successfully parsed {} keys and {} layers",
+            result.physical_layout.len(),
+            result.layers.len()
+        );
     }
 
     #[tokio::test]
@@ -555,47 +670,59 @@ mod tests {
 
         let app = app();
         let content = include_str!("../../static/hshs52.keymap");
-        
+
         let response = app
             .oneshot(
                 Request::builder()
                     .method("POST")
                     .uri("/api/parse-keymap")
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::to_string(&KeymapRequest {
-                        content: content.to_string(),
-                    }).unwrap()))
+                    .body(Body::from(
+                        serde_json::to_string(&KeymapRequest {
+                            content: content.to_string(),
+                        })
+                        .unwrap(),
+                    ))
                     .unwrap(),
             )
             .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        
+
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let data: KeymapData = serde_json::from_slice(&body).expect("Should return valid JSON");
-        
+
         assert!(data.physical_layout.len() >= 52);
         assert!(!data.layers.is_empty());
     }
 
     #[test]
     fn test_zmk_behaviors_metadata() {
-        use thockflow::keymap::behaviors::{ZMK_BEHAVIORS, ParameterType};
-        
-        let lt = ZMK_BEHAVIORS.iter().find(|b| b.label == Some("lt")).expect("lt behavior missing");
+        use thockflow::keymap::behaviors::{ParameterType, ZMK_BEHAVIORS};
+
+        let lt = ZMK_BEHAVIORS
+            .iter()
+            .find(|b| b.label == Some("lt"))
+            .expect("lt behavior missing");
         assert_eq!(lt.binding_cells, 2);
         assert_eq!(lt.parameter_metadata.len(), 2);
         assert_eq!(lt.parameter_metadata[0], ParameterType::Layer);
         assert_eq!(lt.parameter_metadata[1], ParameterType::Keycode);
 
-        let mt = ZMK_BEHAVIORS.iter().find(|b| b.label == Some("mt")).expect("mt behavior missing");
+        let mt = ZMK_BEHAVIORS
+            .iter()
+            .find(|b| b.label == Some("mt"))
+            .expect("mt behavior missing");
         assert_eq!(mt.binding_cells, 2);
         assert_eq!(mt.parameter_metadata.len(), 2);
         assert_eq!(mt.parameter_metadata[0], ParameterType::Modifier);
         assert_eq!(mt.parameter_metadata[1], ParameterType::Keycode);
 
-        let bt = ZMK_BEHAVIORS.iter().find(|b| b.label == Some("bt")).expect("bt behavior missing");
+        let bt = ZMK_BEHAVIORS
+            .iter()
+            .find(|b| b.label == Some("bt"))
+            .expect("bt behavior missing");
         assert_eq!(bt.binding_cells, 2);
         assert_eq!(bt.parameter_metadata[0], ParameterType::Constant);
     }
@@ -603,16 +730,16 @@ mod tests {
     #[test]
     fn test_keycode_logic() {
         use thockflow::keymap::keycodes;
-        
+
         // Backspace, arrows, etc. should be regular but NOT modifiers
         assert!(keycodes::is_regular_key("BSPC"));
         assert!(!keycodes::is_modifier("BSPC"));
-        
+
         assert!(keycodes::is_regular_key("LEFT"));
         assert!(!keycodes::is_modifier("LEFT"));
 
         assert!(keycodes::is_regular_key("C_AC_BACK"));
-        assert!(!keycodes::is_modifier("C_AC_BACK"));        
+        assert!(!keycodes::is_modifier("C_AC_BACK"));
         // Modifiers should be modifiers
         assert!(keycodes::is_modifier("LSHFT"));
         assert!(keycodes::is_modifier("RCTRL"));
@@ -636,12 +763,29 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
+                PhysicalKey {
+                    x: 200,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
             ],
-            layers: vec![
-                Layer { name: "new_layer_0".to_string(), bindings: vec!["&kp X".to_string(), "&kp Y".to_string()] },
-            ],
+            layers: vec![Layer {
+                name: "new_layer_0".to_string(),
+                bindings: vec!["&kp X".to_string(), "&kp Y".to_string()],
+            }],
             includes: vec![],
         };
 
@@ -666,12 +810,34 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
+                PhysicalKey {
+                    x: 200,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
             ],
             layers: vec![
-                Layer { name: "layer_0".to_string(), bindings: vec!["&kp LONG_BINDING".to_string(), "&kp B".to_string()] },
-                Layer { name: "layer_1".to_string(), bindings: vec!["&kp A".to_string(), "&kp SHORT".to_string()] },
+                Layer {
+                    name: "layer_0".to_string(),
+                    bindings: vec!["&kp LONG_BINDING".to_string(), "&kp B".to_string()],
+                },
+                Layer {
+                    name: "layer_1".to_string(),
+                    bindings: vec!["&kp A".to_string(), "&kp SHORT".to_string()],
+                },
             ],
             includes: vec![],
         };
@@ -698,12 +864,34 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
+                PhysicalKey {
+                    x: 200,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
             ],
             layers: vec![
-                Layer { name: "layer_0".to_string(), bindings: vec!["&kp A".to_string(), "&kp B".to_string()] },
-                Layer { name: "new_layer".to_string(), bindings: vec!["&kp C".to_string(), "&kp D".to_string()] },
+                Layer {
+                    name: "layer_0".to_string(),
+                    bindings: vec!["&kp A".to_string(), "&kp B".to_string()],
+                },
+                Layer {
+                    name: "new_layer".to_string(),
+                    bindings: vec!["&kp C".to_string(), "&kp D".to_string()],
+                },
             ],
             includes: vec![],
         };
@@ -755,29 +943,48 @@ mod tests {
 "#;
         let data = KeymapData {
             physical_layout: vec![
-                PhysicalKey { x: 0, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
-                PhysicalKey { x: 200, y: 0, width: 100, height: 100, rotation: 0, rx: 0, ry: 0 },
+                PhysicalKey {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
+                PhysicalKey {
+                    x: 200,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    rotation: 0,
+                    rx: 0,
+                    ry: 0,
+                },
             ],
-            layers: vec![
-                Layer { name: "layer_0".to_string(), bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()] },
-            ],
+            layers: vec![Layer {
+                name: "layer_0".to_string(),
+                bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()],
+            }],
             includes: vec!["custom.h".to_string()],
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         println!("Result:\n{}", result);
-        
+
         // Should have added custom.h, mouse_move.dtsi, and pointing.h
         assert!(result.contains("#include <custom.h>"));
         assert!(result.contains("#include <behaviors/mouse_move.dtsi>"));
         assert!(result.contains("#include <dt-bindings/zmk/pointing.h>"));
-        
+
         // Check placement: should be after keys.h
         let pos_keys = result.find("#include <dt-bindings/zmk/keys.h>").unwrap();
         let pos_custom = result.find("#include <custom.h>").unwrap();
         let pos_mmv = result.find("#include <behaviors/mouse_move.dtsi>").unwrap();
-        let pos_pointing = result.find("#include <dt-bindings/zmk/pointing.h>").unwrap();
-        
+        let pos_pointing = result
+            .find("#include <dt-bindings/zmk/pointing.h>")
+            .unwrap();
+
         assert!(pos_custom > pos_keys, "custom.h should be after keys.h");
         assert!(pos_mmv > pos_keys, "mouse_move.dtsi should be after keys.h");
         assert!(pos_pointing > pos_keys, "pointing.h should be after keys.h");
@@ -789,12 +996,12 @@ mod tests {
         use thockflow::keymap::generate_svg;
         let content = include_str!("../../static/hshs52.keymap");
         let data = parse_keymap_with_tree_sitter(content).expect("Should parse hshs52");
-        
+
         let svg = generate_svg(&data);
         assert!(!svg.is_empty());
         assert!(svg.contains("<svg"));
         assert!(svg.contains("</svg>"));
-        
+
         // Validate SVG using roxmltree
         let doc = match roxmltree::Document::parse(&svg) {
             Ok(d) => d,
@@ -809,20 +1016,34 @@ mod tests {
         };
         let root = doc.root_element();
         assert_eq!(root.tag_name().name(), "svg");
-        
+
         // Check for layers (layer-title class)
-        let layer_titles: Vec<_> = root.descendants()
+        let layer_titles: Vec<_> = root
+            .descendants()
             .filter(|n| n.attribute("class") == Some("layer-title"))
             .collect();
-        assert_eq!(layer_titles.len(), data.layers.len(), "Should have correct number of layer titles");
-        
+        assert_eq!(
+            layer_titles.len(),
+            data.layers.len(),
+            "Should have correct number of layer titles"
+        );
+
         // Check for keys (rect with class "key")
-        let keys: Vec<_> = root.descendants()
+        let keys: Vec<_> = root
+            .descendants()
             .filter(|n| n.attribute("class") == Some("key"))
             .collect();
-        assert_eq!(keys.len(), data.layers.len() * data.physical_layout.len(), "Should have correct total number of keys across all layers");
-        
-        println!("SVG validation passed: {} layers, {} total keys", layer_titles.len(), keys.len());
+        assert_eq!(
+            keys.len(),
+            data.layers.len() * data.physical_layout.len(),
+            "Should have correct total number of keys across all layers"
+        );
+
+        println!(
+            "SVG validation passed: {} layers, {} total keys",
+            layer_titles.len(),
+            keys.len()
+        );
     }
 }
 
@@ -879,7 +1100,10 @@ async fn index(
     // Remove dev script tag if present to avoid duplicate loads
     let html = index_html_s
         .replace("<body>", &format!("<body>{}", out))
-        .replace("</head>", &format!("{}</head>", html_wasm_init_head(init_quote_index)));
+        .replace(
+            "</head>",
+            &format!("{}</head>", html_wasm_init_head(init_quote_index)),
+        );
     (
         HeaderMap::from_iter([(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"))]),
         Html(html),
@@ -921,7 +1145,7 @@ async fn main() -> Result<()> {
         std::env::set_var("RUST_LOG", "info");
     }
     env_logger::init();
-    
+
     let app = app();
 
     if lambda_web::is_running_on_lambda() {
