@@ -99,6 +99,7 @@ rust_library(
         normal = True,
     ) + [
         "//vial-protocol",
+        "//proto:zmk_studio_rust_proto",
     ],
 )
 
@@ -112,6 +113,7 @@ rust_test(
         normal = True,
     ) + [
         "//vial-protocol",
+        "//proto:zmk_studio_rust_proto",
     ],
 )
 

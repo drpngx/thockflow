@@ -8,6 +8,7 @@ lazy_static! {
         m.insert("SEMI", ";");
         m.insert("SQT", "'");
         m.insert("SLASH", "/");
+        m.insert("FSLH", "/");
         m.insert("BSPC", "Bksp");
         m.insert("LSHFT", "Shift");
         m.insert("RSHFT", "Shift");
@@ -153,6 +154,7 @@ pub fn get_keycode_shifted(code: &str) -> Option<&'static str> {
         "COMMA" => Some("<"),
         "DOT" => Some(">"),
         "SLASH" => Some("?"),
+        "FSLH" => Some("?"),
         _ => None,
     }
 }
@@ -181,6 +183,8 @@ pub fn is_plain_key(code: &str) -> bool {
         "COMMA",
         "DOT",
         "BSLH",
+        "SLASH",
+        "FSLH",
         "ESC",
         "SPACE",
         "ENTER",

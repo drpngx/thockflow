@@ -47,7 +47,10 @@ rust_binary(
     name = "server",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),
-    compile_data = ["//:static/hshs52.keymap"],
+    compile_data = [
+        "//:static/hshs52.keymap",
+        "//:static/kanata-surf.kbd",
+    ],
     data = [
         "//:app_wasm",
         "//:static_files",
@@ -71,7 +74,10 @@ rust_binary(
 rust_test(
     name = "server_test",
     crate = ":server",
-    compile_data = ["//:static/hshs52.keymap"],
+    compile_data = [
+        "//:static/hshs52.keymap",
+        "//:static/kanata-surf.kbd",
+    ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
     ),

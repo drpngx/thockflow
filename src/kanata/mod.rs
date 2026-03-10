@@ -12,18 +12,9 @@ use crate::keymap::{
 
 pub mod layout;
 
-fn is_mac() -> bool {
-    if let Some(window) = web_sys::window() {
-        let navigator = window.navigator();
-        let platform = navigator.platform().unwrap_or_default().to_lowercase();
-        platform.contains("mac") || platform.contains("iphone") || platform.contains("ipad") || platform.contains("ipod")
-    } else {
-        false
-    }
-}
-
 fn format_kanata_keycode(kc: &str, is_mac: bool) -> String {
     match kc {
+        "_" => "▽".to_string(),
         "ent" | "enter" | "ret" => "⏎".to_string(),
         "bspc" | "backspace" => "⌫".to_string(),
         "spc" | "space" => "SPACE".to_string(),
@@ -42,10 +33,10 @@ fn format_kanata_keycode(kc: &str, is_mac: bool) -> String {
         "down" => "↓".to_string(),
         "left" => "←".to_string(),
         "right" => "→".to_string(),
-        "pgup" => "⇞".to_string(),
-        "pgdn" => "⇟".to_string(),
-        "home" => "↖".to_string(),
-        "end" => "↘".to_string(),
+        "pgup" => "PgUp".to_string(),
+        "pgdn" => "PgDn".to_string(),
+        "home" => "Home".to_string(),
+        "end" => "End".to_string(),
         "ins" => "INS".to_string(),
         "del" => "⌦".to_string(),
         "mlft" => "🖱️1".to_string(),
@@ -77,7 +68,7 @@ fn format_kanata_keycode(kc: &str, is_mac: bool) -> String {
     }
 }
 
-fn get_kanata_binding_parts(binding: &str, aliases: &std::collections::HashMap<String, String>, is_mac: bool, _is_laptop: bool) -> BindingParts {
+pub fn get_kanata_binding_parts_internal(binding: &str, aliases: &std::collections::HashMap<String, String>, is_mac: bool, _is_laptop: bool) -> BindingParts {
     let mut current = binding.to_string();
     let mut top_left = "".to_string();
     let mut top_right = "".to_string();
@@ -354,7 +345,7 @@ impl<'a> KanataValidator<'a> {
 }
 
 static KANATA_KEYS: &[&str] = &[
-    "lsft", "rsft", "lctl", "rctl", "lalt", "ralt", "lmet", "rmet",
+    "_", "lsft", "rsft", "lctl", "rctl", "lalt", "ralt", "lmet", "rmet",
     "caps", "esc", "ent", "bspc", "spc", "tab", "del", "ins",
     "up", "down", "left", "right", "pgup", "pgdn", "home", "end",
     "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
@@ -363,6 +354,172 @@ static KANATA_KEYS: &[&str] = &[
     "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
     "comm", "dot", "slsh", "scln", "apos", "lbkt", "rbkt", "bksl", "grv", "min", "eql",
 ];
+
+fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
+    let mut suggestions = Vec::new();
+    let lower_text = text.to_lowercase();
+    
+    // Determine the relevant part of the string for completion
+    let (prefix, query) = if let Some(last_open) = lower_text.rfind('(') {
+        // We are inside an action
+        let after_open = &lower_text[last_open + 1..];
+        
+        let mut depth = 0;
+        let mut last_space = None;
+        for (i, c) in after_open.char_indices() {
+            if c == '(' { depth += 1; }
+            else if c == ')' { depth -= 1; }
+            else if c.is_whitespace() && depth == 0 { last_space = Some(i); }
+        }
+
+        if let Some(space_idx) = last_space {
+            // We are in parameters
+            let query = &after_open[space_idx + 1..];
+            (&text[..last_open + 1 + space_idx + 1], query)
+        } else {
+            // Completing the action name itself
+            (&text[..last_open + 1], after_open)
+        }
+    } else if let Some(eq_pos) = lower_text.find('=') {
+        let after_eq = &lower_text[eq_pos + 1..];
+        let trimmed = after_eq.trim_start();
+        let offset = lower_text.len() - trimmed.len();
+        (&text[..offset], trimmed)
+    } else {
+        ("", lower_text.as_str())
+    };
+
+    let is_layer_action = if let Some(last_open) = lower_text.rfind('(') {
+        let after_open = &lower_text[last_open + 1..];
+        let parts: Vec<&str> = after_open.split_whitespace().collect();
+        let has_space = after_open.chars().any(|c| c.is_whitespace());
+        !parts.is_empty() && (parts[0] == "layer-toggle" || parts[0] == "layer-switch" || parts[0] == "layer-while-held") && has_space
+    } else {
+        false
+    };
+
+    let is_timeout_action = if let Some(last_open) = lower_text.rfind('(') {
+        let after_open = &lower_text[last_open + 1..];
+        let parts: Vec<&str> = after_open.split_whitespace().collect();
+        let has_space = after_open.chars().any(|c| c.is_whitespace());
+        if !parts.is_empty() && has_space {
+            if let Some(action) = KANATA_ACTIONS.iter().find(|a| a.name == parts[0]) {
+                let param_idx = if after_open.ends_with(' ') { parts.len() - 1 } else { parts.len() - 2 };
+                action.params.get(param_idx) == Some(&ParamType::Timeout)
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if is_layer_action {
+        for layer in &data.layers {
+            if layer.name.to_lowercase().contains(query) {
+                suggestions.push(layer.name.clone());
+            }
+        }
+    } else if is_timeout_action {
+        for t in ["50", "100", "200", "250", "300", "1000"] {
+            if t.contains(query) {
+                suggestions.push(t.to_string());
+            }
+        }
+    } else {
+        let only_actions = query.starts_with('(') || (text.contains('=') && query.is_empty());
+        let clean_query = if query.starts_with('(') { &query[1..] } else { query };
+
+        for action in KANATA_ACTIONS {
+            if action.name.contains(clean_query) {
+                suggestions.push(format!("({}", action.name));
+            }
+        }
+        if !only_actions {
+            for key in KANATA_KEYS {
+                if key.contains(query) {
+                    suggestions.push(key.to_string());
+                }
+            }
+            for alias in data.aliases.keys() {
+                if alias.contains(query) {
+                    suggestions.push(alias.clone());
+                }
+            }
+        }
+    }
+
+    suggestions.sort();
+    suggestions.dedup();
+    suggestions.truncate(30);
+    (prefix.to_string(), suggestions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::keymap::{Layer, KeymapData};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_completion_congruence() {
+        let mut data = KeymapData {
+            physical_layout: Vec::new(),
+            layers: vec![Layer { name: "base".to_string(), bindings: Vec::new() }],
+            includes: Vec::new(),
+            aliases: HashMap::new(),
+            defsrc: Vec::new(),
+            unmapped_names: Vec::new(),
+        };
+        data.aliases.insert("myalias".to_string(), "lsft".to_string());
+
+        let validator = KanataValidator::new(&data);
+
+        for action in KANATA_ACTIONS {
+            let input = format!("({} ", action.name);
+            let (_prefix, suggestions) = get_suggestions(&input, &data);
+            
+            if suggestions.is_empty() {
+                // Some actions might not have suggestions if they only take timeouts or layers we haven't defined
+                continue;
+            }
+
+            // Test first suggestion
+            let first = &suggestions[0];
+            
+            // Note: full might be incomplete (e.g. "(one-shot 500") 
+            // but we want to make sure it's at least a valid start or prefix.
+            // Actually, the requirement says "make sure the suggestion can be validated".
+            // If it's a number, we might need to complete the whole action to validate it.
+            
+            if action.name == "one-shot" {
+                assert!(first.parse::<u32>().is_ok(), "one-shot suggestion should be a number, got {}", first);
+                let completed = format!("(one-shot {} lsft)", first);
+                assert!(validator.validate_action(&completed), "Completed one-shot should be valid");
+            }
+            
+            if action.name == "tap-hold" {
+                assert!(first.parse::<u32>().is_ok());
+            }
+        }
+    }
+
+    #[test]
+    fn test_transparent_suggestion() {
+        let data = KeymapData {
+            physical_layout: Vec::new(),
+            layers: Vec::new(),
+            includes: Vec::new(),
+            aliases: HashMap::new(),
+            defsrc: Vec::new(),
+            unmapped_names: Vec::new(),
+        };
+        let (_, suggestions) = get_suggestions("_", &data);
+        assert!(suggestions.contains(&"_".to_string()));
+    }
+}
 
 async fn is_laptop() -> bool {
     if let Some(window) = web_sys::window() {
@@ -414,20 +571,63 @@ pub fn KanataHome() -> Html {
     let selected_key = use_state(|| None::<SelectedKey>);
     let is_laptop_state = use_state(|| false);
 
-    let on_open = {
+    let parse_content = {
         let kanata_data = kanata_data.clone();
         let original_content = original_content.clone();
         let error = error.clone();
         let loading = loading.clone();
-        let file_handle = file_handle.clone();
         let is_laptop_state = is_laptop_state.clone();
-        Callback::from(move |_| {
+        Callback::from(move |content: String| {
             let kanata_data = kanata_data.clone();
             let original_content = original_content.clone();
             let error = error.clone();
             let loading = loading.clone();
-            let file_handle = file_handle.clone();
             let is_laptop_state = is_laptop_state.clone();
+            spawn_local(async move {
+                loading.set(true);
+                let laptop = is_laptop().await;
+                is_laptop_state.set(laptop);
+                original_content.set(content.clone());
+
+                let parse_result = Request::post("/api/parse-kanata")
+                    .json(&KanataRequest { 
+                        content, 
+                        is_mac: crate::is_mac(),
+                        is_laptop: laptop
+                    })
+                    .unwrap()
+                    .send()
+                    .await;
+
+                loading.set(false);
+                match parse_result {
+                    Ok(resp) => {
+                        if resp.ok() {
+                            match resp.json::<KeymapData>().await {
+                                Ok(data) => {
+                                    kanata_data.set(Some(data));
+                                    error.set(None);
+                                }
+                                Err(e) => error.set(Some(format!("JSON Parse error: {}", e))),
+                            }
+                        } else {
+                            error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
+                        }
+                    }
+                    Err(e) => error.set(Some(format!("Network error: {}", e))),
+                }
+            });
+        })
+    };
+
+    let on_open = {
+        let parse_content = parse_content.clone();
+        let error = error.clone();
+        let file_handle = file_handle.clone();
+        Callback::from(move |_| {
+            let parse_content = parse_content.clone();
+            let error = error.clone();
+            let file_handle = file_handle.clone();
             spawn_local(async move {
                 let options = js_sys::Object::new();
                 let types = js_sys::Array::new();
@@ -450,10 +650,6 @@ pub fn KanataHome() -> Html {
                         if handles.length() > 0 {
                             let handle: FileSystemFileHandle = handles.get(0).unchecked_into();
                             file_handle.set(Some(handle.clone()));
-
-                            loading.set(true);
-                            let laptop = is_laptop().await;
-                            is_laptop_state.set(laptop);
                             
                             let file_promise = handle.get_file();
                             let file_result = wasm_bindgen_futures::JsFuture::from(file_promise).await;
@@ -467,52 +663,16 @@ pub fn KanataHome() -> Html {
                                     match content_result {
                                         Ok(content_val) => {
                                             let content = content_val.as_string().unwrap_or_default();
-                                            original_content.set(content.clone());
-
-                                            let parse_result = Request::post("/api/parse-kanata")
-                                                .json(&KanataRequest { 
-                                                    content, 
-                                                    is_mac: is_mac(),
-                                                    is_laptop: laptop
-                                                })
-                                                .unwrap()
-                                                .send()
-                                                .await;
-
-                                            loading.set(false);
-                                            match parse_result {
-                                                Ok(resp) => {
-                                                    if resp.ok() {
-                                                        match resp.json::<KeymapData>().await {
-                                                            Ok(data) => {
-                                                                kanata_data.set(Some(data));
-                                                                error.set(None);
-                                                            }
-                                                            Err(e) => error.set(Some(format!("JSON Parse error: {}", e))),
-                                                        }
-                                                    } else {
-                                                        error.set(Some(format!("Server error: {}", resp.text().await.unwrap_or_default())));
-                                                    }
-                                                }
-                                                Err(e) => error.set(Some(format!("Network error: {}", e))),
-                                            }
+                                            parse_content.emit(content);
                                         }
-                                        Err(e) => {
-                                            loading.set(false);
-                                            error.set(Some(format!("Failed to read file: {:?}", e)));
-                                        }
+                                        Err(e) => error.set(Some(format!("Failed to read file: {:?}", e))),
                                     }
                                 }
-                                Err(e) => {
-                                    loading.set(false);
-                                    error.set(Some(format!("Failed to get file: {:?}", e)));
-                                }
+                                Err(e) => error.set(Some(format!("Failed to get file: {:?}", e))),
                             }
                         }
                     }
-                    Err(e) => {
-                        error.set(Some(format!("File picker error: {:?}", e)));
-                    }
+                    Err(e) => error.set(Some(format!("File picker error: {:?}", e))),
                 }
             });
         })
@@ -589,6 +749,49 @@ pub fn KanataHome() -> Html {
         })
     };
 
+    // Global keyboard listener for Ctrl-S and Ctrl-O
+    {
+        let has_data = kanata_data.is_some();
+        let on_open = on_open.clone();
+        let on_save = on_save.clone();
+        use_effect_with((has_data, on_open, on_save), move |(has_data, on_open, on_save)| {
+            let on_open = on_open.clone();
+            let on_save = on_save.clone();
+            let has_data = *has_data;
+            let key_listener = Closure::wrap(Box::new(move |e: KeyboardEvent| {
+                let key = e.key().to_lowercase();
+                if (e.ctrl_key() || e.meta_key()) && key == "o" {
+                    e.prevent_default();
+                    on_open.emit(MouseEvent::new("click").unwrap());
+                } else if (e.ctrl_key() || e.meta_key()) && key == "s" {
+                    if has_data {
+                        e.prevent_default();
+                        on_save.emit(MouseEvent::new("click").unwrap());
+                    }
+                }
+            }) as Box<dyn FnMut(KeyboardEvent)>);
+
+            let window = web_sys::window().expect("should have a window");
+            window
+                .add_event_listener_with_callback(
+                    "keydown",
+                    key_listener.as_ref().unchecked_ref(),
+                )
+                .unwrap();
+
+            move || {
+                let window = web_sys::window().expect("should have a window");
+                window
+                    .remove_event_listener_with_callback(
+                        "keydown",
+                        key_listener.as_ref().unchecked_ref(),
+                    )
+                    .unwrap();
+                drop(key_listener);
+            }
+        });
+    }
+
     html! {
         <div class="w-full flex flex-col items-center p-4">
             <h2 class="text-4xl font-display mb-8">{"Kanata Editor"}</h2>
@@ -610,10 +813,29 @@ pub fn KanataHome() -> Html {
                     } else { html! {} }}
                 </div>
                 { if kanata_data.is_some() {
+                    let data = (*kanata_data).clone().unwrap();
+                    let laptop = *is_laptop_state;
+                    let on_download_svg = {
+                        let data = data.clone();
+                        Callback::from(move |_| {
+                            let svg_content = crate::keymap::generate_svg(&data, true, crate::is_mac(), laptop);
+                            let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(&svg_content))).unwrap();
+                            let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+                            let document = web_sys::window().unwrap().document().unwrap();
+                            let anchor = document.create_element("a").unwrap().unchecked_into::<web_sys::HtmlAnchorElement>();
+                            anchor.set_href(&url);
+                            anchor.set_download("kanata.svg");
+                            anchor.click();
+                            web_sys::Url::revoke_object_url(&url).unwrap();
+                        })
+                    };
                     html! {
                         <div class="flex space-x-2 mt-6">
                             <button onclick={on_save} class="px-6 py-2.5 bg-green-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-green-700 hover:shadow-lg focus:bg-green-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-green-800 active:shadow-lg transition duration-150 ease-in-out">
                                 {"Save File"}
+                            </button>
+                            <button onclick={on_download_svg} class="px-6 py-2.5 bg-purple-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-purple-700 hover:shadow-lg focus:bg-purple-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-purple-800 active:shadow-lg transition duration-150 ease-in-out">
+                                {"Download SVG"}
                             </button>
                         </div>
                     }
@@ -683,7 +905,10 @@ fn KanataRenderer(props: &RendererProps) -> Html {
 
     {
         let container_ref = container_ref.clone();
-        use_effect(move || {
+        let current_layer_idx = *props.current_layer;
+        let data = props.data.clone();
+        let selected_key = (*props.selected_key).clone();
+        use_effect_with((current_layer_idx, data, selected_key), move |_| {
             if let Some(element) = container_ref.cast::<web_sys::HtmlElement>() {
                 let _ = element.focus();
             }
@@ -749,7 +974,7 @@ fn KanataRenderer(props: &RendererProps) -> Html {
     let mut max_y = i32::MIN;
     
     // Split into standard keys and aliases for rendering
-    let num_standard_keys = props.data.defsrc.len() - props.data.aliases.len();
+    let _num_standard_keys = props.data.defsrc.len() - props.data.aliases.len();
     
     for pk in props.data.physical_layout.iter() {
         min_x = min_x.min(pk.x);
@@ -764,7 +989,8 @@ fn KanataRenderer(props: &RendererProps) -> Html {
     let offset_x = -(min_x as f32 * scale);
     let offset_y = -(min_y as f32 * scale);
 
-    let alias_y_threshold = 6500; // Based on our compute_standard_kanata_layout
+    let unmapped_y_threshold = 6500;
+    let alias_y_threshold = 8000;
 
     html! {
         <div ref={container_ref.clone()} tabindex="0" onkeydown={on_keydown} class="flex flex-col items-center w-full focus:outline-none">
@@ -796,7 +1022,7 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                     { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| {
                         let binding = layer.bindings.get(i).cloned().unwrap_or_else(|| "".to_string());
                         let defsrc_name = props.data.defsrc.get(i).cloned().unwrap_or_default();
-                        let parts = get_kanata_binding_parts(&binding, &props.data.aliases, is_mac(), props.is_laptop);
+                        let parts = get_kanata_binding_parts_internal(&binding, &props.data.aliases, crate::is_mac(), props.is_laptop);
                         let x = (pk.x as f32 * scale + offset_x) as i32;
                         let y = (pk.y as f32 * scale + offset_y) as i32;
                         let w = (pk.width as f32 * scale) as i32 - 2;
@@ -806,22 +1032,31 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                         let show_hint = *jump_mode_active && hint.map(|h| h.starts_with(&*jump_input)).unwrap_or(false);
 
                         let is_alias_section = pk.y >= alias_y_threshold;
-                        let alias_name = if is_alias_section { Some(defsrc_name.clone()) } else { None };
+                        let is_unmapped_section = pk.y >= unmapped_y_threshold && pk.y < alias_y_threshold;
 
                         html! {
                             <>
-                                { if pk.y == alias_y_threshold && i == num_standard_keys {
-                                    html! { <div class="absolute w-full border-t-2 border-dashed border-gray-300 dark:border-gray-600" style={format!("top: {}px; left: 0;", y - 20)}>
-                                        <span class="absolute -top-3 left-0 bg-gray-50 dark:bg-gray-800 px-2 text-[10px] font-bold text-gray-400">{"ALIASES"}</span>
+                                { if pk.y == unmapped_y_threshold && pk.x == 0 {
+                                    html! { <div class="absolute w-full border-t-2 border-dashed border-orange-300 dark:border-orange-900/30" style={format!("top: {}px; left: 0;", y - 20)}>
+                                        <span class="absolute -top-3 left-0 bg-gray-50 dark:bg-gray-800 px-2 text-[10px] font-bold text-orange-400">{"UNMAPPED"}</span>
+                                    </div> }
+                                } else { html! {} }}
+
+                                { if pk.y == alias_y_threshold && pk.x == 0 {
+                                    html! { <div class="absolute w-full border-t-2 border-dashed border-blue-300 dark:border-blue-900/30" style={format!("top: {}px; left: 0;", y - 20)}>
+                                        <span class="absolute -top-3 left-0 bg-gray-50 dark:bg-gray-800 px-2 text-[10px] font-bold text-blue-400">{"ALIASES"}</span>
                                     </div> }
                                 } else { html! {} }}
                                 
-                                { if let Some(name) = alias_name {
-                                    html! { <div class="absolute text-[8px] font-bold text-blue-500 truncate text-center" style={format!("left: {}px; top: {}px; width: {}px;", x, y - 12, w)}> {name} </div> }
+                                { if is_alias_section || is_unmapped_section {
+                                    let label_color = if is_alias_section { "text-blue-500" } else { "text-orange-500" };
+                                    html! { <div class={classes!("absolute", "text-[8px]", "font-bold", "truncate", "text-center", label_color)} style={format!("left: {}px; top: {}px; width: {}px;", x, y - 12, w)}> {defsrc_name.clone()} </div> }
                                 } else { html! {} }}
 
                                 <div onclick={onclick} class={classes!("absolute", "bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-600", "flex", "flex-col", "items-center", "justify-center", "rounded", "cursor-pointer", "hover:border-blue-400", "dark:hover:border-blue-500", "shadow-sm", "transition-all", "select-none",
-                                    if is_alias_section { "bg-blue-50/30 dark:bg-blue-900/10" } else { "" }
+                                    if is_alias_section { "bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" } 
+                                    else if is_unmapped_section { "bg-orange-50/30 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800" }
+                                    else { "" }
                                 )} style={format!("left: {}px; top: {}px; width: {}px; height: {}px;", x, y, w, h)}>
 
                                     <div class="w-full flex justify-between px-1 text-[7px] text-gray-400 absolute top-0.5 pointer-events-none">
@@ -874,7 +1109,7 @@ struct PopupProps {
 
 #[function_component]
 fn KanataBindingPopup(props: &PopupProps) -> Html {
-    let num_standard_keys = props.data.defsrc.len() - props.data.aliases.len();
+    let num_standard_keys = props.data.defsrc.len() + props.data.unmapped_names.len();
     let is_alias_section = props.selected_key.key_index >= num_standard_keys;
     let binding = &props.data.layers[props.selected_key.layer_index].bindings[props.selected_key.key_index];
     
@@ -903,6 +1138,8 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
         validator.validate_full(&*current_text)
     };
 
+    let (prefix, suggestions) = get_suggestions(&*current_text, &props.data);
+
     let on_save = {
         let on_update = props.on_update.clone();
         let data = props.data.clone();
@@ -911,18 +1148,29 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
         let on_close = props.on_close.clone();
         let is_valid = is_valid;
         let is_laptop = props.is_laptop;
-        Callback::from(move |e| {
+        Callback::from(move |e: MouseEvent| {
             if !is_valid { return; }
             let mut new_data = data.clone();
             let text = (*current_text).clone().trim().to_string();
             
-            let num_standard_keys = new_data.defsrc.len() - new_data.aliases.len();
-            let is_alias_section = sk.key_index >= num_standard_keys;
+            let num_standard = new_data.defsrc.len();
+            let num_unmapped = new_data.unmapped_names.len();
+            let num_physical_src = num_standard + num_unmapped;
+            let is_alias_section = sk.key_index >= num_physical_src;
 
             if is_alias_section {
                 // Editing an existing alias value (RHS)
-                let name = new_data.defsrc[sk.key_index].clone();
-                new_data.aliases.insert(name, text);
+                let _name = new_data.defsrc.get(sk.key_index)
+                    .or_else(|| new_data.unmapped_names.get(sk.key_index - num_standard))
+                    .cloned();
+                // This is a bit tricky if sk.key_index points to an alias but we use defsrc.
+                // Actually, the UI shows standard + unmapped + aliases.
+                // If i >= num_physical_src, it's an alias.
+                let mut sorted_alias_names: Vec<String> = new_data.aliases.keys().cloned().collect();
+                sorted_alias_names.sort();
+                if let Some(alias_name) = sorted_alias_names.get(sk.key_index - num_physical_src) {
+                    new_data.aliases.insert(alias_name.clone(), text);
+                }
             } else if let Some((name, val)) = text.split_once('=') {
                 // Creating or updating an alias (name = val)
                 let name = name.trim();
@@ -937,17 +1185,15 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
             }
 
             // Recompute everything to ensure consistency
-            let key_names: Vec<String> = new_data.defsrc.iter().take(num_standard_keys).cloned().collect();
             let mut sorted_alias_names: Vec<String> = new_data.aliases.keys().cloned().collect();
             sorted_alias_names.sort();
             
-            new_data.defsrc = key_names.clone();
-            new_data.defsrc.extend(sorted_alias_names.clone());
-            new_data.physical_layout = layout::compute_standard_kanata_layout(&key_names, &sorted_alias_names, is_mac(), is_laptop);
+            new_data.physical_layout = layout::compute_standard_kanata_layout(&new_data.defsrc, &new_data.unmapped_names, &sorted_alias_names, crate::is_mac(), is_laptop);
             
             for layer in &mut new_data.layers {
                 let current_bindings = layer.bindings.clone();
-                layer.bindings = current_bindings.into_iter().take(num_standard_keys).collect();
+                // bindings are standard + unmapped + aliases
+                layer.bindings = current_bindings.into_iter().take(num_physical_src).collect();
                 layer.bindings.extend(sorted_alias_names.clone());
             }
 
@@ -956,82 +1202,6 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
         })
     };
 
-    let text = (*current_text).clone();
-    let mut suggestions = Vec::new();
-    let lower_text = text.to_lowercase();
-    
-    // Determine the relevant part of the string for completion
-    let (prefix, query) = if let Some(last_open) = lower_text.rfind('(') {
-        // We are inside an action
-        let after_open = &lower_text[last_open + 1..];
-        
-        let mut depth = 0;
-        let mut last_space = None;
-        for (i, c) in after_open.char_indices() {
-            if c == '(' { depth += 1; }
-            else if c == ')' { depth -= 1; }
-            else if c.is_whitespace() && depth == 0 { last_space = Some(i); }
-        }
-
-        if let Some(space_idx) = last_space {
-            // We are in parameters
-            let query = &after_open[space_idx + 1..];
-            (&text[..last_open + 1 + space_idx + 1], query)
-        } else {
-            // Completing the action name itself
-            (&text[..last_open + 1], after_open)
-        }
-    } else if let Some(eq_pos) = lower_text.find('=') {
-        let after_eq = &lower_text[eq_pos + 1..];
-        let trimmed = after_eq.trim_start();
-        let offset = lower_text.len() - trimmed.len();
-        (&text[..offset], trimmed)
-    } else {
-        ("", lower_text.as_str())
-    };
-
-    let is_layer_action = if let Some(last_open) = lower_text.rfind('(') {
-        let after_open = &lower_text[last_open + 1..];
-        let parts: Vec<&str> = after_open.split_whitespace().collect();
-        let has_space = after_open.chars().any(|c| c.is_whitespace());
-        !parts.is_empty() && (parts[0] == "layer-toggle" || parts[0] == "layer-switch" || parts[0] == "layer-while-held") && has_space
-    } else {
-        false
-    };
-
-    if is_layer_action {
-        for layer in &props.data.layers {
-            if layer.name.to_lowercase().contains(query) {
-                suggestions.push(layer.name.clone());
-            }
-        }
-    } else {
-        let only_actions = query.starts_with('(') || (text.contains('=') && query.is_empty());
-        let clean_query = if query.starts_with('(') { &query[1..] } else { query };
-
-        for action in KANATA_ACTIONS {
-            if action.name.contains(clean_query) {
-                suggestions.push(format!("({}", action.name));
-            }
-        }
-        if !only_actions {
-            for key in KANATA_KEYS {
-                if key.contains(query) {
-                    suggestions.push(key.to_string());
-                }
-            }
-            for alias in props.data.aliases.keys() {
-                if alias.contains(query) {
-                    suggestions.push(alias.clone());
-                }
-            }
-        }
-    }
-
-    suggestions.sort();
-    suggestions.dedup();
-    suggestions.truncate(30);
-
     let on_keydown = {
         let on_close = props.on_close.clone();
         let on_save = on_save.clone();
@@ -1039,7 +1209,7 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
         let suggestions = suggestions.clone();
         let current_text = current_text.clone();
         let show_suggestions = show_suggestions.clone();
-        let prefix = prefix.to_string();
+        let prefix = prefix.clone();
         Callback::from(move |e: KeyboardEvent| {
             match e.key().as_str() {
                 "Escape" => {
@@ -1048,7 +1218,7 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                 }
                 "Enter" => {
                     e.prevent_default();
-                    on_save.emit(MouseEvent::new("click").unwrap().into());
+                    on_save.emit(MouseEvent::new("click").unwrap());
                 }
                 "ArrowDown" => {
                     if !suggestions.is_empty() {
@@ -1099,6 +1269,7 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
         });
     }
 
+    let text = (*current_text).clone();
     let mut info_title = "Binding".to_string();
     let mut info_desc = "Enter a keycode or an alias name.".to_string();
     let mut info_params = Vec::new();
@@ -1218,16 +1389,18 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                                         let s_clone = s.clone();
                                         let current_text = current_text.clone();
                                         let show_suggestions = show_suggestions.clone();
+                                        let prefix = prefix.clone();
                                         let is_active = i == *suggestion_index && *show_suggestions;
                                         let onclick = Callback::from(move |_| {
-                                            current_text.set(s_clone.clone());
+                                            current_text.set(format!("{}{}", prefix, s_clone.clone()));
                                             show_suggestions.set(false);
                                         });
+                                        let display = if s == "_" { "transparent (▽)".to_string() } else { s.clone() };
                                         html! {
                                             <button onclick={onclick} class={classes!("text-left", "px-3", "py-2", "text-xs", "rounded-lg", "transition-colors", "font-mono", "border", "truncate",
                                                 if is_active { "bg-blue-600 text-white border-blue-400" } else { "hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border-transparent hover:border-blue-200 dark:hover:border-blue-800 text-gray-700 dark:text-gray-300" }
                                             )}>
-                                                {s}
+                                                {display}
                                             </button>
                                         }
                                     })}

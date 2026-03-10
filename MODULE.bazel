@@ -213,7 +213,36 @@ register_toolchains(
     "//emsdk:emsdk_win_toolchain",
 )
 
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "protobuf", version = "29.1", repo_name = "com_google_protobuf")
+bazel_dep(name = "rules_rust_prost", version = "0.68.1")
+
+prost_bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+prost_bindeps.spec(
+    artifact = "bin",
+    package = "protoc-gen-prost",
+    version = "0.4.0",
+)
+prost_bindeps.annotation(
+    crate = "protoc-gen-prost",
+    gen_all_binaries = True,
+)
+prost_bindeps.from_specs(
+    name = "prost_bindeps",
+    host_tools = "@rust_host_tools_nightly",
+)
+use_repo(prost_bindeps, "prost_bindeps")
+
+register_toolchains("//toolchains:prost_toolchain")
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "zmk_studio_messages",
+    build_file = "//proto:zmk_studio_messages.BUILD",
+    strip_prefix = "zmk-studio-messages-6cb4c283e76209d59c45fbcb218800cd19e9339d",
+    urls = ["https://github.com/zmkfirmware/zmk-studio-messages/archive/6cb4c283e76209d59c45fbcb218800cd19e9339d.zip"],
+)
 
 http_archive(
     name = "zmk",

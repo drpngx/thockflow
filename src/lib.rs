@@ -1,7 +1,20 @@
+extern crate zmk_studio_proto as zmk_studio_rust_proto;
+
 pub mod keymap;
 pub mod kanata;
 mod typing;
 pub mod vial;
+pub mod zmk_studio;
+
+pub fn is_mac() -> bool {
+    if let Some(window) = web_sys::window() {
+        let navigator = window.navigator();
+        let platform = navigator.platform().unwrap_or_default().to_lowercase();
+        platform.contains("mac") || platform.contains("iphone") || platform.contains("ipad") || platform.contains("ipod")
+    } else {
+        false
+    }
+}
 
 use std::collections::HashMap;
 
@@ -28,6 +41,8 @@ pub enum Route {
     Kanata,
     #[at("/vial")]
     Vial,
+    #[at("/zmk-studio")]
+    ZmkStudio,
 }
 
 #[derive(Properties, PartialEq, Debug, Default)]
@@ -101,6 +116,11 @@ fn Navbar() -> Html {
                         {"Vial"}
                     </button>
                 </Link<Route>>
+                <Link<Route> classes="p-4 text-3xl  " to={Route::ZmkStudio}>
+                    <button >
+                        {"ZMK Studio"}
+                    </button>
+                </Link<Route>>
                 <a class="p-4 text-3xl" href="https://github.com/drpngx/thockflow">{"GitHub"}</a>
             </div>
         </div>
@@ -166,6 +186,13 @@ fn switch(route: Route) -> Html {
                         <div class="w-full font-body flex px-2 flex-col items-center">
                             <div class="w-full max-w-[1920px]">
                                 <vial::VialHome />
+                            </div>
+                        </div>
+                    },
+                    Route::ZmkStudio => html! {
+                        <div class="w-full font-body flex px-2 flex-col items-center">
+                            <div class="w-full max-w-[1920px]">
+                                <zmk_studio::ZmkStudioHome />
                             </div>
                         </div>
                     },

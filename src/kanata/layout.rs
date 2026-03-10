@@ -418,7 +418,7 @@ pub fn is_standard_key(name: &str, is_mac: bool, is_laptop: bool) -> bool {
 /// Computes physical layout using standard keyboard positions.
 /// Only keys present in standard 108-key layout are shown.
 /// Aliases are added at the bottom as special keys.
-pub fn compute_standard_kanata_layout(key_names: &[String], alias_names: &[String], is_mac: bool, is_laptop: bool) -> Vec<PhysicalKey> {
+pub fn compute_standard_kanata_layout(key_names: &[String], unmapped_names: &[String], alias_names: &[String], is_mac: bool, is_laptop: bool) -> Vec<PhysicalKey> {
     let mut layout = Vec::new();
     let key_width = 1000;
     let key_height = 1000;
@@ -441,13 +441,30 @@ pub fn compute_standard_kanata_layout(key_names: &[String], alias_names: &[Strin
                 rx: 0,
                 ry: 0,
             });
-        } else {
-            // Key not in standard layout, skip as requested
         }
     }
 
-    // 2. Process aliases at the bottom
-    let alias_y_start = 7000;
+    // 2. Process unmapped keys
+    let unmapped_y_start = 6500;
+    let unmapped_margin = 100;
+    let unmapped_cols = 10;
+
+    for (i, _name) in unmapped_names.iter().enumerate() {
+        let col = i % unmapped_cols;
+        let row = i / unmapped_cols;
+        layout.push(PhysicalKey {
+            x: col as i32 * (key_width + unmapped_margin),
+            y: unmapped_y_start + row as i32 * (key_height + unmapped_margin),
+            width: key_width,
+            height: key_height,
+            rotation: 0,
+            rx: 0,
+            ry: 0,
+        });
+    }
+
+    // 3. Process aliases at the bottom
+    let alias_y_start = 8000;
     let alias_margin = 100;
     let alias_cols = 10;
     
@@ -607,7 +624,7 @@ mod tests {
         let key_names = vec!["esc".to_string(), "f1".to_string(), "a".to_string(), "invalid".to_string()];
         let alias_names = vec!["alias1".to_string(), "alias2".to_string()];
         
-        let layout = compute_standard_kanata_layout(&key_names, &alias_names, false, false);
+        let layout = compute_standard_kanata_layout(&key_names, &[], &alias_names, false, false);
         
         // "esc", "f1", "a" are standard. "invalid" is not. 2 aliases. Total = 3 + 2 = 5
         assert_eq!(layout.len(), 5);

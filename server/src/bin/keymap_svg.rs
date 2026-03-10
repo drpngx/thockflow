@@ -246,6 +246,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         includes,
         aliases: std::collections::HashMap::new(),
         defsrc: Vec::new(),
+        unmapped_names: Vec::new(),
     })
 }
 
@@ -259,7 +260,7 @@ fn main() -> Result<()> {
     let content =
         fs::read_to_string(&args[1]).with_context(|| format!("Failed to read {}", args[1]))?;
     let data = parse_keymap(&content)?;
-    let svg = generate_svg(&data);
+    let svg = generate_svg(&data, false, false, false);
 
     if let Some(output_path) = args.get(2) {
         fs::write(output_path, &svg).with_context(|| format!("Failed to write {}", output_path))?;

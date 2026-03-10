@@ -177,7 +177,7 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
                 }
             }
         }
-        "&out" | "&ext_power" | "&rgb_ug" | "&bl" => {
+        "&out" | "&ext_power" | "&rgb_ug" | "&bl" | "&mkp" | "&msc" | "&mmv" => {
             let cmd_raw = params.get(0).unwrap_or(&"");
             let prefix = match behavior_raw {
                 "&out" => "OUT_",
@@ -235,6 +235,8 @@ pub struct KeymapData {
     pub aliases: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub defsrc: Vec<String>,
+    #[serde(default)]
+    pub unmapped_names: Vec<String>,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.
@@ -316,7 +318,7 @@ fn escape_xml(s: &str) -> String {
         .replace("'", "&apos;")
 }
 
-pub fn generate_svg(data: &KeymapData) -> String {
+pub fn generate_svg(data: &KeymapData, is_kanata: bool, is_mac: bool, is_laptop: bool) -> String {
     let mut min_x = i32::MAX;
     let mut max_x = i32::MIN;
     let mut min_y = i32::MAX;
@@ -393,7 +395,11 @@ pub fn generate_svg(data: &KeymapData) -> String {
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="0 0 {} {}" style="background-color: #ffffff;">"#,
         total_width, total_height, total_width, total_height
     );
-    svg.push_str("<style>text { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; } .key { fill: white; stroke: #d1d5db; stroke-width: 0.5; } .label { fill: #9ca3af; font-size: 5px; } .main-text { fill: #1f2937; font-size: 8px; font-weight: bold; } .layer-title { font-size: 18px; font-weight: bold; fill: #111827; }</style>");
+    svg.push_str("<style>text { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; } .key { fill: white; stroke: #d1d5db; stroke-width: 0.5; } .alias-key { fill: #f0f9ff; stroke: #bae6fd; stroke-width: 0.5; } .unmapped-key { fill: #fffaf5; stroke: #fed7aa; stroke-width: 0.5; } .label { fill: #9ca3af; font-size: 5px; } .main-text { fill: #1f2937; font-size: 8px; font-weight: bold; } .layer-title { font-size: 18px; font-weight: bold; fill: #111827; } .alias-label { fill: #3b82f6; font-size: 4px; font-weight: bold; } .unmapped-label { fill: #f97316; font-size: 4px; font-weight: bold; } .separator-alias { stroke: #bae6fd; stroke-width: 1; stroke-dasharray: 4; } .separator-unmapped { stroke: #fed7aa; stroke-width: 1; stroke-dasharray: 4; }</style>");
+
+    let unmapped_y_threshold = 6500;
+    let alias_y_threshold = 8000;
+    let _num_standard_keys = if is_kanata { data.defsrc.len() - data.aliases.len() } else { 0 };
 
     for (l_idx, layer) in data.layers.iter().enumerate() {
         let y_offset = (layer_height + padding) * l_idx as f32 + 80.0;
@@ -412,13 +418,39 @@ pub fn generate_svg(data: &KeymapData) -> String {
                 .get(i)
                 .cloned()
                 .unwrap_or_else(|| "".to_string());
-            let parts = get_binding_parts(&binding);
+            
+            let parts = if is_kanata {
+                crate::kanata::get_kanata_binding_parts_internal(&binding, &data.aliases, is_mac, is_laptop)
+            } else {
+                get_binding_parts(&binding)
+            };
 
             let x = pk.x as f32 * pos_scale + offset_x;
             let y = pk.y as f32 * pos_scale + offset_y;
             let w = (pk.width as f32 * size_scale).max(20.0) - 4.0;
             let h = (pk.height as f32 * size_scale).max(20.0) - 4.0;
             let rotation = pk.rotation as f32 / 100.0;
+
+            let is_alias_section = is_kanata && pk.y >= alias_y_threshold;
+            let is_unmapped_section = is_kanata && pk.y >= unmapped_y_threshold && pk.y < alias_y_threshold;
+
+            if is_kanata && pk.x == 0 {
+                if pk.y == unmapped_y_threshold {
+                    let sep_y = y - 10.0;
+                    svg.push_str(&format!(
+                        r#"<line x1="40" y1="{}" x2="{}" y2="{}" class="separator-unmapped" />"#,
+                        sep_y, total_width - 40.0, sep_y
+                    ));
+                    svg.push_str(&format!(r#"<text x="40" y="{}" style="fill: #f97316; font-size: 6px; font-weight: bold;">UNMAPPED</text>"#, sep_y - 2.0));
+                } else if pk.y == alias_y_threshold {
+                    let sep_y = y - 10.0;
+                    svg.push_str(&format!(
+                        r#"<line x1="40" y1="{}" x2="{}" y2="{}" class="separator-alias" />"#,
+                        sep_y, total_width - 40.0, sep_y
+                    ));
+                    svg.push_str(&format!(r#"<text x="40" y="{}" style="fill: #3b82f6; font-size: 6px; font-weight: bold;">ALIASES</text>"#, sep_y - 2.0));
+                }
+            }
 
             let transform = if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) {
                 let rx_s = pk.rx as f32 * pos_scale + offset_x;
@@ -440,13 +472,28 @@ pub fn generate_svg(data: &KeymapData) -> String {
                 )
             };
             svg.push_str(&format!(r#"<g transform="{}">"#, transform));
+            
+            let key_class = if is_alias_section { "alias-key" } else if is_unmapped_section { "unmapped-key" } else { "key" };
             svg.push_str(&format!(
-                r#"<rect x="{}" y="{}" width="{}" height="{}" rx="2" ry="2" class="key" />"#,
+                r#"<rect x="{}" y="{}" width="{}" height="{}" rx="2" ry="2" class="{}" />"#,
                 -w / 2.0,
                 -h / 2.0,
                 w,
-                h
+                h,
+                key_class
             ));
+
+            if is_alias_section || is_unmapped_section {
+                if let Some(name) = data.defsrc.get(i) {
+                    let label_class = if is_alias_section { "alias-label" } else { "unmapped-label" };
+                    svg.push_str(&format!(
+                        r#"<text x="0" y="{}" class="{}" text-anchor="middle">{}</text>"#,
+                        -h / 2.0 - 2.0,
+                        label_class,
+                        escape_xml(name)
+                    ));
+                }
+            }
 
             if !parts.top_left.is_empty() {
                 svg.push_str(&format!(
@@ -459,7 +506,8 @@ pub fn generate_svg(data: &KeymapData) -> String {
             if !parts.top_right.is_empty() {
                 let display_tr = parts.top_right.chars().take(8).collect::<String>();
                 svg.push_str(&format!(
-                    r#"<text x="0" y="{}" class="label" text-anchor="middle">{}</text>"#,
+                    r#"<text x="{}" y="{}" class="label" text-anchor="end">{}</text>"#,
+                    w / 2.0 - 1.5,
                     -h / 2.0 + 4.5,
                     escape_xml(&display_tr)
                 ));
@@ -472,6 +520,17 @@ pub fn generate_svg(data: &KeymapData) -> String {
             };
             let display_center = parts.center.chars().take(12).collect::<String>();
             svg.push_str(&format!(r#"<text x="0" y="{}" class="main-text" text-anchor="middle" dominant-baseline="middle">{}</text>"#, center_y, escape_xml(&display_center)));
+
+            if is_kanata {
+                 if let Some(defsrc_name) = data.defsrc.get(i) {
+                     svg.push_str(&format!(
+                        r#"<text x="{}" y="{}" class="label" text-anchor="end" style="font-size: 3px; opacity: 0.5;">{}</text>"#,
+                        w / 2.0 - 1.5,
+                        h / 2.0 - 1.5,
+                        escape_xml(defsrc_name)
+                    ));
+                 }
+            }
 
             svg.push_str("</g>");
         }
@@ -796,7 +855,7 @@ pub fn KeymapHome() -> Html {
         let file_handle = file_handle.clone();
         Callback::from(move |_| {
             if let Some(data) = &*keymap_data {
-                let svg_content = generate_svg(data);
+                let svg_content = generate_svg(data, false, crate::is_mac(), false);
                 let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(
                     &JsValue::from_str(&svg_content),
                 ))
@@ -891,7 +950,7 @@ enum HintTarget {
 }
 
 #[function_component]
-fn KeymapRenderer(props: &RendererProps) -> Html {
+pub fn KeymapRenderer(props: &RendererProps) -> Html {
     let current_layer = use_state(|| 0);
     let selected_key = use_state(|| None::<SelectedKey>);
     let show_param_selection = use_state(|| false);
@@ -1592,13 +1651,14 @@ pub struct PopupProps {
 }
 
 #[derive(Serialize)]
-struct SaveKeymapRequest {
-    original_content: String,
-    data: KeymapData,
+pub struct SaveKeymapRequest {
+    pub original_content: String,
+    pub data: KeymapData,
 }
+
 #[derive(Deserialize)]
-struct SaveKeymapResponse {
-    content: String,
+pub struct SaveKeymapResponse {
+    pub content: String,
 }
 #[derive(Clone, PartialEq, Debug)]
 struct Suggestion {
@@ -1706,12 +1766,16 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
             current_text.set(text.clone());
             let parts: Vec<&str> = text.split_whitespace().collect();
             current_behavior_label.set(parts.get(0).map(|&s| s.to_string()).unwrap_or_default());
-            current_params.set(
-                parts[1..]
-                    .iter()
-                    .map(|&s| s.to_string())
-                    .collect::<Vec<String>>(),
-            );
+            if parts.len() > 1 {
+                current_params.set(
+                    parts[1..]
+                        .iter()
+                        .map(|&s| s.to_string())
+                        .collect::<Vec<String>>(),
+                );
+            } else {
+                current_params.set(vec![]);
+            }
             show_suggestions.set(true);
         })
     };
@@ -2105,20 +2169,29 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
             }
         })
     };
-    let mut max_x = 0;
+    let mut min_x = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut min_y = i32::MAX;
+    let mut max_y = i32::MIN;
+
     for pk in &props.data.physical_layout {
-        if pk.x.abs() > max_x {
-            max_x = pk.x.abs();
-        }
+        if pk.x < min_x { min_x = pk.x; }
+        if pk.x + pk.width > max_x { max_x = pk.x + pk.width; }
+        if pk.y < min_y { min_y = pk.y; }
+        if pk.y + pk.height > max_y { max_y = pk.y + pk.height; }
     }
-    let u_pos = if max_x > 20000 {
-        19050.0
-    } else if max_x > 500 {
-        1000.0
-    } else {
-        100.0
-    };
-    let mini_scale = 10.0 / u_pos;
+
+    let layout_width = (max_x - min_x).max(1) as f32;
+    let layout_height = (max_y - min_y).max(1) as f32;
+    
+    // Add 10% padding
+    let scale_x = 280.0 / layout_width;
+    let scale_y = 100.0 / layout_height;
+    let mini_scale = scale_x.min(scale_y);
+    
+    let offset_x = -min_x as f32 * mini_scale + (300.0 - layout_width * mini_scale) / 2.0;
+    let offset_y = -min_y as f32 * mini_scale + (128.0 - layout_height * mini_scale) / 2.0;
+
     let mut current_binding_full = (*current_behavior_label).clone();
     for p in &*current_params {
         current_binding_full.push(' ');
@@ -2134,7 +2207,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="bg-[#1a202c] text-white rounded-lg shadow-2xl flex max-w-5xl w-full overflow-hidden border border-gray-700 h-[80vh]">
             <div class="flex-1 p-8 overflow-y-auto flex flex-col">
-                <div class="flex justify-center mb-8 relative h-32 w-full shrink-0"> <div class="relative"> { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| { let is_selected = i == props.selected_key.key_index; let x = (pk.x as f32 * mini_scale) as i32; let y = (pk.y as f32 * mini_scale) as i32; let w = (pk.width as f32 * mini_scale).max(4.0) as i32 - 1; let h = (pk.height as f32 * mini_scale).max(4.0) as i32 - 1; let rotation_deg = pk.rotation as f32 / 1000.0; let style = if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) { let rx_s = (pk.rx as f32 * mini_scale) as i32; let ry_s = (pk.ry as f32 * mini_scale) as i32; format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg); transform-origin: {}px {}px;", x, y, w, h, rotation_deg, rx_s - x, ry_s - y) } else { format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg) }; let class = if is_selected { "bg-green-500" } else { "bg-gray-700" }; html! { <div class={classes!("absolute", "rounded-sm", class)} style={style} /> } })} </div>
+                <div class="flex justify-center mb-8 relative h-32 w-full shrink-0"> <div class="relative" style="width: 300px;"> { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| { let is_selected = i == props.selected_key.key_index; let x = (pk.x as f32 * mini_scale + offset_x) as i32; let y = (pk.y as f32 * mini_scale + offset_y) as i32; let w = (pk.width as f32 * mini_scale).max(4.0) as i32 - 1; let h = (pk.height as f32 * mini_scale).max(4.0) as i32 - 1; let rotation_deg = pk.rotation as f32 / 100.0; let style = if pk.rotation != 0 && (pk.rx != 0 || pk.ry != 0) { let rx_s = (pk.rx as f32 * mini_scale + offset_x) as i32; let ry_s = (pk.ry as f32 * mini_scale + offset_y) as i32; format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg); transform-origin: {}px {}px;", x, y, w, h, rotation_deg, rx_s - x, ry_s - y) } else { format!("left: {}px; top: {}px; width: {}px; height: {}px; transform: rotate({}deg);", x, y, w, h, rotation_deg) }; let class = if is_selected { "bg-green-500 z-10" } else { "bg-gray-700" }; html! { <div class={classes!("absolute", "rounded-sm", class)} style={style} /> } })} </div>
                     <div class="flex items-center ml-24 space-x-8"> <span class="text-2xl text-gray-400">{"→"}</span> <div class="bg-gray-800 w-16 h-16 rounded-lg border border-gray-600 flex items-center justify-center relative font-mono shadow-inner" style={preview_style}> { if !preview_parts.top_left.is_empty() { html! { <span class="absolute top-1 left-1 text-[8px] text-gray-400 leading-none">{preview_parts.top_left}</span> } } else { html! {} } } { if !preview_parts.top_right.is_empty() { html! { <span class="absolute top-1 right-1 text-[8px] text-gray-400 leading-none text-right max-w-[70%] truncate">{preview_parts.top_right}</span> } } else { html! {} } } <span class="text-xl font-bold">{preview_parts.center}</span> </div> </div>
                 </div>
                 <div class="mb-6 shrink-0"> <input ref={input_ref} type="text" class={classes!("w-full", "bg-gray-900", "border", "text-2xl", "p-4", "rounded", "font-mono", "focus:outline-none", if is_valid { vec!["border-gray-600", "focus:border-blue-500"] } else { vec!["border-red-500", "focus:border-red-400", "text-red-200"] })} value={(*current_text).clone()} oninput={let update = update_from_text.clone(); Callback::from(move |e: InputEvent| { let input: HtmlInputElement = e.target_unchecked_into(); update.emit(input.value()); })} onkeydown={on_keydown} /> { if !is_valid { html! { <div class="text-red-400 text-sm mt-1">{"Invalid binding: incomplete or incorrect parameters."}</div> } } else { html! {} }} </div>
