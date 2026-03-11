@@ -42,12 +42,9 @@ I want to generate long quotes for a typing practice. They don't have to be actu
 Vial:
 - broken mouse scroll down weird character
 - broken pre-shifted position in layout
-- save keymap
-- serialize to json
-- check the save
-- save svg
 - TAB should move the inner tabs?
 - test matrix
+We want to implement the Test Matrix in the Vial tab. It draws the physical layout of the current layer. Whenever we press a key, it will highlight the corresponding key in the keymap. When we release the key, the key will lose the highlight. If we press a key that changes the layer, we display the correct layer. We will poll every 30ms to ask for the matrix state. We need a design and implementation doc that lists all exhaustive tests required.
 
 Tidy:
 - implement the same pretty keys everywhere

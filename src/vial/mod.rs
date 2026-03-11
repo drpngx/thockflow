@@ -5,6 +5,7 @@ use std::io::Cursor;
 use std::rc::Rc;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
@@ -870,6 +871,175 @@ pub fn VialHome() -> Html {
         })
     };
 
+    // -- Save keymap as .vil file with dual parsing validation ----------------
+    let on_save_vil = {
+        let layers = layers.clone();
+        let layer_names = layer_names.clone();
+        let keyboard_name = keyboard_name.clone();
+        let matrix_rows = matrix_rows.clone();
+        let matrix_cols = matrix_cols.clone();
+        let error = error.clone();
+        Callback::from(move |_: MouseEvent| {
+            let lays = layers.clone();
+            let names = layer_names.clone();
+            let kb_name = (*keyboard_name).clone();
+            let rows = *matrix_rows;
+            let cols = *matrix_cols;
+            let error = error.clone();
+            
+            spawn_local(async move {
+                // Build the VIL JSON structure
+                let layers_json: Vec<serde_json::Value> = lays
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, layer)| {
+                        let name = names.get(idx).cloned().unwrap_or_else(|| format!("Layer{}", idx));
+                        serde_json::json!({
+                            "name": name,
+                            "keycodes": layer.iter().map(|kc| format!("0x{:04X}", kc)).collect::<Vec<_>>()
+                        })
+                    })
+                    .collect();
+                
+                let vil_data = serde_json::json!({
+                    "version": 1,
+                    "keyboard": kb_name,
+                    "matrix": {
+                        "rows": rows,
+                        "cols": cols
+                    },
+                    "layers": layers_json
+                });
+                
+                // Serialize to string
+                let json_str = match serde_json::to_string_pretty(&vil_data) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        error.set(Some(format!("Failed to serialize keymap: {}", e)));
+                        return;
+                    }
+                };
+                
+                // DUAL PARSING: Parse it back to verify it works
+                match serde_json::from_str::<serde_json::Value>(&json_str) {
+                    Ok(parsed) => {
+                        // Verify the parsed data has the expected structure
+                        if !parsed.get("layers").is_some() {
+                            error.set(Some("Validation failed: missing layers in generated file".to_string()));
+                            return;
+                        }
+                        
+                        // Create and download the file
+                        let blob = match web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(
+                            &JsValue::from_str(&json_str),
+                        )) {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error.set(Some(format!("Failed to create blob: {:?}", e)));
+                                return;
+                            }
+                        };
+                        
+                        let url = match web_sys::Url::create_object_url_with_blob(&blob) {
+                            Ok(u) => u,
+                            Err(e) => {
+                                error.set(Some(format!("Failed to create URL: {:?}", e)));
+                                return;
+                            }
+                        };
+                        
+                        let window = web_sys::window().unwrap();
+                        let document = window.document().unwrap();
+                        let link = document
+                            .create_element("a")
+                            .unwrap()
+                            .dyn_into::<web_sys::HtmlAnchorElement>()
+                            .unwrap();
+                        
+                        let filename = if kb_name.is_empty() {
+                            "keymap.vil".to_string()
+                        } else {
+                            format!("{}_keymap.vil", kb_name.to_lowercase().replace(' ', "_"))
+                        };
+                        
+                        link.set_href(&url);
+                        link.set_download(&filename);
+                        link.click();
+                        
+                        let _ = web_sys::Url::revoke_object_url(&url);
+                        error.set(None); // Clear any previous errors
+                    }
+                    Err(e) => {
+                        error.set(Some(format!("Dual parsing validation failed: {}", e)));
+                    }
+                }
+            });
+        })
+    };
+
+    // -- Download keymap as SVG -----------------------------------------------
+    let on_download_svg = {
+        let layers = layers.clone();
+        let layer_names = layer_names.clone();
+        let keyboard_name = keyboard_name.clone();
+        let key_layout = key_layout.clone();
+        let matrix_cols = matrix_cols.clone();
+        let vial_protocol_ver = vial_protocol_ver.clone();
+        let error = error.clone();
+        Callback::from(move |_: MouseEvent| {
+            let lays = layers.clone();
+            let names = layer_names.clone();
+            let kb_name = (*keyboard_name).clone();
+            let layout = (*key_layout).clone();
+            let cols = *matrix_cols;
+            let protocol_ver = *vial_protocol_ver;
+            let error = error.clone();
+            
+            spawn_local(async move {
+                let svg = generate_vial_svg(&lays, &names, &kb_name, &layout, cols, protocol_ver);
+                
+                let blob = match web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(
+                    &JsValue::from_str(&svg),
+                )) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        error.set(Some(format!("Failed to create blob: {:?}", e)));
+                        return;
+                    }
+                };
+                
+                let url = match web_sys::Url::create_object_url_with_blob(&blob) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        error.set(Some(format!("Failed to create URL: {:?}", e)));
+                        return;
+                    }
+                };
+                
+                let window = web_sys::window().unwrap();
+                let document = window.document().unwrap();
+                let link = document
+                    .create_element("a")
+                    .unwrap()
+                    .dyn_into::<web_sys::HtmlAnchorElement>()
+                    .unwrap();
+                
+                let filename = if kb_name.is_empty() {
+                    "keymap.svg".to_string()
+                } else {
+                    format!("{}_keymap.svg", kb_name.to_lowercase().replace(' ', "_"))
+                };
+                
+                link.set_href(&url);
+                link.set_download(&filename);
+                link.click();
+                
+                let _ = web_sys::Url::revoke_object_url(&url);
+                error.set(None);
+            });
+        })
+    };
+
     let set_tab = |tab: VialTab| {
         let active_tab = active_tab.clone();
         Callback::from(move |_: MouseEvent| active_tab.set(tab.clone()))
@@ -982,6 +1152,12 @@ pub fn VialHome() -> Html {
                             <span class="text-sm text-gray-500">{format!("{} layers", *layer_count)}</span>
                             <button onclick={on_save.clone()} class="ml-auto bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-4 rounded shadow text-sm">
                                 {"Save Keymap to Device"}
+                            </button>
+                            <button onclick={on_save_vil.clone()} class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Save keymap as .vil file">
+                                {"Save as .vil"}
+                            </button>
+                            <button onclick={on_download_svg.clone()} class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Download keymap as SVG">
+                                {"Download SVG"}
                             </button>
                             <button
                                 class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
@@ -1479,4 +1655,167 @@ fn render_matrix_tab(matrix_state: &UseStateHandle<Vec<Vec<bool>>>, cols: u8) ->
             }
         </div>
     }
+}
+
+/// Generate an SVG representation of the Vial keymap
+fn generate_vial_svg(
+    layers: &[Vec<u16>],
+    layer_names: &[String],
+    keyboard_name: &str,
+    key_layout: &[MatrixPos],
+    matrix_cols: u8,
+    protocol_version: u32,
+) -> String {
+    if layers.is_empty() || key_layout.is_empty() {
+        return String::new();
+    }
+
+    // Calculate layout bounds
+    let mut min_x = f32::MAX;
+    let mut max_x = f32::MIN;
+    let mut min_y = f32::MAX;
+    let mut max_y = f32::MIN;
+    let mut avg_w = 0.0;
+    
+    for pos in key_layout.iter() {
+        avg_w += pos.w;
+        if pos.x < min_x { min_x = pos.x; }
+        if pos.x + pos.w > max_x { max_x = pos.x + pos.w; }
+        if pos.y < min_y { min_y = pos.y; }
+        if pos.y + pos.h > max_y { max_y = pos.y + pos.h; }
+    }
+    avg_w /= key_layout.len() as f32;
+
+    let u_size = if avg_w < 5.0 { 1.0 } else if avg_w < 500.0 { 100.0 } else { 1000.0 };
+    let size_scale = 44.0 / u_size;
+    let u_pos = if max_x.abs() > 20000.0 || min_x.abs() > 20000.0 {
+        19050.0
+    } else {
+        u_size
+    };
+    let pos_scale = 44.0 / u_pos;
+
+    let layer_width = (max_x - min_x) * pos_scale;
+    let layer_height = (max_y - min_y) * pos_scale;
+    let padding = 60.0;
+
+    let total_width = layer_width + 80.0;
+    let total_height = (layer_height + padding) * layers.len() as f32 + 80.0;
+
+    let mut svg = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="0 0 {} {}" style="background-color: #f8fafc;">"#,
+        total_width, total_height, total_width, total_height
+    );
+
+    // Add styles
+    svg.push_str(r#"<style>
+        text { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .key { fill: white; stroke: #cbd5e1; stroke-width: 0.5; }
+        .key:hover { fill: #f1f5f9; }
+        .label { fill: #94a3b8; font-size: 5px; }
+        .main-text { fill: #1e293b; font-size: 8px; font-weight: 600; }
+        .layer-title { font-size: 16px; font-weight: bold; fill: #0f172a; }
+        .keyboard-name { font-size: 12px; fill: #64748b; }
+    </style>"#);
+
+    // Add keyboard name at top
+    if !keyboard_name.is_empty() {
+        svg.push_str(&format!(
+            r#"<text x="40" y="30" class="keyboard-name">{}</text>"#,
+            escape_xml(keyboard_name)
+        ));
+    }
+
+    // Render each layer
+    for (l_idx, layer) in layers.iter().enumerate() {
+        let y_offset = (layer_height + padding) * l_idx as f32 + 60.0;
+        let name = layer_names.get(l_idx).cloned().unwrap_or_else(|| format!("L{}", l_idx));
+        
+        svg.push_str(&format!(
+            r#"<text x="40" y="{}" class="layer-title">{}</text>"#,
+            y_offset - 10.0,
+            escape_xml(&name)
+        ));
+
+        let offset_x = -(min_x * pos_scale) + 40.0;
+        let offset_y = -(min_y * pos_scale) + y_offset;
+
+        for pos in key_layout.iter() {
+            let keycode_idx = (pos.row as usize) * (matrix_cols as usize) + (pos.col as usize);
+            let kc = layer.get(keycode_idx).copied().unwrap_or(0);
+            let disp = keycode_display(kc, protocol_version, keyboard_name);
+
+            let x = pos.x * pos_scale + offset_x;
+            let y = pos.y * pos_scale + offset_y;
+            let w = (pos.w * size_scale).max(20.0) - 4.0;
+            let h = (pos.h * size_scale).max(20.0) - 4.0;
+
+            svg.push_str(&format!(
+                r#"<g transform="translate({}, {})">"#,
+                x + w / 2.0, y + h / 2.0
+            ));
+
+            // Key rect
+            svg.push_str(&format!(
+                r#"<rect x="{}" y="{}" width="{}" height="{}" rx="3" ry="3" class="key" />"#,
+                -w / 2.0, -h / 2.0, w, h
+            ));
+
+            // Upper left label (function name like MO, TO, etc.)
+            if !disp.upper_left.is_empty() {
+                svg.push_str(&format!(
+                    r#"<text x="{}" y="{}" class="label" text-anchor="start">{}</text>"#,
+                    -w / 2.0 + 2.0,
+                    -h / 2.0 + 5.0,
+                    escape_xml(&disp.upper_left)
+                ));
+            }
+
+            // Upper middle label
+            if !disp.upper_middle.is_empty() {
+                svg.push_str(&format!(
+                    r#"<text x="0" y="{}" class="label" text-anchor="middle">{}</text>"#,
+                    -h / 2.0 + 5.0,
+                    escape_xml(&disp.upper_middle)
+                ));
+            }
+
+            // Upper right label (for LT tap key, etc.)
+            if !disp.upper_right.is_empty() {
+                let display_tr = disp.upper_right.chars().take(6).collect::<String>();
+                svg.push_str(&format!(
+                    r#"<text x="{}" y="{}" class="label" text-anchor="end">{}</text>"#,
+                    w / 2.0 - 2.0,
+                    -h / 2.0 + 5.0,
+                    escape_xml(&display_tr)
+                ));
+            }
+
+            // Main label (center)
+            let center_y = if !disp.upper_left.is_empty() || !disp.upper_right.is_empty() {
+                1.0
+            } else {
+                0.0
+            };
+            let display_center = disp.middle.chars().take(8).collect::<String>();
+            svg.push_str(&format!(
+                r#"<text x="0" y="{}" class="main-text" text-anchor="middle" dominant-baseline="middle">{}</text>"#,
+                center_y,
+                escape_xml(&display_center)
+            ));
+
+            svg.push_str("</g>");
+        }
+    }
+
+    svg.push_str("</svg>");
+    svg
+}
+
+fn escape_xml(s: &str) -> String {
+    s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
 }
