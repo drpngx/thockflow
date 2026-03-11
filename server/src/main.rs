@@ -61,6 +61,17 @@ struct SaveKeymapResponse {
     content: String,
 }
 
+#[derive(Deserialize, Serialize)]
+struct PatchKeymapRequest {
+    file_content: String,
+    data: KeymapData,
+}
+
+#[derive(Serialize)]
+struct PatchKeymapResponse {
+    content: String,
+}
+
 async fn parse_keymap_api(Json(req): Json<KeymapRequest>) -> impl IntoResponse {
     info!(
         "Received parse request, content length: {}",
@@ -94,6 +105,53 @@ async fn save_keymap_api(Json(req): Json<SaveKeymapRequest>) -> impl IntoRespons
         }
         Err(e) => {
             error!("Generation error: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
+    }
+}
+
+async fn patch_keymap_api(Json(req): Json<PatchKeymapRequest>) -> impl IntoResponse {
+    info!("Received patch request, file content length: {}", req.file_content.len());
+    
+    // First, validate the uploaded file by parsing it
+    if let Err(e) = parse_keymap_with_tree_sitter(&req.file_content) {
+        error!("Invalid keymap file uploaded: {}", e);
+        return (StatusCode::BAD_REQUEST, format!("Invalid keymap file: {}", e)).into_response();
+    }
+    
+    // Generate the patched keymap by merging the layers from data into the uploaded file
+    match generate_keymap_dts(&req.file_content, &req.data) {
+        Ok(content) => {
+            // Validate the generated content by parsing it again
+            match parse_keymap_with_tree_sitter(&content) {
+                Ok(_) => {
+                    info!(
+                        "Successfully patched and validated keymap, new length: {}",
+                        content.len()
+                    );
+                    (StatusCode::OK, Json(PatchKeymapResponse { content })).into_response()
+                }
+                Err(e) => {
+                    error!("Patched keymap failed validation: {}", e);
+                    // Find the problematic line
+                    let error_str = e.to_string();
+                    if let Some(line_str) = error_str.split("line ").nth(1) {
+                        if let Some(line_num) = line_str.split(",").next().and_then(|s| s.trim().parse::<usize>().ok()) {
+                            error!("Error around line {}:", line_num);
+                            for (i, line) in content.lines().enumerate() {
+                                let line_no = i + 1;
+                                if line_no >= line_num.saturating_sub(2) && line_no <= line_num + 2 {
+                                    error!("  {}: {}", line_no, line);
+                                }
+                            }
+                        }
+                    }
+                    (StatusCode::INTERNAL_SERVER_ERROR, format!("Patched file is invalid: {}", e)).into_response()
+                }
+            }
+        }
+        Err(e) => {
+            error!("Patch generation error: {}", e);
             (StatusCode::BAD_REQUEST, e.to_string()).into_response()
         }
     }
@@ -255,6 +313,7 @@ fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
     let mut replacements = Vec::new();
 
     // Helper to generate bindings string
+    // Note: The value node in tree-sitter is "integer_cells" and includes the < > delimiters
     let gen_bindings = |target_layer: &Layer| {
         let mut new_bindings = String::from("<");
         for row in rows.iter() {
@@ -1101,6 +1160,139 @@ mod tests {
             keys.len()
         );
     }
+
+    #[test]
+    fn test_patch_keymap_endpoint() {
+        // Test patching an existing keymap file with modified layer data
+        let file_content = include_str!("../../static/hshs52.keymap");
+        
+        // First parse the original to get the data
+        let mut data = parse_keymap_with_tree_sitter(file_content).expect("Should parse hshs52");
+        
+        // Modify a binding to simulate editing
+        if !data.layers.is_empty() && !data.layers[0].bindings.is_empty() {
+            data.layers[0].bindings[0] = "&kp X".to_string();
+        }
+        
+        // Now patch the file with the modified data
+        let result = generate_keymap_dts(file_content, &data).expect("Should generate patched keymap");
+        
+        // Validate the result
+        let reparsed = parse_keymap_with_tree_sitter(&result);
+        if let Err(ref e) = reparsed {
+            eprintln!("Parse error: {}", e);
+            // Print entire result for debugging
+            eprintln!("=== GENERATED CONTENT START ===");
+            eprintln!("{}", result);
+            eprintln!("=== GENERATED CONTENT END ===");
+        }
+        assert!(reparsed.is_ok(), "Patched keymap should be valid: {:?}", reparsed.err());
+        
+        // Check the modification was applied
+        assert!(result.contains("&kp X"), "Modified binding should be present");
+    }
+    
+    #[test]
+    fn test_patch_simple_keymap() {
+        // Test with a minimal keymap that has a physical layout
+        let file_content = r#"
+/ {
+    layout: layout {
+        compatible = "zmk,physical-layout";
+        keys = <&key_physical_attrs 100 100 0 0 0 0 0
+                &key_physical_attrs 100 100 1000 0 0 0 0>;
+    };
+    
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            bindings = <&kp A &kp B>;
+        };
+        lower {
+            bindings = <&kp C &kp D>;
+        };
+    };
+};
+"#;
+        
+        let mut data = parse_keymap_with_tree_sitter(file_content).expect("Should parse simple");
+        
+        // Modify first binding
+        if !data.layers.is_empty() && !data.layers[0].bindings.is_empty() {
+            data.layers[0].bindings[0] = "&kp Z".to_string();
+        }
+        
+        eprintln!("=== ORIGINAL ===");
+        eprintln!("{}", file_content);
+        eprintln!("=== LAYER DATA ===");
+        for (i, layer) in data.layers.iter().enumerate() {
+            eprintln!("Layer {}: {} with {} bindings", i, layer.name, layer.bindings.len());
+            eprintln!("  Bindings: {:?}", layer.bindings);
+        }
+        
+        let result = generate_keymap_dts(file_content, &data).expect("Should generate");
+        
+        eprintln!("=== RESULT ===");
+        eprintln!("{}", result);
+        
+        // Check structure
+        let reparsed = parse_keymap_with_tree_sitter(&result);
+        assert!(reparsed.is_ok(), "Should reparse: {:?}", reparsed.err());
+        assert!(result.contains("&kp Z"), "Should have Z");
+    }
+
+    #[test]
+    fn test_bindings_value_node_format() {
+        // Test to understand what tree-sitter considers the "value" node for bindings
+        let content = r#"
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            bindings = <&kp A &kp B>;
+        };
+    };
+};
+"#;
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_devicetree::LANGUAGE.into()).unwrap();
+        let tree = parser.parse(content, None).unwrap();
+        
+        fn find_bindings_property<'a>(node: tree_sitter::Node<'a>, source: &[u8]) -> Option<tree_sitter::Node<'a>> {
+            if node.kind() == "property" {
+                if let Some(name_node) = node.child_by_field_name("name") {
+                    let name = name_node.utf8_text(source).unwrap_or("");
+                    if name == "bindings" {
+                        return Some(node);
+                    }
+                }
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if let Some(result) = find_bindings_property(child, source) {
+                    return Some(result);
+                }
+            }
+            None
+        }
+        
+        if let Some(prop_node) = find_bindings_property(tree.root_node(), content.as_bytes()) {
+            // Try child_by_field_name("value")
+            if let Some(value_node) = prop_node.child_by_field_name("value") {
+                let kind = value_node.kind();
+                let text = value_node.utf8_text(content.as_bytes()).unwrap_or("");
+                
+                // The value node is "integer_cells" and includes < >
+                assert_eq!(kind, "integer_cells");
+                assert!(text.starts_with('<'), "Value should start with <");
+                assert!(text.ends_with('>'), "Value should end with >");
+            } else {
+                panic!("No value field found");
+            }
+        } else {
+            panic!("Could not find bindings property");
+        }
+    }
 }
 
 static LOCAL_POOL: Lazy<LocalPoolHandle> = Lazy::new(|| LocalPoolHandle::new(num_cpus::get()));
@@ -1593,6 +1785,7 @@ fn app() -> Router {
         get(index),
         route("/api/parse-keymap", post(parse_keymap_api))
             .route("/api/save-keymap", post(save_keymap_api))
+            .route("/api/patch-keymap", post(patch_keymap_api))
             .route("/api/parse-kanata", post(parse_kanata_api))
             .route("/api/save-kanata", post(save_kanata_api))
             .route(*APP_JS_PATH, app_wasm_serve.clone())

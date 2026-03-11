@@ -231,15 +231,43 @@ pub fn ZmkStudioHome() -> Html {
         let rpc_client = rpc_client.clone();
         let device_name = device_name.clone();
         let error = error.clone();
+        let loading = loading.clone();
 
         Callback::from(move |_: MouseEvent| {
-            // Drop client reference — transport will be closed
-            let _ = &*rpc_client;
-            rpc_client.set(None);
-            connected.set(false);
-            keymap_data.set(None);
-            device_name.set(String::new());
-            error.set(None);
+            loading.set(true);
+            
+            // Close the transport connection first
+            let client_opt = (*rpc_client).clone();
+            let rpc_client_clone = rpc_client.clone();
+            let connected_clone = connected.clone();
+            let keymap_data_clone = keymap_data.clone();
+            let device_name_clone = device_name.clone();
+            let error_clone = error.clone();
+            let loading_clone = loading.clone();
+            
+            if let Some(client) = client_opt {
+                spawn_local(async move {
+                    // Try to close the transport properly
+                    if let Ok(close_promise) = client.close() {
+                        let _ = wasm_bindgen_futures::JsFuture::from(close_promise).await;
+                    }
+                    
+                    // Now clear all state
+                    rpc_client_clone.set(None);
+                    connected_clone.set(false);
+                    keymap_data_clone.set(None);
+                    device_name_clone.set(String::new());
+                    error_clone.set(None);
+                    loading_clone.set(false);
+                });
+            } else {
+                rpc_client.set(None);
+                connected.set(false);
+                keymap_data.set(None);
+                device_name.set(String::new());
+                error.set(None);
+                loading.set(false);
+            }
         })
     };
 
@@ -470,6 +498,158 @@ pub fn ZmkStudioHome() -> Html {
                     }
                 });
             }
+        })
+    };
+
+    // --- Patch keymap handler (merge layers into uploaded file) ---
+    let on_patch_keymap = {
+        let keymap_data = keymap_data.clone();
+        let error = error.clone();
+        let loading = loading.clone();
+
+        Callback::from(move |_: MouseEvent| {
+            if keymap_data.is_none() {
+                return;
+            }
+            let keymap_data = keymap_data.clone();
+            let error = error.clone();
+            let loading = loading.clone();
+
+            spawn_local(async move {
+                // Open file picker to select an existing keymap file
+                let options = js_sys::Object::new();
+                let types = js_sys::Array::new();
+                let type0 = js_sys::Object::new();
+                js_sys::Reflect::set(&type0, &"description".into(), &"ZMK Keymap Files".into())
+                    .unwrap();
+                let accept = js_sys::Object::new();
+                let extensions = js_sys::Array::new();
+                extensions.push(&".keymap".into());
+                js_sys::Reflect::set(&accept, &"text/plain".into(), &extensions).unwrap();
+                js_sys::Reflect::set(&type0, &"accept".into(), &accept).unwrap();
+                types.push(&type0);
+                js_sys::Reflect::set(&options, &"types".into(), &types).unwrap();
+                js_sys::Reflect::set(
+                    &options,
+                    &"excludeAcceptAllOption".into(),
+                    &JsValue::from(true),
+                )
+                .unwrap();
+                js_sys::Reflect::set(&options, &"multiple".into(), &JsValue::from(false)).unwrap();
+
+                let picker_promise = crate::keymap::show_open_file_picker(&options);
+                let result = wasm_bindgen_futures::JsFuture::from(picker_promise).await;
+
+                match result {
+                    Ok(handles) => {
+                        let handles: js_sys::Array = handles.unchecked_into();
+                        if handles.length() > 0 {
+                            let handle_val = handles.get(0);
+                            let handle: crate::keymap::FileSystemFileHandle = handle_val.unchecked_into();
+
+                            loading.set(true);
+                            error.set(None);
+                            
+                            let file_promise = handle.get_file();
+                            let file_result = wasm_bindgen_futures::JsFuture::from(file_promise).await;
+
+                            match file_result {
+                                Ok(file_val) => {
+                                    let file: web_sys::File = file_val.unchecked_into();
+                                    let content_promise = file.text();
+                                    let content_result = wasm_bindgen_futures::JsFuture::from(content_promise).await;
+
+                                    match content_result {
+                                        Ok(content_val) => {
+                                            let file_content = content_val.as_string().unwrap_or_default();
+                                            
+                                            if let Some(data) = &*keymap_data {
+                                                let data = data.clone();
+                                                
+                                                // Send to server for patching
+                                                let patch_result = gloo_net::http::Request::post("/api/patch-keymap")
+                                                    .json(&crate::keymap::PatchKeymapRequest {
+                                                        file_content,
+                                                        data,
+                                                    })
+                                                    .unwrap()
+                                                    .send()
+                                                    .await;
+
+                                                match patch_result {
+                                                    Ok(resp) => {
+                                                        loading.set(false);
+                                                        if resp.ok() {
+                                                            match resp.json::<crate::keymap::PatchKeymapResponse>().await {
+                                                                Ok(res) => {
+                                                                    // Save back to the original file handle
+                                                                    let writable_promise = handle.create_writable();
+                                                                    let writable_result = wasm_bindgen_futures::JsFuture::from(writable_promise).await;
+
+                                                                    match writable_result {
+                                                                        Ok(writable_val) => {
+                                                                            let writable: crate::keymap::FileSystemWritableFileStream = writable_val.unchecked_into();
+                                                                            let write_promise = writable.write(&JsValue::from_str(&res.content));
+                                                                            let _ = wasm_bindgen_futures::JsFuture::from(write_promise).await;
+                                                                            let close_promise = writable.close();
+                                                                            let _ = wasm_bindgen_futures::JsFuture::from(close_promise).await;
+                                                                            error.set(None);
+                                                                        }
+                                                                        Err(e) => {
+                                                                            error.set(Some(format!(
+                                                                                "Failed to save file: {:?}",
+                                                                                e
+                                                                            )));
+                                                                        }
+                                                                    }
+                                                                }
+                                                                Err(e) => {
+                                                                    error.set(Some(format!(
+                                                                        "Failed to parse server response: {}",
+                                                                        e
+                                                                    )));
+                                                                }
+                                                            }
+                                                        } else {
+                                                            let error_text = resp
+                                                                .text()
+                                                                .await
+                                                                .unwrap_or_else(|_| "Unknown error".to_string());
+                                                            error.set(Some(format!("Server error: {}", error_text)));
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        loading.set(false);
+                                                        error.set(Some(format!("Network error: {}", e)));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            loading.set(false);
+                                            error.set(Some(format!(
+                                                "Failed to read file content: {:?}",
+                                                e
+                                            )));
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    loading.set(false);
+                                    error.set(Some(format!(
+                                        "Failed to get file from handle: {:?}",
+                                        e
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // User cancelled file picker, not an error
+                        log::debug!("File picker cancelled: {:?}", e);
+                    }
+                }
+            });
         })
     };
 
@@ -735,6 +915,9 @@ pub fn ZmkStudioHome() -> Html {
                                         </button>
                                         <button onclick={on_download_keymap} class="px-4 py-1.5 bg-blue-600 text-white font-medium text-xs uppercase rounded shadow hover:bg-blue-700 transition">
                                             {"Download Keymap"}
+                                        </button>
+                                        <button onclick={on_patch_keymap} class="px-4 py-1.5 bg-purple-600 text-white font-medium text-xs uppercase rounded shadow hover:bg-purple-700 transition">
+                                            {"Patch Keymap"}
                                         </button>
                                         { if *has_unsaved_changes {
                                             html! {

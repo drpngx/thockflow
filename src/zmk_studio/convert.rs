@@ -198,6 +198,12 @@ pub fn to_keymap_data(
 }
 
 fn format_binding(binding: &ProtoBinding, cache: &BehaviorCache) -> String {
+    // Check if this is an empty/unset binding (behavior_id 0 with no params)
+    // ZMK returns 0 for unset bindings
+    if binding.behavior_id == 0 && binding.param1 == 0 && binding.param2 == 0 {
+        return "&none".to_string();
+    }
+
     let mut label = cache
         .id_to_label
         .get(&binding.behavior_id)
@@ -211,6 +217,11 @@ fn format_binding(binding: &ProtoBinding, cache: &BehaviorCache) -> String {
 
     if label == "trans" || label == "none" {
         return format!("&{}", label);
+    }
+
+    // If the behavior_id wasn't found in cache (unknown behavior), treat as none
+    if !cache.id_to_label.contains_key(&binding.behavior_id) {
+        return "&none".to_string();
     }
 
     let params_str = format_params(&label, binding.param1, binding.param2);

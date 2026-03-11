@@ -1660,6 +1660,17 @@ pub struct SaveKeymapRequest {
 pub struct SaveKeymapResponse {
     pub content: String,
 }
+
+#[derive(Serialize)]
+pub struct PatchKeymapRequest {
+    pub file_content: String,
+    pub data: KeymapData,
+}
+
+#[derive(Deserialize)]
+pub struct PatchKeymapResponse {
+    pub content: String,
+}
 #[derive(Clone, PartialEq, Debug)]
 struct Suggestion {
     value: String,

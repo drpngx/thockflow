@@ -641,13 +641,13 @@ mod tests {
         assert_eq!(layout[2].x, 1750);
         assert_eq!(layout[2].y, 3200);
         
-        // alias1 at (0, 7000)
+        // alias1 at (0, 8000) - aliases start at alias_y_start = 8000
         assert_eq!(layout[3].x, 0);
-        assert_eq!(layout[3].y, 7000);
+        assert_eq!(layout[3].y, 8000);
         
-        // alias2 at (1100, 7000)
+        // alias2 at (1100, 8000)
         assert_eq!(layout[4].x, 1100);
-        assert_eq!(layout[4].y, 7000);
+        assert_eq!(layout[4].y, 8000);
     }
 
     #[test]

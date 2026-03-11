@@ -79,6 +79,11 @@ impl RpcClient {
         *self.raw_response_cb.borrow_mut() = Some(Box::new(cb));
     }
 
+    /// Close the transport connection.
+    pub fn close(&self) -> Result<js_sys::Promise, String> {
+        self.transport.close()
+    }
+
     async fn call_raw(&self, subsystem: studio::request::Subsystem) -> Result<RequestResponseOneOf, String> {
         let id = {
             let mut next = self.next_id.borrow_mut();

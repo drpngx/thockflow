@@ -16,6 +16,11 @@ env HTTP_LISTEN_ADDR=0.0.0.0:8081 RUST_BACKTRACE=1 RUST_LOG=info bazel run //ser
 envgpg -e THOCKFLOW bazel run -c opt //server:serve
 ```
 
+To pull the latest cloudflared:
+```
+bazel fetch @cloudflared//...
+```
+
 ## Rehash the zmk behaviors file
 ```
 env HTTP_LISTEN_ADDR=0.0.0.0:8081 RUST_BACKTRACE=1 RUST_LOG=info bazel run -c opt //server:zmk_behaviors
