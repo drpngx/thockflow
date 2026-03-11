@@ -56,11 +56,8 @@ Tidy:
 - tree-sitter goes in a sandboxed process
 - implement C-o and C-s for all tabs
 - implement the layer menu everywhere (about quick fill and kanata shadow keys)
-We need to improve the Kanata tab. The layout must have a menu, exactly like we have in the `keymap` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
 
-We need to improve the Vial tab. The layout must have a menu, exactly like we have in the `keymap` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
-
-We need to improve the ZMK Studio tab. The layout must have a menu, exactly like we have in the `keymap` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
+We need to improve the Kanata tab. The layout must have a menu, exactly like we have in the `vial` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. The munu should be accessible under the `j` jump. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
 
 - test write paths
 

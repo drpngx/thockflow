@@ -2,6 +2,9 @@
 
 use lzma_rs::xz_decompress;
 use std::io::Cursor;
+use std::rc::Rc;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
@@ -23,6 +26,14 @@ enum VialTab {
     Keymap,
     TestMatrix,
     QmkSettings,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+enum HintTarget {
+    Layer(usize),
+    LayerMenu(usize),
+    Menu(usize, usize),
+    Key(usize),
 }
 
 /// Raw value bytes for one qsid, keyed by qsid.
@@ -72,6 +83,12 @@ pub fn VialHome() -> Html {
     let selected_key = use_state(|| None::<(usize, usize)>);
     let container_ref = use_node_ref();
 
+    // Layer menu state
+    let layer_menu_index = use_state(|| None::<usize>);
+    let menu_focus_index = use_state(|| 0usize);
+    let quick_assign_index = use_state(|| None::<usize>);
+    let layer_names = use_state(|| Vec::<String>::new());
+
     {
         let container_ref = container_ref.clone();
         let connected_state = *connected;
@@ -101,6 +118,7 @@ pub fn VialHome() -> Html {
         let matrix_cols = matrix_cols.clone();
         let key_layout = key_layout.clone();
         let layers = layers.clone();
+        let layer_names = layer_names.clone();
 
         Callback::from(move |_: MouseEvent| {
             let connected = connected.clone();
@@ -119,6 +137,7 @@ pub fn VialHome() -> Html {
             let matrix_cols = matrix_cols.clone();
             let key_layout = key_layout.clone();
             let layers = layers.clone();
+            let layer_names = layer_names.clone();
 
             spawn_local(async move {
                 loading.set(true);
@@ -335,6 +354,9 @@ pub fn VialHome() -> Html {
                         all_layers.push(layer_codes);
                         layers.set(all_layers.clone());
                     }
+                    // Initialize layer names
+                    let names: Vec<String> = (0..l_count).map(|i| format!("L{}", i)).collect();
+                    layer_names.set(names);
                 }
 
                 // 5. QMK settings (only if vial protocol >= 4)
@@ -362,6 +384,8 @@ pub fn VialHome() -> Html {
         let layer_count = layer_count.clone();
         let active_layer = active_layer.clone();
         let qmk_settings = qmk_settings.clone();
+        let layer_names = layer_names.clone();
+        let layer_menu_index = layer_menu_index.clone();
 
         Callback::from(move |_: MouseEvent| {
             let device = device.clone();
@@ -374,6 +398,8 @@ pub fn VialHome() -> Html {
             let layer_count = layer_count.clone();
             let active_layer = active_layer.clone();
             let qmk_settings = qmk_settings.clone();
+            let layer_names = layer_names.clone();
+            let layer_menu_index = layer_menu_index.clone();
 
             if let Some(dev) = (*device).clone() {
                 spawn_local(async move {
@@ -388,6 +414,8 @@ pub fn VialHome() -> Html {
                     layer_count.set(0);
                     active_layer.set(0);
                     qmk_settings.set(Vec::new());
+                    layer_names.set(Vec::new());
+                    layer_menu_index.set(None);
                 });
             }
         })
@@ -396,38 +424,254 @@ pub fn VialHome() -> Html {
     // -- tab switchers ------------------------------------------------------
 
     let hint_chars = "asdfghjklqwertyuiopzxcvbnm";
-    let mut hint_map = std::collections::HashMap::new();
-    let mut hint_idx = 0;
+    let mut hint_map: std::collections::HashMap<String, HintTarget> = std::collections::HashMap::new();
+    let _hint_idx = 0;
 
-    // Layer hints (2 chars)
-    let layer_count_val = *layer_count;
-    let mut layer_hints = vec![String::new(); layer_count_val as usize];
-    for i in 0..layer_count_val as usize {
-        if hint_idx < hint_chars.len() * hint_chars.len() {
-            let h = format!(
-                "{}{}",
-                hint_chars.chars().nth(hint_idx / hint_chars.len()).unwrap(),
-                hint_chars.chars().nth(hint_idx % hint_chars.len()).unwrap()
-            );
-            layer_hints[i] = h.clone();
-            hint_map.insert(h, (None, Some(i)));
-            hint_idx += 1;
+    // Build all targets: layers, layer menus, menu items (if open), keys
+    let mut all_targets = Vec::new();
+    let layer_count_val = *layer_count as usize;
+    for i in 0..layer_count_val {
+        all_targets.push(HintTarget::Layer(i));
+        all_targets.push(HintTarget::LayerMenu(i));
+        if let Some(lmi) = *layer_menu_index {
+            if lmi == i {
+                for j in 0..9 {
+                    all_targets.push(HintTarget::Menu(i, j));
+                }
+            }
         }
     }
 
-    // Key hints (2 chars)
-    let mut key_hints = vec![String::new(); (*key_layout).len()];
-    for (i, _) in (*key_layout).iter().enumerate() {
-        if hint_idx < hint_chars.len() * hint_chars.len() {
+    // Key hints
+    let key_count = (*key_layout).len();
+    for i in 0..key_count {
+        all_targets.push(HintTarget::Key(i));
+    }
+
+    // Assign hints to targets
+    let mut layer_hints = vec![String::new(); layer_count_val];
+    let mut key_hints = vec![String::new(); key_count];
+    for (i, target) in all_targets.into_iter().enumerate() {
+        if i < hint_chars.len() * hint_chars.len() {
             let h = format!(
                 "{}{}",
-                hint_chars.chars().nth(hint_idx / hint_chars.len()).unwrap(),
-                hint_chars.chars().nth(hint_idx % hint_chars.len()).unwrap()
+                hint_chars.chars().nth(i / hint_chars.len()).unwrap(),
+                hint_chars.chars().nth(i % hint_chars.len()).unwrap()
             );
-            key_hints[i] = h.clone();
-            hint_map.insert(h, (Some(i), None));
-            hint_idx += 1;
+            match target {
+                HintTarget::Layer(idx) => layer_hints[idx] = h.clone(),
+                HintTarget::Key(idx) => key_hints[idx] = h.clone(),
+                _ => {}
+            }
+            hint_map.insert(h, target);
         }
+    }
+
+    // -- layer menu actions -------------------------------------------------
+
+    let move_layer = {
+        let layers = layers.clone();
+        let active_layer = active_layer.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        let layer_names = layer_names.clone();
+        move |idx: usize, up: bool| {
+            let mut lays = (*layers).clone();
+            if up && idx == 0 {
+                return;
+            }
+            if !up && idx >= lays.len() - 1 {
+                return;
+            }
+            let target = if up { idx - 1 } else { idx + 1 };
+            lays.swap(idx, target);
+            // Sync active_layer if it moved
+            let current = *active_layer as usize;
+            if current == idx {
+                active_layer.set(target as u8);
+            } else if current == target {
+                active_layer.set(idx as u8);
+            }
+            // Also swap layer names
+            let mut names = (*layer_names).clone();
+            names.swap(idx, target);
+            layer_names.set(names);
+            layers.set(lays);
+            layer_menu_index.set(None);
+        }
+    };
+
+    let rename_layer = {
+        let layer_names = layer_names.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |idx: usize| {
+            let window = web_sys::window().unwrap();
+            let current_name = &layer_names[idx];
+            if let Ok(Some(new_name)) =
+                window.prompt_with_message_and_default("Rename layer:", current_name)
+            {
+                let trimmed = new_name.trim();
+                if !trimmed.is_empty() && trimmed.len() <= 32 {
+                    let mut names = (*layer_names).clone();
+                    names[idx] = trimmed.to_string();
+                    layer_names.set(names);
+                }
+            }
+            layer_menu_index.set(None);
+        }
+    };
+
+    let duplicate_layer = {
+        let layers = layers.clone();
+        let layer_names = layer_names.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |idx: usize| {
+            // Max layers limit check (Vial typically supports 32 layers)
+            if layers.len() >= 32 {
+                return;
+            }
+            let mut lays = (*layers).clone();
+            let mut names = (*layer_names).clone();
+            let new_layer = lays[idx].clone();
+            let new_name = format!("{} (copy)", names[idx]);
+            lays.insert(idx + 1, new_layer);
+            names.insert(idx + 1, new_name);
+            layers.set(lays);
+            layer_names.set(names);
+            layer_menu_index.set(None);
+        }
+    };
+
+    let delete_layer = {
+        let layers = layers.clone();
+        let layer_names = layer_names.clone();
+        let active_layer = active_layer.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |idx: usize| {
+            // Prevent deleting last layer
+            if layers.len() <= 1 {
+                return;
+            }
+            // Optional: Confirm dialog for destructive action
+            let window = web_sys::window().unwrap();
+            let confirmed = window
+                .confirm_with_message(&format!(
+                    "Delete layer '{}'? This cannot be undone.",
+                    layer_names[idx]
+                ))
+                .unwrap_or(false);
+            if !confirmed {
+                layer_menu_index.set(None);
+                return;
+            }
+            let mut lays = (*layers).clone();
+            let mut names = (*layer_names).clone();
+            lays.remove(idx);
+            names.remove(idx);
+            // Adjust active_layer if necessary
+            let current = *active_layer as usize;
+            if current >= lays.len() {
+                active_layer.set((lays.len() - 1) as u8);
+            } else if current == idx && current > 0 {
+                active_layer.set((current - 1) as u8);
+            }
+            layers.set(lays);
+            layer_names.set(names);
+            layer_menu_index.set(None);
+        }
+    };
+
+    let reset_layer = {
+        let layers = layers.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |idx: usize| {
+            let mut lays = (*layers).clone();
+            let key_count = lays[idx].len();
+            lays[idx] = vec![0x0000; key_count]; // KC_NO = 0x0000
+            layers.set(lays);
+            layer_menu_index.set(None);
+        }
+    };
+
+    let trans_to_none = {
+        let layers = layers.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |idx: usize| {
+            let mut lays = (*layers).clone();
+            for kc in lays[idx].iter_mut() {
+                if *kc == 0x0001 {
+                    // KC_TRANSPARENT
+                    *kc = 0x0000; // KC_NO
+                }
+            }
+            layers.set(lays);
+            layer_menu_index.set(None);
+        }
+    };
+
+    let none_to_trans = {
+        let layers = layers.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |idx: usize| {
+            let mut lays = (*layers).clone();
+            for kc in lays[idx].iter_mut() {
+                if *kc == 0x0000 {
+                    // KC_NO
+                    *kc = 0x0001; // KC_TRANSPARENT
+                }
+            }
+            layers.set(lays);
+            layer_menu_index.set(None);
+        }
+    };
+
+    let start_quick_assign = {
+        let quick_assign_index = quick_assign_index.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        move |_| {
+            quick_assign_index.set(Some(0)); // Start at first key
+            layer_menu_index.set(None);
+        }
+    };
+
+    // -- click outside to close menu ----------------------------------------
+    {
+        let layer_menu_index = layer_menu_index.clone();
+        use_effect(move || {
+            let lmi = layer_menu_index.clone();
+            let click_listener = Closure::wrap(
+                Box::new(move |_e: MouseEvent| lmi.set(None)) as Box<dyn FnMut(MouseEvent)>
+            );
+            let lmi_esc = layer_menu_index.clone();
+            let key_listener = Closure::wrap(Box::new(move |e: KeyboardEvent| {
+                if e.key() == "Escape" {
+                    lmi_esc.set(None);
+                }
+            }) as Box<dyn FnMut(KeyboardEvent)>);
+            let window = web_sys::window().unwrap();
+            window
+                .add_event_listener_with_callback("click", click_listener.as_ref().unchecked_ref())
+                .unwrap();
+            window
+                .add_event_listener_with_callback("keydown", key_listener.as_ref().unchecked_ref())
+                .unwrap();
+            move || {
+                let window = web_sys::window().unwrap();
+                window
+                    .remove_event_listener_with_callback(
+                        "click",
+                        click_listener.as_ref().unchecked_ref(),
+                    )
+                    .unwrap();
+                window
+                    .remove_event_listener_with_callback(
+                        "keydown",
+                        key_listener.as_ref().unchecked_ref(),
+                    )
+                    .unwrap();
+                drop(click_listener);
+                drop(key_listener);
+            }
+        });
     }
 
     let on_keydown = {
@@ -436,7 +680,103 @@ pub fn VialHome() -> Html {
         let selected_key = selected_key.clone();
         let hint_map = hint_map.clone();
         let active_layer = active_layer.clone();
+        let layer_menu_index = layer_menu_index.clone();
+        let menu_focus_index = menu_focus_index.clone();
+        let quick_assign_index = quick_assign_index.clone();
+        let layers = layers.clone();
+        let key_layout = key_layout.clone();
+        let move_l = move_layer.clone();
+        let dup_l = duplicate_layer.clone();
+        let del_l = delete_layer.clone();
+        let ren_l = rename_layer.clone();
+        let res_l = reset_layer.clone();
+        let batch_t_n = trans_to_none.clone();
+        let batch_n_t = none_to_trans.clone();
+        let start_qa = start_quick_assign.clone();
         Callback::from(move |e: KeyboardEvent| {
+            // Handle menu keyboard navigation when menu is open
+            if let Some(l_idx) = *layer_menu_index {
+                match e.key().as_str() {
+                    "ArrowDown" => {
+                        menu_focus_index.set((*menu_focus_index + 1) % 9);
+                        e.prevent_default();
+                        return;
+                    }
+                    "ArrowUp" => {
+                        menu_focus_index.set((*menu_focus_index + 8) % 9);
+                        e.prevent_default();
+                        return;
+                    }
+                    "Enter" => {
+                        match *menu_focus_index {
+                            0 => move_l(l_idx, true),
+                            1 => move_l(l_idx, false),
+                            2 => ren_l(l_idx),
+                            3 => dup_l(l_idx),
+                            4 => del_l(l_idx),
+                            5 => res_l(l_idx),
+                            6 => batch_t_n(l_idx),
+                            7 => batch_n_t(l_idx),
+                            8 => start_qa(()),
+                            _ => {}
+                        }
+                        e.prevent_default();
+                        return;
+                    }
+                    "Escape" => {
+                        layer_menu_index.set(None);
+                        e.prevent_default();
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+
+            // Quick assign mode handling
+            if let Some(idx) = *quick_assign_index {
+                if e.key() == "Escape" {
+                    quick_assign_index.set(None);
+                    e.prevent_default();
+                    return;
+                }
+                // Try to parse as a simple keypress for quick assign
+                // For simplicity, we'll just handle single characters and some special keys
+                if e.key().len() == 1 {
+                    // This is a simplified keycode mapping - just using ASCII for letters
+                    // A full implementation would map all keys to proper keycodes
+                    let key = e.key();
+                    if let Some(first) = key.chars().next() {
+                        let kc: u16 = if first.is_ascii_alphabetic() {
+                            // Convert to uppercase and use as keycode offset
+                            (first.to_ascii_uppercase() as u16) - ('A' as u16) + 0x04
+                        } else if first.is_ascii_digit() {
+                            if first == '0' {
+                                0x27
+                            } else {
+                                (first as u16) - ('1' as u16) + 0x1e
+                            }
+                        } else {
+                            0x0000 // KC_NO for unsupported keys
+                        };
+                        if kc != 0x0000 {
+                            let mut lays = (*layers).clone();
+                            let layer_idx = *active_layer as usize;
+                            if layer_idx < lays.len() && idx < lays[layer_idx].len() {
+                                lays[layer_idx][idx] = kc;
+                                layers.set(lays);
+                                // Advance to next key
+                                let key_count = (*key_layout).len();
+                                if key_count > 0 {
+                                    quick_assign_index.set(Some((idx + 1) % key_count));
+                                }
+                            }
+                            e.prevent_default();
+                        }
+                    }
+                }
+                return;
+            }
+
             if selected_key.is_some() {
                 return;
             }
@@ -451,11 +791,30 @@ pub fn VialHome() -> Html {
                     key if key.len() == 1 && hint_chars.contains(key) => {
                         let mut new_input = (*jump_input).clone();
                         new_input.push_str(key);
-                        if let Some(&(key_idx, layer_idx)) = hint_map.get(&new_input) {
-                            if let Some(idx) = key_idx {
-                                selected_key.set(Some((*active_layer as usize, idx)));
-                            } else if let Some(l_idx) = layer_idx {
-                                active_layer.set(l_idx as u8);
+                        if let Some(target) = hint_map.get(&new_input) {
+                            match target {
+                                HintTarget::Key(idx) => {
+                                    selected_key.set(Some((*active_layer as usize, *idx)));
+                                }
+                                HintTarget::Layer(idx) => {
+                                    active_layer.set(*idx as u8);
+                                }
+                                HintTarget::LayerMenu(idx) => {
+                                    layer_menu_index.set(Some(*idx));
+                                    menu_focus_index.set(0);
+                                }
+                                HintTarget::Menu(l_idx, m_idx) => match *m_idx {
+                                    0 => move_l(*l_idx, true),
+                                    1 => move_l(*l_idx, false),
+                                    2 => ren_l(*l_idx),
+                                    3 => dup_l(*l_idx),
+                                    4 => del_l(*l_idx),
+                                    5 => res_l(*l_idx),
+                                    6 => batch_t_n(*l_idx),
+                                    7 => batch_n_t(*l_idx),
+                                    8 => start_qa(()),
+                                    _ => {}
+                                },
                             }
                             jump_mode_active.set(false);
                             jump_input.set(String::new());
@@ -477,8 +836,13 @@ pub fn VialHome() -> Html {
     let on_key_click = {
         let selected_key = selected_key.clone();
         let active_layer = active_layer.clone();
+        let quick_assign_index = quick_assign_index.clone();
         Callback::from(move |idx: usize| {
-            selected_key.set(Some((*active_layer as usize, idx)));
+            if quick_assign_index.is_some() {
+                quick_assign_index.set(Some(idx));
+            } else {
+                selected_key.set(Some((*active_layer as usize, idx)));
+            }
         })
     };
 
@@ -692,7 +1056,20 @@ pub fn VialHome() -> Html {
                                 &layers, *layer_count, &active_layer, &key_layout, *matrix_cols,
                                 on_key_click.clone(), *jump_mode_active, &*jump_input, &key_hints, &layer_hints,
                                 *vial_protocol_ver,
-                                &*keyboard_name
+                                &*keyboard_name,
+                                &*layer_names,
+                                &layer_menu_index,
+                                &menu_focus_index,
+                                &quick_assign_index,
+                                &hint_map,
+                                Rc::new(move |idx, up| move_layer(idx, up)),
+                                Rc::new(move |idx| rename_layer(idx)),
+                                Rc::new(move |idx| duplicate_layer(idx)),
+                                Rc::new(move |idx| delete_layer(idx)),
+                                Rc::new(move |idx| reset_layer(idx)),
+                                Rc::new(move |idx| trans_to_none(idx)),
+                                Rc::new(move |idx| none_to_trans(idx)),
+                                Rc::new(move || start_quick_assign(())),
                             ),
                             VialTab::TestMatrix => render_matrix_tab(&matrix_state, *matrix_cols),
                             VialTab::QmkSettings => html! {
@@ -802,6 +1179,19 @@ fn render_keymap_tab(
     layer_hints: &[String],
     protocol_version: u32,
     keyboard_name: &str,
+    layer_names: &[String],
+    layer_menu_index: &UseStateHandle<Option<usize>>,
+    menu_focus_index: &UseStateHandle<usize>,
+    quick_assign_index: &UseStateHandle<Option<usize>>,
+    hint_map: &std::collections::HashMap<String, HintTarget>,
+    move_layer: Rc<dyn Fn(usize, bool)>,
+    rename_layer: Rc<dyn Fn(usize)>,
+    duplicate_layer: Rc<dyn Fn(usize)>,
+    delete_layer: Rc<dyn Fn(usize)>,
+    reset_layer: Rc<dyn Fn(usize)>,
+    trans_to_none: Rc<dyn Fn(usize)>,
+    none_to_trans: Rc<dyn Fn(usize)>,
+    start_quick_assign: Rc<dyn Fn()>,
 ) -> Html {
     let idx = **active_layer as usize;
     let layer_keys = layers.get(idx);
@@ -837,11 +1227,13 @@ fn render_keymap_tab(
             let content_width_px = (max_x - min_x) * pos_scale;
             let offset_x = -(min_x * pos_scale);
 
+            let quick_assign_target = **quick_assign_index;
+
             html! {
                 <div class="relative bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 overflow-auto shadow-inner w-full max-w-full"
                      style="min-height: 350px; height: 55vh;">
                     <div class="relative mx-auto" style={format!("width: {}px;", content_width_px)}>
-                        { for key_layout.iter().map(|pos| {
+                        { for key_layout.iter().enumerate().map(|(layout_idx, pos)| {
                             let keycode_idx = (pos.row as usize) * (matrix_cols as usize) + (pos.col as usize);
                             let kc = codes.get(keycode_idx).copied().unwrap_or(0);
                             let disp = keycode_display(kc, protocol_version, keyboard_name);
@@ -856,13 +1248,16 @@ fn render_keymap_tab(
                                 "position: absolute; left: {}px; top: {}px; width: {}px; height: {}px;",
                                 x, y, w, h
                             );
+                            let is_quick_assign_target = quick_assign_target.map(|idx| idx == layout_idx).unwrap_or(false);
+                            let key_class = if is_quick_assign_target {
+                                "flex flex-col items-center justify-center font-bold border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-pointer select-none relative ring-4 ring-blue-500 z-40"
+                            } else {
+                                "flex flex-col items-center justify-center font-bold border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-pointer select-none relative"
+                            };
                             html! {
                                 <div
                                     onclick={onclick}
-                                    class="flex flex-col items-center justify-center font-bold border rounded-md
-                                           bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600
-                                           shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500
-                                           transition-all cursor-pointer select-none relative"
+                                    class={key_class}
                                     style={style}
                                     title={format!("Row {}, Col {}
 Keycode: 0x{:04X}", pos.row, pos.col, kc)}
@@ -885,6 +1280,7 @@ Keycode: 0x{:04X}", pos.row, pos.col, kc)}
 
         } else {
             // Fallback: simple grid
+            let quick_assign_target = **quick_assign_index;
             html! {
                 <div class="flex flex-wrap gap-1 my-4">
                     { for codes.iter().enumerate().map(|(keycode_idx, &kc)| {
@@ -892,12 +1288,16 @@ Keycode: 0x{:04X}", pos.row, pos.col, kc)}
                         let hint = key_hints.get(keycode_idx);
                         let show_hint = jump_mode_active && hint.map(|h| h.starts_with(jump_input)).unwrap_or(false);
                         let onclick = { let cb = on_key_click.clone(); Callback::from(move |_: MouseEvent| cb.emit(keycode_idx)) };
+                        let is_quick_assign_target = quick_assign_target.map(|idx| idx == keycode_idx).unwrap_or(false);
+                        let key_class = if is_quick_assign_target {
+                            "w-14 h-14 flex flex-col items-center justify-center border rounded bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-pointer select-none relative ring-4 ring-blue-500 z-40"
+                        } else {
+                            "w-14 h-14 flex flex-col items-center justify-center border rounded bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-pointer select-none relative"
+                        };
                         html! {
                             <div
                                 onclick={onclick}
-                                class="w-14 h-14 flex flex-col items-center justify-center border rounded
-                                       bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600
-                                       hover:bg-blue-100 dark:hover:bg-blue-900 cursor-pointer select-none relative"
+                                class={key_class}
                                 title={format!("0x{kc:04X}")}
                             >
                                 <div class="absolute top-0.5 left-1 text-[7px] leading-tight opacity-50 truncate max-w-[30%]">{disp.upper_left}</div>
@@ -941,29 +1341,110 @@ Keycode: 0x{:04X}", pos.row, pos.col, kc)}
                 if layer_count > 0 {
                     <div class="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
                         { for (0..layer_count).map(|i| {
+                            let i_usize = i as usize;
                             let active_layer = active_layer.clone();
+                            let layer_menu_index = layer_menu_index.clone();
                             let is_active = *active_layer == i;
-                            let hint = layer_hints.get(i as usize);
+                            let is_menu_open = *layer_menu_index == Some(i_usize);
+                            let hint = layer_hints.get(i_usize);
                             let show_hint = jump_mode_active && hint.map(|h| h.starts_with(jump_input)).unwrap_or(false);
+                            let menu_trigger_hint = hint_map.iter().find(|(_, t)| **t == HintTarget::LayerMenu(i_usize)).map(|(h, _)| h);
+                            let show_menu_trigger_hint = jump_mode_active && menu_trigger_hint.map(|h| h.starts_with(jump_input)).unwrap_or(false);
+                            let layer_name = layer_names.get(i_usize).map(|s| s.as_str()).unwrap_or("Layer");
                             html! {
-                                <button
-                                    class={classes!("px-4", "py-1.5", "rounded-md", "shadow-sm", "font-medium", "transition-all", "relative",
-                                        if is_active { "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400" } else { "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" }
-                                    )}
-                                    onclick={Callback::from(move |_: MouseEvent| active_layer.set(i))}
-                                >
-                                    {format!("L{}", i)}
-                                    { if show_hint {
-                                        let h = hint.unwrap();
-                                        let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
-                                        html! { <div class="absolute top-0 left-0 bg-yellow-400 dark:bg-yellow-600 px-0.5 z-30 font-bold text-[10px] text-black dark:text-white rounded-tl-md rounded-br-md shadow-sm pointer-events-none leading-tight border-r border-b border-yellow-500 dark:border-yellow-700"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
+                                <div class="relative" onclick={Callback::from(|e: MouseEvent| e.stop_propagation())}>
+                                    <button
+                                        class={classes!("px-4", "py-1.5", "rounded-md", "shadow-sm", "font-medium", "transition-all", "relative", "flex", "items-center", "gap-2",
+                                            if is_active { "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400" } else { "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" }
+                                        )}
+                                        onclick={let cl = active_layer.clone(); Callback::from(move |_: MouseEvent| cl.set(i))}
+                                    >
+                                        {layer_name}
+                                        <span
+                                            onclick={let lmi = layer_menu_index.clone(); Callback::from(move |e: MouseEvent| {
+                                                e.stop_propagation();
+                                                if *lmi == Some(i_usize) { lmi.set(None); } else { lmi.set(Some(i_usize)); }
+                                            })}
+                                            class="hover:bg-black/10 dark:hover:bg-white/10 rounded p-1 relative"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            { if show_menu_trigger_hint {
+                                                let h = menu_trigger_hint.unwrap();
+                                                let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
+                                                html! { <div class="absolute -top-2 -right-2 bg-blue-400 dark:bg-blue-600 px-1 z-50 font-bold text-[10px] text-black dark:text-white rounded-md shadow-sm pointer-events-none"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
+                                            } else { html! {} }}
+                                        </span>
+                                        { if show_hint {
+                                            let h = hint.unwrap();
+                                            let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
+                                            html! { <div class="absolute top-0 left-0 bg-yellow-400 dark:bg-yellow-600 px-0.5 z-30 font-bold text-[10px] text-black dark:text-white rounded-tl-md rounded-br-md shadow-sm pointer-events-none leading-tight border-r border-b border-yellow-500 dark:border-yellow-700"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
+                                        } else { html! {} }}
+                                    </button>
+                                    { if is_menu_open {
+                                        let move_up = move_layer.clone(); let move_dn = move_layer.clone(); let dup = duplicate_layer.clone(); let del = delete_layer.clone(); let ren = rename_layer.clone(); let res = reset_layer.clone();
+                                        let batch_t_n = trans_to_none.clone(); let batch_n_t = none_to_trans.clone(); let qa = start_quick_assign.clone();
+                                        let lmi = layer_menu_index.clone();
+                                        let menu_items: Vec<(&str, Callback<MouseEvent>)> = vec![
+                                            ("Move Up", Callback::from(move |_| move_up(i_usize, true))),
+                                            ("Move Down", Callback::from(move |_| move_dn(i_usize, false))),
+                                            ("Rename", Callback::from(move |_| ren(i_usize))),
+                                            ("Duplicate", Callback::from(move |_| dup(i_usize))),
+                                            ("Delete", Callback::from(move |_| del(i_usize))),
+                                            ("Reset all to None", Callback::from(move |_| res(i_usize))),
+                                            ("Trans → None", Callback::from(move |_| batch_t_n(i_usize))),
+                                            ("None → Trans", Callback::from(move |_| batch_n_t(i_usize))),
+                                            ("Quick Assignment", { let qa = qa.clone(); let lmi = lmi.clone(); Callback::from(move |_| { qa(); lmi.set(None); }) }),
+                                        ];
+                                        html! {
+                                            <div class="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 py-1 overflow-hidden">
+                                                { for menu_items.into_iter().enumerate().map(|(j, (label, cb))| {
+                                                    let is_focused = **menu_focus_index == j;
+                                                    let menu_hint = hint_map.iter().find(|(_, t)| **t == HintTarget::Menu(i_usize, j)).map(|(h, _)| h);
+                                                    let show_menu_hint = jump_mode_active && menu_hint.map(|h| h.starts_with(jump_input)).unwrap_or(false);
+                                                    let class = classes!("w-full", "text-left", "px-4", "py-2", "text-sm", "relative",
+                                                        if is_focused { "bg-blue-100 dark:bg-blue-900/40" } else { "hover:bg-gray-100 dark:hover:bg-gray-700" },
+                                                        if j == 4 { "text-red-500" } else if j == 5 { "text-orange-500" } else if j == 8 { "font-bold text-blue-500" } else { "" }
+                                                    );
+                                                    html! {
+                                                        <>
+                                                            { if j == 5 || j == 8 { html! { <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div> } } else { html! {} } }
+                                                            <button onclick={cb} class={class}>
+                                                                {label}
+                                                                { if show_menu_hint {
+                                                                    let h = menu_hint.unwrap();
+                                                                    let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
+                                                                    html! { <div class="absolute top-0 right-0 bg-yellow-400 dark:bg-yellow-600 px-1 z-50 font-bold text-[10px] text-black dark:text-white rounded-bl-md shadow-sm pointer-events-none"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
+                                                                } else { html! {} }}
+                                                            </button>
+                                                        </>
+                                                    }
+                                                })}
+                                            </div>
+                                        }
                                     } else { html! {} }}
-                                </button>
+                                </div>
                             }
                         })}
                     </div>
                 }
             </div>
+
+            { if let Some(idx) = **quick_assign_index {
+                let current_key = idx + 1;
+                let total_keys = key_layout.len();
+                html! {
+                    <div class="w-full mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-lg font-bold text-blue-800 dark:text-blue-300">{"Quick Assignment Mode"}</h3>
+                                <p class="text-sm text-blue-600 dark:text-blue-400">{format!("Press keys on your keyboard to assign. Currently editing key {} of {}", current_key, total_keys)}</p>
+                            </div>
+                            <button onclick={let qa = quick_assign_index.clone(); Callback::from(move |_: MouseEvent| qa.set(None))} class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded-lg font-bold">{"Done"}</button>
+                        </div>
+                        <p class="text-xs text-blue-500 dark:text-blue-400 mt-2">{"Press Escape to exit, or click any key to jump to it."}</p>
+                    </div>
+                }
+            } else { html! {} }}
 
             {layout_html}
         </div>

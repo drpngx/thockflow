@@ -14,7 +14,7 @@ use yew::prelude::*;
 
 use crate::keymap::{KeymapData, KeymapRenderer};
 
-use convert::{BehaviorCache, ProtoLayer};
+use convert::{BehaviorCache, ProtoBinding, ProtoLayer};
 use rpc::{NotificationOneOf, RpcClient};
 use transport::ZmkTransport;
 
@@ -283,6 +283,41 @@ pub fn ZmkStudioHome() -> Html {
         Callback::from(move |new_data: KeymapData| {
             let old_data = (*keymap_data).clone();
             keymap_data.set(Some(new_data.clone()));
+
+            // Sync proto_layers when layers are reordered/duplicated/deleted
+            // This ensures layer_id lookups remain correct after menu operations
+            if let Some(ref old) = old_data {
+                if old.layers.len() != new_data.layers.len() ||
+                   old.layers.iter().zip(new_data.layers.iter()).any(|(a, b)| a.name != b.name) {
+                    // Layer structure changed - sync proto_layers
+                    let current_proto_layers = (*proto_layers).clone();
+                    let mut new_proto_layers = Vec::new();
+                    
+                    for (idx, layer) in new_data.layers.iter().enumerate() {
+                        // Try to find matching proto_layer by name
+                        let proto_layer = current_proto_layers.iter()
+                            .find(|pl| pl.name == layer.name)
+                            .cloned()
+                            .unwrap_or_else(|| {
+                                // New layer (duplicated) - assign a temporary ID
+                                // The device will assign the real ID when saved
+                                ProtoLayer {
+                                    id: (current_proto_layers.len() + idx) as u32,
+                                    name: layer.name.clone(),
+                                    bindings: layer.bindings.iter().map(|_b| {
+                                        convert::ProtoBinding {
+                                            behavior_id: 0,
+                                            param1: 0,
+                                            param2: 0,
+                                        }
+                                    }).collect(),
+                                }
+                            });
+                        new_proto_layers.push(proto_layer);
+                    }
+                    proto_layers.set(new_proto_layers);
+                }
+            }
 
             if let (Some(old), Some(client)) = (old_data, (*rpc_client).clone()) {
                 let cache = (*behavior_cache).clone();
