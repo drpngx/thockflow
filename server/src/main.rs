@@ -714,6 +714,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         process_unmapped_keys: ProcessUnmappedKeys::No,
         defvars: Vec::new(),
         phantom_keys: Vec::new(),
+        chordsv2: Vec::new(),
     })
 }
 
@@ -2640,6 +2641,7 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
         process_unmapped_keys,
         defvars,
         phantom_keys,
+        chordsv2: Vec::new(),
     })
 }
 

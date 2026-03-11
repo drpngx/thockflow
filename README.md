@@ -65,12 +65,6 @@ We need to improve the ZMK Studio tab. The layout must have a menu, exactly like
 - test write paths
 
 
-Finish basic implementing Kanata:
-- cmd
-We need to improve the Kanata tab. We will add support for the `cmd` action which takes strings. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc The command can be unquoted strings for instance `(cmd bazel build -c opt //...)` We need a design and implementation doc that contains planning for extensive tests.
-- is_laptop: true detection using proper BatteryManager and screen size
-
-
 Mod-tap optimizer:
 - see failure conditions from [howto](https://precondition.github.io/home-row-mods)
 - tap term, permissive

@@ -12,6 +12,18 @@ use crate::keymap::{
 
 pub mod layout;
 
+/// Extension trait for Navigator to access the Battery API
+#[wasm_bindgen]
+extern "C" {
+    /// Represents the Navigator interface extended with getBattery method
+    #[wasm_bindgen(js_name = Navigator)]
+    type BatteryNavigator;
+
+    /// Gets the battery manager for the device
+    #[wasm_bindgen(method, js_name = getBattery, catch)]
+    fn get_battery(this: &BatteryNavigator) -> Result<js_sys::Promise, JsValue>;
+}
+
 fn format_kanata_keycode(kc: &str, is_mac: bool) -> String {
     match kc {
         "_" => "▽".to_string(),
@@ -2114,24 +2126,52 @@ mod tests {
 }
 
 async fn is_laptop() -> bool {
+    use web_sys::BatteryManager;
+    
     if let Some(window) = web_sys::window() {
         let navigator = window.navigator();
-        let get_battery_val = match js_sys::Reflect::get(&navigator, &"getBattery".into()) {
-            Ok(val) => val,
-            Err(_) => return false,
-        };
+        // Cast Navigator to BatteryNavigator to access get_battery
+        let battery_navigator: &BatteryNavigator = navigator.unchecked_ref();
         
-        if get_battery_val.is_function() {
-            let promise_val = match js_sys::Reflect::apply(&get_battery_val.unchecked_into(), &navigator, &js_sys::Array::new()) {
-                Ok(val) => val,
-                Err(_) => return false,
-            };
-            let promise: js_sys::Promise = promise_val.unchecked_into();
-            let result = wasm_bindgen_futures::JsFuture::from(promise).await;
-            return result.is_ok();
+        match battery_navigator.get_battery() {
+            Ok(promise) => {
+                match wasm_bindgen_futures::JsFuture::from(promise).await {
+                    Ok(battery_val) => {
+                        // Try to get the battery manager and log details
+                        if let Ok(battery) = battery_val.dyn_into::<BatteryManager>() {
+                            let charging = battery.charging();
+                            let level = battery.level();
+                            let charging_time = battery.charging_time();
+                            let discharging_time = battery.discharging_time();
+                            
+                            web_sys::console::log_1(&format!(
+                                "Battery info: charging={}, level={}, charging_time={}, discharging_time={}",
+                                charging, level, charging_time, discharging_time
+                            ).into());
+                            
+                            // A desktop typically always reports charging=true and level=1.0
+                            // A laptop on battery would have charging=false and level < 1.0
+                            // If discharging_time is finite, it's definitely a laptop on battery
+                            let is_laptop = !charging || level < 1.0 || discharging_time.is_finite();
+                            web_sys::console::log_1(&format!("is_laptop determination: {}", is_laptop).into());
+                            return is_laptop;
+                        }
+                        false
+                    }
+                    Err(e) => {
+                        web_sys::console::log_1(&format!("Battery API error: {:?}", e).into());
+                        false
+                    }
+                }
+            }
+            Err(e) => {
+                web_sys::console::log_1(&format!("getBattery not available: {:?}", e).into());
+                false
+            }
         }
+    } else {
+        false
     }
-    false
 }
 
 #[derive(Serialize)]
