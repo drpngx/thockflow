@@ -220,10 +220,33 @@ pub struct PhysicalKey {
     pub ry: i32,
 }
 
+/// Type of layer definition in kanata
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub enum LayerType {
+    #[default]
+    Deflayer,    // Traditional (deflayer ...)
+    Deflayermap, // Mapping-based (deflayermap ...)
+}
+
+/// Process-unmapped-keys configuration from defcfg
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub enum ProcessUnmappedKeys {
+    #[default]
+    No,
+    Yes,
+    AllExcept(Vec<String>), // Keys to exclude
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Layer {
     pub name: String,
     pub bindings: Vec<String>,
+    #[serde(default)]
+    pub layer_type: LayerType,
+    #[serde(default)]
+    pub source_layer: Option<String>, // For deflayermap, the source layer name
+    #[serde(default)]
+    pub key_bindings: std::collections::HashMap<String, String>, // Original key->action for deflayermap
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -237,6 +260,8 @@ pub struct KeymapData {
     pub defsrc: Vec<String>,
     #[serde(default)]
     pub unmapped_names: Vec<String>,
+    #[serde(default)]
+    pub process_unmapped_keys: ProcessUnmappedKeys,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.

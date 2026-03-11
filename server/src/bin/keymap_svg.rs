@@ -157,6 +157,9 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
                             layers.push(Layer {
                                 name: layer_name,
                                 bindings,
+                                layer_type: thockflow::keymap::LayerType::Deflayer,
+                                source_layer: None,
+                                key_bindings: std::collections::HashMap::new(),
                             });
                         }
                     }
@@ -247,6 +250,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         aliases: std::collections::HashMap::new(),
         defsrc: Vec::new(),
         unmapped_names: Vec::new(),
+        process_unmapped_keys: thockflow::keymap::ProcessUnmappedKeys::No,
     })
 }
 

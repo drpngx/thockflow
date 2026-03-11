@@ -175,6 +175,8 @@ pub fn to_keymap_data(
     proto_layers: &[ProtoLayer],
     cache: &BehaviorCache,
 ) -> KeymapData {
+    use crate::keymap::{LayerType, ProcessUnmappedKeys};
+
     let layers = proto_layers
         .iter()
         .map(|l| Layer {
@@ -184,6 +186,9 @@ pub fn to_keymap_data(
                 .iter()
                 .map(|b| format_binding(b, cache))
                 .collect(),
+            layer_type: LayerType::Deflayer,
+            source_layer: None,
+            key_bindings: std::collections::HashMap::new(),
         })
         .collect();
 
@@ -194,6 +199,7 @@ pub fn to_keymap_data(
         defsrc: vec![],
         includes: vec![],
         unmapped_names: vec![],
+        process_unmapped_keys: ProcessUnmappedKeys::No,
     }
 }
 

@@ -460,18 +460,25 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keymap::{Layer, KeymapData};
+    use crate::keymap::{Layer, LayerType, KeymapData, ProcessUnmappedKeys};
     use std::collections::HashMap;
 
     #[test]
     fn test_completion_congruence() {
         let mut data = KeymapData {
             physical_layout: Vec::new(),
-            layers: vec![Layer { name: "base".to_string(), bindings: Vec::new() }],
+            layers: vec![Layer { 
+                name: "base".to_string(), 
+                bindings: Vec::new(),
+                layer_type: LayerType::Deflayer,
+                source_layer: None,
+                key_bindings: HashMap::new(),
+            }],
             includes: Vec::new(),
             aliases: HashMap::new(),
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
         };
         data.aliases.insert("myalias".to_string(), "lsft".to_string());
 
@@ -515,6 +522,7 @@ mod tests {
             aliases: HashMap::new(),
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
         };
         let (_, suggestions) = get_suggestions("_", &data);
         assert!(suggestions.contains(&"_".to_string()));

@@ -14,7 +14,7 @@ use futures::future::BoxFuture;
 use futures::ready;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use thockflow::keymap::{parse_raw_bindings, KeymapData, Layer, PhysicalKey};
+use thockflow::keymap::{parse_raw_bindings, KeymapData, Layer, LayerType, PhysicalKey, ProcessUnmappedKeys};
 use thockflow::ServerAppProps;
 use tree_sitter_scheme;
 use tokio_util::task::LocalPoolHandle;
@@ -610,6 +610,9 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                             layers.push(Layer {
                                 name: layer_name,
                                 bindings,
+                                layer_type: LayerType::Deflayer,
+                                source_layer: None,
+                                key_bindings: std::collections::HashMap::new(),
                             });
                         }
                     }
@@ -703,6 +706,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         aliases: HashMap::new(),
         defsrc: Vec::new(),
         unmapped_names: Vec::new(),
+        process_unmapped_keys: ProcessUnmappedKeys::No,
     })
 }
 
@@ -867,11 +871,15 @@ mod tests {
             layers: vec![Layer {
                 name: "new_layer_0".to_string(),
                 bindings: vec!["&kp X".to_string(), "&kp Y".to_string()],
+                layer_type: LayerType::Deflayer,
+                source_layer: None,
+                key_bindings: HashMap::new(),
             }],
             includes: vec![],
             aliases: HashMap::new(),
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -918,16 +926,23 @@ mod tests {
                 Layer {
                     name: "layer_0".to_string(),
                     bindings: vec!["&kp LONG_BINDING".to_string(), "&kp B".to_string()],
+                    layer_type: LayerType::Deflayer,
+                    source_layer: None,
+                    key_bindings: HashMap::new(),
                 },
                 Layer {
                     name: "layer_1".to_string(),
                     bindings: vec!["&kp A".to_string(), "&kp SHORT".to_string()],
+                    layer_type: LayerType::Deflayer,
+                    source_layer: None,
+                    key_bindings: HashMap::new(),
                 },
             ],
             includes: vec![],
             aliases: HashMap::new(),
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -975,16 +990,23 @@ mod tests {
                 Layer {
                     name: "layer_0".to_string(),
                     bindings: vec!["&kp A".to_string(), "&kp B".to_string()],
+                    layer_type: LayerType::Deflayer,
+                    source_layer: None,
+                    key_bindings: HashMap::new(),
                 },
                 Layer {
                     name: "new_layer".to_string(),
                     bindings: vec!["&kp C".to_string(), "&kp D".to_string()],
+                    layer_type: LayerType::Deflayer,
+                    source_layer: None,
+                    key_bindings: HashMap::new(),
                 },
             ],
             includes: vec![],
             aliases: HashMap::new(),
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1077,11 +1099,15 @@ mod tests {
             layers: vec![Layer {
                 name: "layer_0".to_string(),
                 bindings: vec!["&mmv 0".to_string(), "&kp B".to_string()],
+                layer_type: LayerType::Deflayer,
+                source_layer: None,
+                key_bindings: HashMap::new(),
             }],
             includes: vec!["custom.h".to_string()],
             aliases: HashMap::new(),
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1293,6 +1319,206 @@ mod tests {
             panic!("Could not find bindings property");
         }
     }
+
+    #[test]
+    fn test_parse_deflayermap_with_process_unmapped_keys_yes() {
+        let content = r#"
+(defcfg
+  process-unmapped-keys yes
+)
+
+(defsrc
+  esc f1 a b
+)
+
+(deflayer base
+  esc f1 a b
+)
+
+(deflayermap (nav)
+  a (layer-toggle symbols)
+  b left
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Check process-unmapped-keys was parsed
+        assert!(matches!(result.process_unmapped_keys, ProcessUnmappedKeys::Yes));
+
+        // Should have 2 layers
+        assert_eq!(result.layers.len(), 2, "Expected 2 layers");
+
+        // Find the nav layer
+        let nav_layer = result.layers.iter().find(|l| l.name == "nav").expect("Should have nav layer");
+
+        // Check it's a Deflayermap
+        assert!(matches!(nav_layer.layer_type, LayerType::Deflayermap));
+
+        // Check key_bindings were stored
+        assert_eq!(nav_layer.key_bindings.get("a"), Some(&"(layer-toggle symbols)".to_string()));
+        assert_eq!(nav_layer.key_bindings.get("b"), Some(&"left".to_string()));
+
+        // With process-unmapped-keys yes, unmapped keys should inherit from base
+        // defsrc order: esc(0), f1(1), a(2), b(3)
+        // nav mappings: a->(layer-toggle symbols), b->left
+        // So nav bindings should be: ["esc", "f1", "(layer-toggle symbols)", "left"]
+        assert_eq!(nav_layer.bindings[0], "esc", "esc should inherit from base");
+        assert_eq!(nav_layer.bindings[1], "f1", "f1 should inherit from base");
+        assert_eq!(nav_layer.bindings[2], "(layer-toggle symbols)", "a should have explicit mapping");
+        assert_eq!(nav_layer.bindings[3], "left", "b should have explicit mapping");
+    }
+
+    #[test]
+    fn test_parse_deflayermap_with_process_unmapped_keys_no() {
+        let content = r#"
+(defcfg
+  process-unmapped-keys no
+)
+
+(defsrc
+  esc f1 a b
+)
+
+(deflayer base
+  esc f1 a b
+)
+
+(deflayermap (nav)
+  a (layer-toggle symbols)
+  b left
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Check process-unmapped-keys was parsed
+        assert!(matches!(result.process_unmapped_keys, ProcessUnmappedKeys::No));
+
+        // Find the nav layer
+        let nav_layer = result.layers.iter().find(|l| l.name == "nav").expect("Should have nav layer");
+
+        // With process-unmapped-keys no, unmapped keys should be transparent ("_")
+        // nav bindings should be: ["_", "_", "(layer-toggle symbols)", "left"]
+        assert_eq!(nav_layer.bindings[0], "_", "esc should be transparent");
+        assert_eq!(nav_layer.bindings[1], "_", "f1 should be transparent");
+        assert_eq!(nav_layer.bindings[2], "(layer-toggle symbols)", "a should have explicit mapping");
+        assert_eq!(nav_layer.bindings[3], "left", "b should have explicit mapping");
+    }
+
+    #[test]
+    fn test_parse_deflayermap_with_all_except() {
+        let content = r#"
+(defcfg
+  process-unmapped-keys (all-except esc)
+)
+
+(defsrc
+  esc f1 a b
+)
+
+(deflayer base
+  esc f1 a b
+)
+
+(deflayermap (nav)
+  b left
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Check process-unmapped-keys was parsed
+        match &result.process_unmapped_keys {
+            ProcessUnmappedKeys::AllExcept(exclude) => {
+                assert_eq!(exclude, &["esc"]);
+            }
+            _ => panic!("Expected AllExcept variant"),
+        }
+
+        // Find the nav layer
+        let nav_layer = result.layers.iter().find(|l| l.name == "nav").expect("Should have nav layer");
+
+        // With (all-except esc), esc should be transparent, others should inherit from base
+        // nav bindings should be: ["_", "f1", "a", "left"]
+        assert_eq!(nav_layer.bindings[0], "_", "esc should be transparent (excluded)");
+        assert_eq!(nav_layer.bindings[1], "f1", "f1 should inherit from base");
+        assert_eq!(nav_layer.bindings[2], "a", "a should inherit from base");
+        assert_eq!(nav_layer.bindings[3], "left", "b should have explicit mapping");
+    }
+
+    #[test]
+    fn test_deflayermap_roundtrip() {
+        // This test verifies that we can parse a file with deflayermap
+        // and serialize it back while preserving the deflayermap structure
+        let content = r#"(defcfg
+  process-unmapped-keys yes
+)
+
+(defsrc
+  esc f1 a b
+)
+
+(defalias
+  cap1 (layer-toggle nav)
+)
+
+(deflayer base
+  esc f1 a b
+)
+
+(deflayermap (nav)
+  a (layer-toggle symbols)
+  b left
+)
+"#;
+        let data = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse");
+
+        // Verify nav layer exists and is deflayermap
+        let nav_layer = data.layers.iter().find(|l| l.name == "nav").expect("Should have nav layer");
+        assert!(matches!(nav_layer.layer_type, LayerType::Deflayermap));
+
+        // Generate output
+        let result = generate_kanata_kbd(content, &data).expect("Should generate");
+
+        // Verify the output still contains deflayermap
+        assert!(result.contains("(deflayermap (nav)"), "Output should preserve deflayermap");
+        assert!(result.contains("process-unmapped-keys yes"), "Output should preserve defcfg");
+    }
+
+    #[test]
+    fn test_mixed_deflayer_and_deflayermap() {
+        let content = r#"
+(defcfg
+  process-unmapped-keys yes
+)
+
+(defsrc a b c d)
+
+(deflayer base _ _ _ _)
+
+(deflayer full x y z w)
+
+(deflayermap (partial)
+  a x
+  b y
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse");
+
+        // Should have 3 layers
+        assert_eq!(result.layers.len(), 3, "Expected 3 layers");
+
+        // Check layer types
+        let base_layer = result.layers.iter().find(|l| l.name == "base").expect("Should have base layer");
+        let full_layer = result.layers.iter().find(|l| l.name == "full").expect("Should have full layer");
+        let partial_layer = result.layers.iter().find(|l| l.name == "partial").expect("Should have partial layer");
+
+        assert!(matches!(base_layer.layer_type, LayerType::Deflayer));
+        assert!(matches!(full_layer.layer_type, LayerType::Deflayer));
+        assert!(matches!(partial_layer.layer_type, LayerType::Deflayermap));
+
+        // Check partial layer has correct explicit bindings
+        assert_eq!(partial_layer.key_bindings.get("a"), Some(&"x".to_string()));
+        assert_eq!(partial_layer.key_bindings.get("b"), Some(&"y".to_string()));
+    }
 }
 
 static LOCAL_POOL: Lazy<LocalPoolHandle> = Lazy::new(|| LocalPoolHandle::new(num_cpus::get()));
@@ -1392,6 +1618,166 @@ fn find_kanata_node<'a>(
     results
 }
 
+/// Parse defcfg to extract process-unmapped-keys setting
+fn parse_defcfg(node: tree_sitter::Node, source: &[u8]) -> ProcessUnmappedKeys {
+    let mut result = ProcessUnmappedKeys::No;
+    let mut cursor = node.walk();
+    let mut prev_was_process_unmapped_keys = false;
+
+    for child in node.children(&mut cursor) {
+        let kind = child.kind();
+        let text = child.utf8_text(source).unwrap_or("");
+
+        if prev_was_process_unmapped_keys {
+            // This child is the value for process-unmapped-keys
+            if text == "yes" {
+                result = ProcessUnmappedKeys::Yes;
+            } else if text == "no" {
+                result = ProcessUnmappedKeys::No;
+            } else if kind == "list" {
+                // Check for (all-except ...)
+                let mut inner_cursor = child.walk();
+                let mut found_all_except = false;
+                let mut excluded_keys = Vec::new();
+
+                for inner_child in child.children(&mut inner_cursor) {
+                    let inner_text = inner_child.utf8_text(source).unwrap_or("");
+                    if inner_text == "all-except" {
+                        found_all_except = true;
+                    } else if found_all_except && (inner_child.kind() == "symbol" || inner_child.kind() == "boolean") {
+                        excluded_keys.push(inner_text.to_string());
+                    }
+                }
+
+                if found_all_except {
+                    result = ProcessUnmappedKeys::AllExcept(excluded_keys);
+                }
+            }
+            prev_was_process_unmapped_keys = false;
+        } else if kind == "symbol" && text == "process-unmapped-keys" {
+            prev_was_process_unmapped_keys = true;
+        }
+    }
+
+    result
+}
+
+/// Parse a deflayermap node and return a Layer
+/// Syntax: (deflayermap (layer-name) key1 action1 key2 action2 ...)
+fn parse_deflayermap(
+    node: tree_sitter::Node,
+    source: &[u8],
+    defsrc_keys: &[String],
+    base_layer_bindings: Option<&[String]>,
+    process_unmapped: &ProcessUnmappedKeys,
+) -> Option<Layer> {
+    let mut cursor = node.walk();
+    let mut children: Vec<tree_sitter::Node> = Vec::new();
+
+    // Collect all children first (as nodes, not text), skipping parentheses
+    for child in node.children(&mut cursor) {
+        let kind = child.kind();
+        // Skip parentheses - only keep actual content
+        if kind != "(" && kind != ")" {
+            children.push(child);
+        }
+    }
+
+    if children.len() < 2 {
+        return None;
+    }
+
+    // First child should be the symbol "deflayermap"
+    let first_text = children[0].utf8_text(source).unwrap_or("");
+    if first_text != "deflayermap" {
+        return None;
+    }
+
+    // Second child should be a list containing the layer name: (layer-name)
+    let layer_name = if children[1].kind() == "list" {
+        // Extract layer name from inside the parentheses
+        let mut name_cursor = children[1].walk();
+        let mut name = String::new();
+        for child in children[1].children(&mut name_cursor) {
+            let kind = child.kind();
+            if kind != "(" && kind != ")" {
+                name = child.utf8_text(source).unwrap_or("").to_string();
+                break;
+            }
+        }
+        name
+    } else {
+        // Fallback: try direct text (for backwards compatibility if syntax varies)
+        children[1].utf8_text(source).unwrap_or("").to_string()
+    };
+    
+    if layer_name.is_empty() {
+        return None;
+    }
+
+    // Parse key-action pairs (starting from index 2)
+    let mut key_bindings: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut i = 2;
+    while i + 1 < children.len() {
+        let key_node = children[i];
+        let action_node = children[i + 1];
+
+        let key_kind = key_node.kind();
+        let key_name = key_node.utf8_text(source).unwrap_or("").to_string();
+
+        // Only process if key is a symbol/boolean and is in defsrc
+        if (key_kind == "symbol" || key_kind == "boolean") && defsrc_keys.contains(&key_name) {
+            let action_text = action_node.utf8_text(source).unwrap_or("").to_string();
+            key_bindings.insert(key_name, action_text);
+        }
+
+        i += 2;
+    }
+
+    // Build full bindings vector based on defsrc order
+    let mut bindings = Vec::new();
+
+    for (idx, key_name) in defsrc_keys.iter().enumerate() {
+        if let Some(action) = key_bindings.get(key_name) {
+            // Explicit mapping in deflayermap
+            bindings.push(action.clone());
+        } else {
+            // No explicit mapping - determine default behavior
+            match process_unmapped {
+                ProcessUnmappedKeys::Yes => {
+                    // Key is available with its base action
+                    if let Some(base_bindings) = base_layer_bindings {
+                        bindings.push(base_bindings.get(idx).cloned().unwrap_or_else(|| "_".to_string()));
+                    } else {
+                        bindings.push(key_name.clone());
+                    }
+                }
+                ProcessUnmappedKeys::No => {
+                    // Key is not processed (transparent)
+                    bindings.push("_".to_string());
+                }
+                ProcessUnmappedKeys::AllExcept(exclude) => {
+                    if exclude.contains(key_name) {
+                        bindings.push("_".to_string());
+                    } else if let Some(base_bindings) = base_layer_bindings {
+                        bindings.push(base_bindings.get(idx).cloned().unwrap_or_else(|| "_".to_string()));
+                    } else {
+                        bindings.push(key_name.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    Some(Layer {
+        name: layer_name,
+        bindings,
+        layer_type: LayerType::Deflayermap,
+        source_layer: Some("defsrc".to_string()),
+        key_bindings,
+    })
+}
+
 fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -> Result<KeymapData> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_scheme::LANGUAGE.into())?;
@@ -1427,6 +1813,13 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
         if !error_pos.is_empty() {
             return Err(anyhow::anyhow!(error_pos));
         }
+    }
+
+    // Parse defcfg for process-unmapped-keys
+    let defcfg_nodes = find_kanata_node(root, source, "defcfg");
+    let mut process_unmapped_keys = ProcessUnmappedKeys::No;
+    for cfg_node in defcfg_nodes {
+        process_unmapped_keys = parse_defcfg(cfg_node, source);
     }
 
     let defsrc_nodes = find_kanata_node(root, source, "defsrc");
@@ -1549,6 +1942,35 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
             layers.push(Layer {
                 name: layer_name,
                 bindings,
+                layer_type: LayerType::Deflayer,
+                source_layer: None,
+                key_bindings: std::collections::HashMap::new(),
+            });
+        }
+    }
+
+    // Parse deflayermap nodes
+    let deflayermap_nodes = find_kanata_node(root, source, "deflayermap");
+    
+    // Clone base bindings to avoid borrow checker issues
+    let base_bindings: Vec<String> = layers.first().map(|l| l.bindings.clone()).unwrap_or_default();
+
+    for map_node in deflayermap_nodes {
+        if let Some(layer) = parse_deflayermap(map_node, source, &key_names, Some(&base_bindings), &process_unmapped_keys) {
+            // Add unmapped and alias bindings for consistency
+            let mut full_bindings = layer.bindings.clone();
+
+            // Add unmapped keys (already in bindings from parse_deflayermap, but we need to add aliases)
+            for alias_name in &sorted_alias_names {
+                full_bindings.push(alias_name.clone());
+            }
+
+            layers.push(Layer {
+                name: layer.name,
+                bindings: full_bindings,
+                layer_type: layer.layer_type,
+                source_layer: layer.source_layer,
+                key_bindings: layer.key_bindings,
             });
         }
     }
@@ -1560,6 +1982,7 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
         aliases,
         defsrc: key_names,
         unmapped_names,
+        process_unmapped_keys,
     })
 }
 
@@ -1575,6 +1998,7 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
 
     let deflayer_nodes = find_kanata_node(root, source, "deflayer");
     let defalias_nodes = find_kanata_node(root, source, "defalias");
+    let deflayermap_nodes = find_kanata_node(root, source, "deflayermap");
 
     struct Replacement {
         start: usize,
@@ -1711,6 +2135,60 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
                         // Recurse to find all actual bindings
                         update_bindings(child, source, &target_layer.bindings, &mut binding_idx, num_standard_keys, &mut replacements);
                     }
+                }
+            }
+        }
+    }
+
+    // Handle deflayermap updates
+    // Find deflayermap layers in data
+    let deflayermap_layers: Vec<_> = data.layers.iter()
+        .filter(|l| matches!(l.layer_type, LayerType::Deflayermap))
+        .collect();
+
+    for (i, map_node) in deflayermap_nodes.iter().enumerate() {
+        if let Some(target_layer) = deflayermap_layers.get(i) {
+            let mut inner_cursor = map_node.walk();
+            let mut symbol_count = 0;
+
+            for child in map_node.children(&mut inner_cursor) {
+                let kind = child.kind();
+                if kind == "symbol" || kind == "boolean" || kind == "number" {
+                    let text = child.utf8_text(source).unwrap_or("");
+                    
+                    if text == "deflayermap" {
+                        continue;
+                    }
+                    
+                    if symbol_count == 0 {
+                        // Layer name
+                        if text != target_layer.name {
+                            replacements.push(Replacement {
+                                start: child.start_byte(),
+                                end: child.end_byte(),
+                                text: target_layer.name.clone(),
+                            });
+                        }
+                        symbol_count += 1;
+                    } else if symbol_count % 2 == 1 {
+                        // This is a key name in deflayermap
+                        // Find if this key has been updated
+                        if let Some(_new_action) = target_layer.key_bindings.get(text) {
+                            // Look ahead to find the action node (next sibling)
+                            // We need to get the next child in the iteration
+                            // Since we can't easily peek, we'll mark this and handle in the next iteration
+                        }
+                        symbol_count += 1;
+                    } else {
+                        // This is an action - check if it needs updating
+                        let _key_idx = (symbol_count - 1) / 2;
+                        // Get the key name from the previous iteration
+                        symbol_count += 1;
+                    }
+                } else if kind == "list" {
+                    // This is an action (list form)
+                    let _text = child.utf8_text(source).unwrap_or("");
+                    symbol_count += 1;
                 }
             }
         }

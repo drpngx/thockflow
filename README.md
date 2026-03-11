@@ -57,8 +57,17 @@ Tidy:
 - implement C-o and C-s for all tabs
 - test write paths
 
-Finish implementing Kanata:
+Finish basic implementing Kanata:
 - more features than basic layout edits
+- defvar, with concat
+- process-unmapped-keys and shadow keys
+- support `none` as XX ✗ ∅ •: display and parse
+- pre-modified keys: C-S-c
+- mousemove variants, setmouse, mousemove-speed
+- cmd
+- clipboard variants
+- defchords
+
 
 Mod-tap optimizer:
 - see failure conditions from [howto](https://precondition.github.io/home-row-mods)
