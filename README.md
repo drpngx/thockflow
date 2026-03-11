@@ -55,14 +55,17 @@ Tidy:
 - share code for basic operations with Traits, at some point
 - tree-sitter goes in a sandboxed process
 - implement C-o and C-s for all tabs
+- implement the layer menu everywhere (about quick fill and kanata shadow keys)
 - test write paths
 
+
 Finish basic implementing Kanata:
-- more features than basic layout edits
-- defvar, with concat
 - process-unmapped-keys and shadow keys
+We need to improve the Kanata tab. We will add keys in the layout that are not in the `defsrc`. We will just draw the outline of the key without filling it out. It will be availabe to the `j` menu. If the user modifies it from its basic state, then it will be added to the `defsrc` in its proper place unless `process-unmapped-keys=yes`. We need a design and implementation doc that contains planning for extensive tests.
 - support `none` as XX ✗ ∅ •: display and parse
+We need to improve the Kanata tab. We need to support the `none` key. It can be added in the config and completion as `XX ✗ ∅ •` and we will always display it as ∅.
 - pre-modified keys: C-S-c
+We need to improve the Kanata tab. We will pre-modified keys support such as `C-S-a` which means control-shift-a. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#output-chordscombos We need to modify the comletion so that we can see `C-`, etc. If we select this, then we will see the next keys, so `C-` can complete to `C-S-` or `C-a`. We need a design and implementation doc that contains planning for extensive tests.
 - mousemove variants, setmouse, mousemove-speed
 - cmd
 - clipboard variants

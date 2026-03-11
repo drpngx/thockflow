@@ -200,6 +200,7 @@ pub fn to_keymap_data(
         includes: vec![],
         unmapped_names: vec![],
         process_unmapped_keys: ProcessUnmappedKeys::No,
+        defvars: vec![],
     }
 }
 

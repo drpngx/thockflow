@@ -249,6 +249,31 @@ pub struct Layer {
     pub key_bindings: std::collections::HashMap<String, String>, // Original key->action for deflayermap
 }
 
+/// Type of variable value in defvar
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub enum VarType {
+    Integer,
+    Key,           // Single key or action
+    Action,        // Complex action expression
+    List,          // List of items (a b c)
+    String,
+    Unknown,       // Couldn't determine type
+}
+
+impl Default for VarType {
+    fn default() -> Self {
+        VarType::Unknown
+    }
+}
+
+/// A variable defined with defvar
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub struct Defvar {
+    pub name: String,        // Variable name (without $ prefix)
+    pub value: String,       // Raw value as string
+    pub var_type: VarType,   // Auto-detected type
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct KeymapData {
     pub physical_layout: Vec<PhysicalKey>,
@@ -262,6 +287,8 @@ pub struct KeymapData {
     pub unmapped_names: Vec<String>,
     #[serde(default)]
     pub process_unmapped_keys: ProcessUnmappedKeys,
+    #[serde(default)]
+    pub defvars: Vec<Defvar>,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.

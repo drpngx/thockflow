@@ -14,7 +14,7 @@ use futures::future::BoxFuture;
 use futures::ready;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use thockflow::keymap::{parse_raw_bindings, KeymapData, Layer, LayerType, PhysicalKey, ProcessUnmappedKeys};
+use thockflow::keymap::{parse_raw_bindings, Defvar, KeymapData, Layer, LayerType, PhysicalKey, ProcessUnmappedKeys, VarType};
 use thockflow::ServerAppProps;
 use tree_sitter_scheme;
 use tokio_util::task::LocalPoolHandle;
@@ -707,6 +707,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         defsrc: Vec::new(),
         unmapped_names: Vec::new(),
         process_unmapped_keys: ProcessUnmappedKeys::No,
+        defvars: Vec::new(),
     })
 }
 
@@ -880,6 +881,7 @@ mod tests {
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -943,6 +945,7 @@ mod tests {
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1007,6 +1010,7 @@ mod tests {
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1108,6 +1112,7 @@ mod tests {
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
         };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1519,6 +1524,171 @@ mod tests {
         assert_eq!(partial_layer.key_bindings.get("a"), Some(&"x".to_string()));
         assert_eq!(partial_layer.key_bindings.get("b"), Some(&"y".to_string()));
     }
+
+    // ============================================================================
+    // defvar Tests
+    // ============================================================================
+
+    #[test]
+    fn test_parse_defvar_integer() {
+        let content = r#"
+(defvar tap-timeout 100)
+(defvar hold-timeout 200)
+
+(defsrc a b)
+
+(deflayer base a b)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have 2 defvars
+        assert_eq!(result.defvars.len(), 2, "Expected 2 defvars");
+
+        // Check first variable
+        assert_eq!(result.defvars[0].name, "tap-timeout");
+        assert_eq!(result.defvars[0].value, "100");
+        assert!(matches!(result.defvars[0].var_type, VarType::Integer));
+
+        // Check second variable
+        assert_eq!(result.defvars[1].name, "hold-timeout");
+        assert_eq!(result.defvars[1].value, "200");
+        assert!(matches!(result.defvars[1].var_type, VarType::Integer));
+    }
+
+    #[test]
+    fn test_parse_defvar_key() {
+        let content = r#"
+(defvar my-mod lctl)
+(defvar my-key a)
+
+(defsrc a b)
+
+(deflayer base $my-mod $my-key)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have 2 defvars
+        assert_eq!(result.defvars.len(), 2, "Expected 2 defvars");
+
+        // Check variable types
+        let my_mod = result.defvars.iter().find(|v| v.name == "my-mod").expect("Should have my-mod");
+        assert_eq!(my_mod.value, "lctl");
+        assert!(matches!(my_mod.var_type, VarType::Key));
+
+        let my_key = result.defvars.iter().find(|v| v.name == "my-key").expect("Should have my-key");
+        assert_eq!(my_key.value, "a");
+        assert!(matches!(my_key.var_type, VarType::Key));
+    }
+
+    #[test]
+    fn test_parse_defvar_list() {
+        let content = r#"
+(defvar my-macro (a b c d))
+
+(defsrc a b)
+
+(deflayer base a b)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have 1 defvar
+        assert_eq!(result.defvars.len(), 1, "Expected 1 defvar");
+
+        assert_eq!(result.defvars[0].name, "my-macro");
+        assert_eq!(result.defvars[0].value, "(a b c d)");
+        assert!(matches!(result.defvars[0].var_type, VarType::List));
+    }
+
+    #[test]
+    fn test_parse_defvar_action() {
+        let content = r#"
+(defvar nav-toggle (layer-toggle nav))
+
+(defsrc a b)
+
+(deflayer base a b)
+(deflayer nav _ _)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have 1 defvar
+        assert_eq!(result.defvars.len(), 1, "Expected 1 defvar");
+
+        assert_eq!(result.defvars[0].name, "nav-toggle");
+        assert_eq!(result.defvars[0].value, "(layer-toggle nav)");
+        assert!(matches!(result.defvars[0].var_type, VarType::Action));
+    }
+
+    #[test]
+    fn test_parse_defvar_mixed_types() {
+        let content = r#"
+(defvar timeout 100)
+(defvar my-key lsft)
+(defvar my-list (a b c))
+(defvar my-action (tap-hold 200 200 a lctl))
+
+(defsrc a b)
+
+(deflayer base a b)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have 4 defvars
+        assert_eq!(result.defvars.len(), 4, "Expected 4 defvars");
+
+        // Check each type
+        let timeout = result.defvars.iter().find(|v| v.name == "timeout").expect("Should have timeout");
+        assert!(matches!(timeout.var_type, VarType::Integer));
+
+        let my_key = result.defvars.iter().find(|v| v.name == "my-key").expect("Should have my-key");
+        assert!(matches!(my_key.var_type, VarType::Key));
+
+        let my_list = result.defvars.iter().find(|v| v.name == "my-list").expect("Should have my-list");
+        assert!(matches!(my_list.var_type, VarType::List));
+
+        let my_action = result.defvars.iter().find(|v| v.name == "my-action").expect("Should have my-action");
+        assert!(matches!(my_action.var_type, VarType::Action));
+    }
+
+    #[test]
+    fn test_detect_var_type_edge_cases() {
+        // Test empty string
+        assert!(matches!(detect_var_type(""), VarType::Unknown));
+        assert!(matches!(detect_var_type("   "), VarType::Unknown));
+
+        // Test negative integer
+        assert!(matches!(detect_var_type("-100"), VarType::Integer));
+
+        // Test string
+        assert!(matches!(detect_var_type("\"hello\""), VarType::String));
+        assert!(matches!(detect_var_type("'hello'"), VarType::String));
+
+        // Test alias reference as key
+        assert!(matches!(detect_var_type("@my-alias"), VarType::Key));
+    }
+
+    #[test]
+    fn test_defvar_in_deflayermap() {
+        let content = r#"
+(defvar nav-toggle (layer-toggle nav))
+
+(defsrc a b)
+
+(deflayer base a b)
+
+(deflayermap (nav)
+  a $nav-toggle
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have 1 defvar
+        assert_eq!(result.defvars.len(), 1, "Expected 1 defvar");
+        assert_eq!(result.defvars[0].name, "nav-toggle");
+
+        // Should have 2 layers
+        assert_eq!(result.layers.len(), 2, "Expected 2 layers");
+    }
 }
 
 static LOCAL_POOL: Lazy<LocalPoolHandle> = Lazy::new(|| LocalPoolHandle::new(num_cpus::get()));
@@ -1778,6 +1948,60 @@ fn parse_deflayermap(
     })
 }
 
+/// Detect the type of a variable value based on its content
+fn detect_var_type(value: &str) -> VarType {
+    let trimmed = value.trim();
+    
+    // Empty or whitespace-only
+    if trimmed.is_empty() {
+        return VarType::Unknown;
+    }
+    
+    // Integer: pure digits, optionally with leading minus sign
+    if trimmed.parse::<i64>().is_ok() {
+        return VarType::Integer;
+    }
+    
+    // String: wrapped in quotes
+    if (trimmed.starts_with('"') && trimmed.ends_with('"')) ||
+       (trimmed.starts_with('\'') && trimmed.ends_with('\'')) {
+        return VarType::String;
+    }
+    
+    // List: wrapped in parentheses with multiple space-separated items
+    if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        let inner = &trimmed[1..trimmed.len()-1];
+        let parts: Vec<&str> = inner.split_whitespace().collect();
+        if parts.len() > 1 {
+            // Check if it looks like an action (first part is an action name)
+            let action_names = ["tap-hold", "tap-hold-press", "tap-hold-release", "tap-hold-next",
+                "tap-hold-next-release", "layer-toggle", "layer-switch", "layer-while-held",
+                "macro", "multi", "one-shot", "tap-dance", "caps-word", "unicode"];
+            if parts.len() > 0 && action_names.contains(&parts[0]) {
+                return VarType::Action;
+            }
+            return VarType::List;
+        }
+        // Single item in parens might be a grouped expression
+        return VarType::Action;
+    }
+    
+    // Check if it's a single key (alphanumeric, key name, or alias reference)
+    // Simple heuristic: single word without special characters
+    if trimmed.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '@') {
+        // If it starts with @, it's an alias reference (treat as Key type)
+        if trimmed.starts_with('@') {
+            return VarType::Key;
+        }
+        // Single key names are typically short
+        if trimmed.len() <= 10 {
+            return VarType::Key;
+        }
+    }
+    
+    VarType::Unknown
+}
+
 fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -> Result<KeymapData> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_scheme::LANGUAGE.into())?;
@@ -1868,6 +2092,37 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
                     last_name = text;
                 } else {
                     aliases.insert(last_name.clone(), text);
+                    last_name = String::new();
+                }
+            }
+        }
+    }
+
+    // Parse defvar nodes
+    let defvar_nodes = find_kanata_node(root, source, "defvar");
+    let mut defvars = Vec::new();
+    for defvar_node in defvar_nodes {
+        let mut inner_cursor = defvar_node.walk();
+        let mut first = true;
+        let mut last_name = String::new();
+
+        for child in defvar_node.children(&mut inner_cursor) {
+            let kind = child.kind();
+            if kind == "symbol" || kind == "boolean" || kind == "number" || kind == "list" {
+                let text = child.utf8_text(source).unwrap_or("").to_string();
+                if first && text == "defvar" {
+                    first = false;
+                    continue;
+                }
+                if last_name.is_empty() {
+                    last_name = text;
+                } else {
+                    let var_type = detect_var_type(&text);
+                    defvars.push(Defvar {
+                        name: last_name.clone(),
+                        value: text,
+                        var_type,
+                    });
                     last_name = String::new();
                 }
             }
@@ -1983,6 +2238,7 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
         defsrc: key_names,
         unmapped_names,
         process_unmapped_keys,
+        defvars,
     })
 }
 

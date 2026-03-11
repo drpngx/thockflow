@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::keymap::{
     show_open_file_picker, BindingParts, FileSystemFileHandle, FileSystemWritableFileStream,
-    KeymapData, SelectedKey,
+    KeymapData, SelectedKey, VarType,
 };
 
 pub mod layout;
@@ -158,9 +158,10 @@ struct KanataActionInfo {
     description: &'static str,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum ParamType {
-    Timeout,
+    Timeout,    // Timeout/duration parameter (integer-valued)
+    Integer,    // Generic integer parameter
     Action,
     Layer,
     Any,
@@ -169,27 +170,27 @@ enum ParamType {
 static KANATA_ACTIONS: &[KanataActionInfo] = &[
     KanataActionInfo {
         name: "tap-hold",
-        params: &[ParamType::Timeout, ParamType::Timeout, ParamType::Action, ParamType::Action],
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Action, ParamType::Action],
         description: "Tap for one action, hold for another.",
     },
     KanataActionInfo {
         name: "tap-hold-press",
-        params: &[ParamType::Timeout, ParamType::Timeout, ParamType::Action, ParamType::Action],
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Action, ParamType::Action],
         description: "Similar to tap-hold, but hold action triggers on press.",
     },
     KanataActionInfo {
         name: "tap-hold-release",
-        params: &[ParamType::Timeout, ParamType::Timeout, ParamType::Action, ParamType::Action],
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Action, ParamType::Action],
         description: "Similar to tap-hold, but hold action triggers on release.",
     },
     KanataActionInfo {
         name: "tap-hold-next",
-        params: &[ParamType::Timeout, ParamType::Action, ParamType::Action],
+        params: &[ParamType::Integer, ParamType::Action, ParamType::Action],
         description: "Tap for one action, hold for another. Hold triggers if another key is pressed.",
     },
     KanataActionInfo {
         name: "tap-hold-next-release",
-        params: &[ParamType::Timeout, ParamType::Action, ParamType::Action],
+        params: &[ParamType::Integer, ParamType::Action, ParamType::Action],
         description: "Similar to tap-hold-next, but triggers on release of the other key.",
     },
     KanataActionInfo {
@@ -219,17 +220,17 @@ static KANATA_ACTIONS: &[KanataActionInfo] = &[
     },
     KanataActionInfo {
         name: "one-shot",
-        params: &[ParamType::Timeout, ParamType::Action],
+        params: &[ParamType::Integer, ParamType::Action],
         description: "Action stays active for timeout or until next press.",
     },
     KanataActionInfo {
         name: "tap-dance",
-        params: &[ParamType::Timeout, ParamType::Any],
+        params: &[ParamType::Integer, ParamType::Any],
         description: "Different actions based on number of taps: (tap-dance timeout (action1 action2 ...))",
     },
     KanataActionInfo {
         name: "caps-word",
-        params: &[ParamType::Timeout],
+        params: &[ParamType::Integer],
         description: "Capitalize the next word.",
     },
     KanataActionInfo {
@@ -284,7 +285,7 @@ impl<'a> KanataValidator<'a> {
                 for (i, &p_type) in action.params.iter().enumerate() {
                     let val = params[i];
                     match p_type {
-                        ParamType::Timeout => {
+                        ParamType::Timeout | ParamType::Integer => {
                             if val.parse::<u32>().is_err() { return false; }
                         }
                         ParamType::Layer => {
@@ -398,23 +399,8 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
         false
     };
 
-    let is_timeout_action = if let Some(last_open) = lower_text.rfind('(') {
-        let after_open = &lower_text[last_open + 1..];
-        let parts: Vec<&str> = after_open.split_whitespace().collect();
-        let has_space = after_open.chars().any(|c| c.is_whitespace());
-        if !parts.is_empty() && has_space {
-            if let Some(action) = KANATA_ACTIONS.iter().find(|a| a.name == parts[0]) {
-                let param_idx = if after_open.ends_with(' ') { parts.len() - 1 } else { parts.len() - 2 };
-                action.params.get(param_idx) == Some(&ParamType::Timeout)
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    } else {
-        false
-    };
+    // Get the expected parameter type for the current position
+    let expected_type = get_expected_param_type(&lower_text);
 
     if is_layer_action {
         for layer in &data.layers {
@@ -422,10 +408,46 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
                 suggestions.push(layer.name.clone());
             }
         }
-    } else if is_timeout_action {
+    } else if expected_type == Some(ParamType::Integer) || expected_type == Some(ParamType::Timeout) {
+        // Suggest integer literals
         for t in ["50", "100", "200", "250", "300", "1000"] {
             if t.contains(query) {
                 suggestions.push(t.to_string());
+            }
+        }
+        // Suggest integer variables
+        for defvar in &data.defvars {
+            if matches_type(&defvar.var_type, &expected_type.unwrap()) {
+                let var_suggestion = format!("${}", defvar.name);
+                if var_suggestion.to_lowercase().contains(query) || query.starts_with('$') {
+                    suggestions.push(var_suggestion);
+                }
+            }
+        }
+    } else if expected_type == Some(ParamType::Action) {
+        // Suggest action variables and keys
+        let only_actions = query.starts_with('(') || (text.contains('=') && query.is_empty());
+        let clean_query = if query.starts_with('(') { &query[1..] } else { query };
+
+        for action in KANATA_ACTIONS {
+            if action.name.contains(clean_query) {
+                suggestions.push(format!("({}", action.name));
+            }
+        }
+        if !only_actions {
+            for key in KANATA_KEYS {
+                if key.contains(query) {
+                    suggestions.push(key.to_string());
+                }
+            }
+            // Suggest action/key variables
+            for defvar in &data.defvars {
+                if matches_type(&defvar.var_type, &ParamType::Action) {
+                    let var_suggestion = format!("${}", defvar.name);
+                    if var_suggestion.to_lowercase().contains(query) || query.starts_with('$') {
+                        suggestions.push(var_suggestion);
+                    }
+                }
             }
         }
     } else {
@@ -448,6 +470,15 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
                     suggestions.push(alias.clone());
                 }
             }
+            // Also suggest all variables when type is not specified
+            if query.starts_with('$') {
+                for defvar in &data.defvars {
+                    let var_suggestion = format!("${}", defvar.name);
+                    if var_suggestion.to_lowercase().contains(query) {
+                        suggestions.push(var_suggestion);
+                    }
+                }
+            }
         }
     }
 
@@ -457,10 +488,48 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
     (prefix.to_string(), suggestions)
 }
 
+/// Get the expected parameter type for the current cursor position
+fn get_expected_param_type(text: &str) -> Option<ParamType> {
+    if let Some(last_open) = text.rfind('(') {
+        let after_open = &text[last_open + 1..];
+        let parts: Vec<&str> = after_open.split_whitespace().collect();
+        
+        if parts.is_empty() {
+            return None;
+        }
+        
+        if let Some(action) = KANATA_ACTIONS.iter().find(|a| a.name == parts[0]) {
+            // Determine which parameter we're currently completing
+            // If the text ends with space, we're about to type the next parameter
+            // Otherwise, we're in the middle of the current parameter
+            let param_idx = if after_open.ends_with(' ') {
+                parts.len() - 1
+            } else {
+                parts.len().saturating_sub(2)
+            };
+            return action.params.get(param_idx).copied();
+        }
+    }
+    
+    None
+}
+
+/// Check if a variable type matches the expected parameter type
+fn matches_type(var_type: &VarType, param_type: &ParamType) -> bool {
+    match (var_type, param_type) {
+        (VarType::Integer, ParamType::Timeout) => true,
+        (VarType::Integer, ParamType::Integer) => true,
+        (VarType::Key, ParamType::Action) => true,
+        (VarType::Action, ParamType::Action) => true,
+        (VarType::List, ParamType::Any) => true,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keymap::{Layer, LayerType, KeymapData, ProcessUnmappedKeys};
+    use crate::keymap::{Defvar, Layer, LayerType, KeymapData, ProcessUnmappedKeys};
     use std::collections::HashMap;
 
     #[test]
@@ -479,6 +548,7 @@ mod tests {
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
         };
         data.aliases.insert("myalias".to_string(), "lsft".to_string());
 
@@ -523,9 +593,190 @@ mod tests {
             defsrc: Vec::new(),
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
         };
         let (_, suggestions) = get_suggestions("_", &data);
         assert!(suggestions.contains(&"_".to_string()));
+    }
+
+    // ============================================================================
+    // defvar Completion Tests
+    // ============================================================================
+
+    fn create_test_data_with_defvars() -> KeymapData {
+        let mut data = KeymapData {
+            physical_layout: Vec::new(),
+            layers: vec![Layer { 
+                name: "base".to_string(), 
+                bindings: Vec::new(),
+                layer_type: LayerType::Deflayer,
+                source_layer: None,
+                key_bindings: HashMap::new(),
+            }],
+            includes: Vec::new(),
+            aliases: HashMap::new(),
+            defsrc: Vec::new(),
+            unmapped_names: Vec::new(),
+            process_unmapped_keys: ProcessUnmappedKeys::No,
+            defvars: Vec::new(),
+        };
+
+        // Add test variables
+        data.defvars.push(Defvar {
+            name: "tap-timeout".to_string(),
+            value: "100".to_string(),
+            var_type: VarType::Integer,
+        });
+        data.defvars.push(Defvar {
+            name: "hold-timeout".to_string(),
+            value: "200".to_string(),
+            var_type: VarType::Integer,
+        });
+        data.defvars.push(Defvar {
+            name: "my-key".to_string(),
+            value: "a".to_string(),
+            var_type: VarType::Key,
+        });
+        data.defvars.push(Defvar {
+            name: "my-mod".to_string(),
+            value: "lctl".to_string(),
+            var_type: VarType::Key,
+        });
+        data.defvars.push(Defvar {
+            name: "nav-toggle".to_string(),
+            value: "(layer-toggle nav)".to_string(),
+            var_type: VarType::Action,
+        });
+
+        data
+    }
+
+    #[test]
+    fn test_integer_completion_in_tap_hold() {
+        let data = create_test_data_with_defvars();
+
+        // Test first position (should suggest integer variables)
+        let (_, suggestions) = get_suggestions("(tap-hold ", &data);
+        
+        // Should include integer variables
+        assert!(suggestions.contains(&"$tap-timeout".to_string()), "Should suggest $tap-timeout");
+        assert!(suggestions.contains(&"$hold-timeout".to_string()), "Should suggest $hold-timeout");
+        
+        // Should NOT include key/action variables
+        assert!(!suggestions.contains(&"$my-key".to_string()), "Should NOT suggest $my-key in integer position");
+        assert!(!suggestions.contains(&"$my-mod".to_string()), "Should NOT suggest $my-mod in integer position");
+        assert!(!suggestions.contains(&"$nav-toggle".to_string()), "Should NOT suggest $nav-toggle in integer position");
+
+        // Should include integer literals
+        assert!(suggestions.contains(&"100".to_string()), "Should suggest integer literals");
+    }
+
+    #[test]
+    fn test_action_completion_in_tap_hold() {
+        let data = create_test_data_with_defvars();
+
+        // Test third position (should suggest action/key variables)
+        let (_, suggestions) = get_suggestions("(tap-hold 200 300 ", &data);
+        
+        // Should include key/action variables
+        assert!(suggestions.contains(&"$my-key".to_string()), "Should suggest $my-key");
+        assert!(suggestions.contains(&"$my-mod".to_string()), "Should suggest $my-mod");
+        assert!(suggestions.contains(&"$nav-toggle".to_string()), "Should suggest $nav-toggle");
+        
+        // Should NOT include integer variables
+        assert!(!suggestions.contains(&"$tap-timeout".to_string()), "Should NOT suggest $tap-timeout in action position");
+        assert!(!suggestions.contains(&"$hold-timeout".to_string()), "Should NOT suggest $hold-timeout in action position");
+    }
+
+    #[test]
+    fn test_variable_prefix_completion() {
+        let data = create_test_data_with_defvars();
+
+        // Test typing $ prefix in integer position
+        let (_, suggestions) = get_suggestions("(tap-hold $ta", &data);
+        assert!(suggestions.contains(&"$tap-timeout".to_string()));
+
+        // Test typing $ prefix in action position
+        let (_, suggestions) = get_suggestions("(tap-hold 200 300 $my", &data);
+        assert!(suggestions.contains(&"$my-key".to_string()));
+        assert!(suggestions.contains(&"$my-mod".to_string()));
+    }
+
+    #[test]
+    fn test_completion_with_variable_used() {
+        let data = create_test_data_with_defvars();
+
+        // After using first integer variable, should still suggest integers for second position
+        let (_, suggestions) = get_suggestions("(tap-hold $tap-timeout ", &data);
+        
+        // Should still suggest integer variables for second timeout position
+        assert!(suggestions.contains(&"$hold-timeout".to_string()), "Should still suggest integer variables");
+        assert!(suggestions.contains(&"200".to_string()), "Should suggest integer literals");
+        
+        // Should NOT suggest key variables
+        assert!(!suggestions.contains(&"$my-key".to_string()), "Should NOT suggest keys in timeout position");
+    }
+
+    #[test]
+    fn test_get_expected_param_type() {
+        // Test tap-hold positions
+        assert_eq!(get_expected_param_type("(tap-hold "), Some(ParamType::Integer));
+        assert_eq!(get_expected_param_type("(tap-hold 200 "), Some(ParamType::Integer));
+        assert_eq!(get_expected_param_type("(tap-hold 200 300 "), Some(ParamType::Action));
+        assert_eq!(get_expected_param_type("(tap-hold 200 300 a "), Some(ParamType::Action));
+
+        // Test layer-toggle
+        assert_eq!(get_expected_param_type("(layer-toggle "), Some(ParamType::Layer));
+
+        // Test one-shot
+        assert_eq!(get_expected_param_type("(one-shot "), Some(ParamType::Integer));
+        assert_eq!(get_expected_param_type("(one-shot 500 "), Some(ParamType::Action));
+
+        // Test no context
+        assert_eq!(get_expected_param_type(""), None);
+        assert_eq!(get_expected_param_type("just-some-text"), None);
+    }
+
+    #[test]
+    fn test_matches_type() {
+        // Integer matches Integer and Timeout
+        assert!(matches_type(&VarType::Integer, &ParamType::Integer));
+        assert!(matches_type(&VarType::Integer, &ParamType::Timeout));
+
+        // Key matches Action
+        assert!(matches_type(&VarType::Key, &ParamType::Action));
+
+        // Action matches Action
+        assert!(matches_type(&VarType::Action, &ParamType::Action));
+
+        // List matches Any
+        assert!(matches_type(&VarType::List, &ParamType::Any));
+
+        // Mismatches
+        assert!(!matches_type(&VarType::Integer, &ParamType::Action));
+        assert!(!matches_type(&VarType::Key, &ParamType::Integer));
+        assert!(!matches_type(&VarType::Action, &ParamType::Integer));
+        assert!(!matches_type(&VarType::String, &ParamType::Action));
+    }
+
+    #[test]
+    fn test_integer_completion_in_other_actions() {
+        let data = create_test_data_with_defvars();
+
+        // Test one-shot
+        let (_, suggestions) = get_suggestions("(one-shot ", &data);
+        assert!(suggestions.contains(&"$tap-timeout".to_string()));
+        assert!(!suggestions.contains(&"$my-key".to_string()));
+
+        // Test tap-dance
+        let (_, suggestions) = get_suggestions("(tap-dance ", &data);
+        assert!(suggestions.contains(&"$tap-timeout".to_string()));
+        assert!(!suggestions.contains(&"$my-key".to_string()));
+
+        // Test caps-word
+        let (_, suggestions) = get_suggestions("(caps-word ", &data);
+        assert!(suggestions.contains(&"$tap-timeout".to_string()));
+        assert!(!suggestions.contains(&"$my-key".to_string()));
     }
 }
 
@@ -1293,6 +1544,7 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                     info_desc = action.description.to_string();
                     info_params = action.params.iter().map(|p| match p {
                         ParamType::Timeout => "timeout",
+                        ParamType::Integer => "integer",
                         ParamType::Action => "action",
                         ParamType::Layer => "layer",
                         ParamType::Any => "any",
@@ -1309,6 +1561,7 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                 info_desc = action.description.to_string();
                 info_params = action.params.iter().map(|p| match p {
                     ParamType::Timeout => "timeout",
+                    ParamType::Integer => "integer",
                     ParamType::Action => "action",
                     ParamType::Layer => "layer",
                     ParamType::Any => "any",
