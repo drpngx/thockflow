@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::keymap::{
     show_open_file_picker, BindingParts, FileSystemFileHandle, FileSystemWritableFileStream,
-    KeymapData, SelectedKey, VarType,
+    KeyOrigin, KeymapData, SelectedKey, VarType,
 };
 
 pub mod layout;
@@ -533,6 +533,30 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
+    fn test_keymap_data_deserialization_with_phantoms() {
+        let json = r#"{
+            "physical_layout": [
+                {"x": 0, "y": 0, "width": 1000, "height": 1000, "rotation": 0, "rx": 0, "ry": 0, "origin": "Standard", "name": "esc"},
+                {"x": 1000, "y": 0, "width": 1000, "height": 1000, "rotation": 0, "rx": 0, "ry": 0, "origin": "Phantom", "name": "f1"}
+            ],
+            "layers": [],
+            "includes": [],
+            "aliases": {},
+            "defsrc": ["esc"],
+            "unmapped_names": [],
+            "process_unmapped_keys": "No",
+            "defvars": [],
+            "phantom_keys": [{"name": "f1", "position": [1000, 0]}]
+        }"#;
+        let data: KeymapData = serde_json::from_str(json).expect("Should deserialize");
+        assert_eq!(data.physical_layout.len(), 2);
+        assert_eq!(data.physical_layout[0].origin, KeyOrigin::Standard);
+        assert_eq!(data.physical_layout[1].origin, KeyOrigin::Phantom);
+        assert_eq!(data.physical_layout[1].name, "f1");
+        assert_eq!(data.phantom_keys.len(), 1);
+    }
+
+    #[test]
     fn test_completion_congruence() {
         let mut data = KeymapData {
             physical_layout: Vec::new(),
@@ -549,6 +573,7 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
+            phantom_keys: Vec::new(),
         };
         data.aliases.insert("myalias".to_string(), "lsft".to_string());
 
@@ -594,6 +619,7 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
+            phantom_keys: Vec::new(),
         };
         let (_, suggestions) = get_suggestions("_", &data);
         assert!(suggestions.contains(&"_".to_string()));
@@ -619,6 +645,7 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
+            phantom_keys: Vec::new(),
         };
 
         // Add test variables
@@ -1182,6 +1209,12 @@ fn KanataRenderer(props: &RendererProps) -> Html {
         let current_layer = props.current_layer.clone();
         let hint_map = hint_map.clone();
         let layer_hint_map = layer_hint_map.clone();
+        // Pre-compute which keys are phantoms to avoid borrowing props in closure
+        let phantom_indices: std::collections::HashSet<usize> = props.data.physical_layout.iter()
+            .enumerate()
+            .filter(|(_, pk)| pk.origin == KeyOrigin::Phantom)
+            .map(|(i, _)| i)
+            .collect();
 
         Callback::from(move |e: KeyboardEvent| {
             if selected_key.is_some() {
@@ -1200,9 +1233,11 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                         new_input.push_str(key);
 
                         if let Some(&idx) = hint_map.get(&new_input) {
+                            let is_phantom = phantom_indices.contains(&idx);
                             selected_key.set(Some(SelectedKey {
                                 layer_index: *current_layer,
                                 key_index: idx,
+                                is_phantom,
                             }));
                             jump_mode_active.set(false);
                             jump_input.set(String::new());
@@ -1235,6 +1270,11 @@ fn KanataRenderer(props: &RendererProps) -> Html {
     // Split into standard keys and aliases for rendering
     let _num_standard_keys = props.data.defsrc.len() - props.data.aliases.len();
     
+    // DEBUG: Log phantom keys info to help diagnose rendering issues
+    let phantom_count = props.data.physical_layout.iter().filter(|pk| pk.origin == KeyOrigin::Phantom).count();
+    web_sys::console::log_1(&format!("DEBUG FRONTEND: Physical layout has {} keys total, {} have origin=Phantom. phantom_keys array size is {}. process_unmapped_keys is {:?}", 
+        props.data.physical_layout.len(), phantom_count, props.data.phantom_keys.len(), props.data.process_unmapped_keys).into());
+
     for pk in props.data.physical_layout.iter() {
         min_x = min_x.min(pk.x);
         max_x = max_x.max(pk.x + pk.width);
@@ -1276,17 +1316,30 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                 })}
             </div>
 
-            <div class={classes!("relative", "border", "dark:border-gray-600", "p-8", "rounded-xl", "bg-gray-50", "dark:bg-gray-800", "shadow-inner", "overflow-auto", "w-full", "max-w-full")} style="min-height: 350px; height: 65vh;">
-                <div class="relative mx-auto" style={format!("width: {}px; height: {}px;", content_width, content_height)}>
+            <div class={classes!("relative", "border", "dark:border-gray-600", "p-8", "rounded-xl", "bg-gray-50", "dark:bg-gray-800", "shadow-inner", "overflow-auto", "w-full", "max-w-full", "text-center")} style="min-height: 350px; height: 65vh;">
+                <div class="relative inline-block text-left" style={format!("width: {}px; height: {}px;", content_width, content_height)}>
                     { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| {
                         let binding = layer.bindings.get(i).cloned().unwrap_or_else(|| "".to_string());
-                        let defsrc_name = props.data.defsrc.get(i).cloned().unwrap_or_default();
+                        let defsrc_name = if pk.origin == KeyOrigin::Phantom {
+                            pk.name.clone()  // Use the phantom key's name
+                        } else {
+                            props.data.defsrc.get(i).cloned().unwrap_or_default()
+                        };
                         let parts = get_kanata_binding_parts_internal(&binding, &props.data.aliases, crate::is_mac(), props.is_laptop);
                         let x = (pk.x as f32 * scale + offset_x) as i32;
                         let y = (pk.y as f32 * scale + offset_y) as i32;
                         let w = (pk.width as f32 * scale) as i32 - 2;
                         let h = (pk.height as f32 * scale) as i32 - 2;
-                        let onclick = { let sk = props.selected_key.clone(); let cur_l = *props.current_layer; Callback::from(move |_| sk.set(Some(SelectedKey { layer_index: cur_l, key_index: i }))) };
+                        let is_phantom = pk.origin == KeyOrigin::Phantom;
+                        let onclick = { 
+                            let sk = props.selected_key.clone(); 
+                            let cur_l = *props.current_layer; 
+                            Callback::from(move |_| sk.set(Some(SelectedKey { 
+                                layer_index: cur_l, 
+                                key_index: i,
+                                is_phantom,
+                            }))) 
+                        };
                         let hint = hint_map.iter().find(|(_, &idx)| idx == i).map(|(h, _)| h);
                         let show_hint = *jump_mode_active && hint.map(|h| h.starts_with(&*jump_input)).unwrap_or(false);
 
@@ -1312,21 +1365,43 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                                     html! { <div class={classes!("absolute", "text-[8px]", "font-bold", "truncate", "text-center", label_color)} style={format!("left: {}px; top: {}px; width: {}px;", x, y - 12, w)}> {defsrc_name.clone()} </div> }
                                 } else { html! {} }}
 
-                                <div onclick={onclick} class={classes!("absolute", "bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-600", "flex", "flex-col", "items-center", "justify-center", "rounded", "cursor-pointer", "hover:border-blue-400", "dark:hover:border-blue-500", "shadow-sm", "transition-all", "select-none",
-                                    if is_alias_section { "bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" } 
-                                    else if is_unmapped_section { "bg-orange-50/30 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800" }
-                                    else { "" }
+                                <div onclick={onclick} class={classes!("absolute", "flex", "flex-col", "items-center", "justify-center", "rounded", "cursor-pointer", "transition-all", "select-none",
+                                    if is_phantom {
+                                        // Phantom key styling: outline only, transparent fill
+                                        vec!["border-2", "border-dashed", "border-gray-400", "dark:border-gray-500", "bg-transparent", "hover:border-gray-600", "dark:hover:border-gray-400"]
+                                    } else if is_alias_section {
+                                        vec!["bg-blue-50/30", "dark:bg-blue-900/10", "border", "border-blue-200", "dark:border-blue-800"]
+                                    } else if is_unmapped_section {
+                                        vec!["bg-orange-50/30", "dark:bg-orange-900/10", "border", "border-orange-200", "dark:border-orange-800"]
+                                    } else {
+                                        vec!["bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-600", "hover:border-blue-400", "dark:hover:border-blue-500", "shadow-sm"]
+                                    }
                                 )} style={format!("left: {}px; top: {}px; width: {}px; height: {}px;", x, y, w, h)}>
 
-                                    <div class="w-full flex justify-between px-1 text-[7px] text-gray-400 absolute top-0.5 pointer-events-none">
-                                        <span class="truncate max-w-[45%]">{parts.top_left}</span>
-                                        <span class="truncate max-w-[45%] text-right">{parts.top_right}</span>
-                                    </div>
-                                    <span class="text-[12px] font-bold truncate px-1 mt-1 leading-tight text-center pointer-events-none">{parts.center}</span>
-                                    
-                                    <div class="w-full flex justify-end px-1 text-[6px] text-gray-300 dark:text-gray-500 absolute bottom-0.5 pointer-events-none font-mono">
-                                        <span>{defsrc_name}</span>
-                                    </div>
+                                    { if is_phantom {
+                                        // Phantom keys show their name in the center
+                                        html! {
+                                            <>
+                                                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 truncate px-1 mt-1 leading-tight text-center pointer-events-none">{&pk.name}</span>
+                                                <span class="text-[7px] text-gray-300 dark:text-gray-600 absolute bottom-0.5 pointer-events-none">{"(phantom)"}</span>
+                                            </>
+                                        }
+                                    } else {
+                                        // Regular keys show binding parts
+                                        html! {
+                                            <>
+                                                <div class="w-full flex justify-between px-1 text-[7px] text-gray-400 absolute top-0.5 pointer-events-none">
+                                                    <span class="truncate max-w-[45%]">{parts.top_left}</span>
+                                                    <span class="truncate max-w-[45%] text-right">{parts.top_right}</span>
+                                                </div>
+                                                <span class="text-[12px] font-bold truncate px-1 mt-1 leading-tight text-center pointer-events-none">{parts.center}</span>
+                                                
+                                                <div class="w-full flex justify-end px-1 text-[6px] text-gray-300 dark:text-gray-500 absolute bottom-0.5 pointer-events-none font-mono">
+                                                    <span>{defsrc_name}</span>
+                                                </div>
+                                            </>
+                                        }
+                                    }}
 
                                     { if show_hint {
                                         let h = hint.unwrap();
@@ -1368,8 +1443,8 @@ struct PopupProps {
 
 #[function_component]
 fn KanataBindingPopup(props: &PopupProps) -> Html {
-    let num_standard_keys = props.data.defsrc.len() + props.data.unmapped_names.len();
-    let is_alias_section = props.selected_key.key_index >= num_standard_keys;
+    let pk = &props.data.physical_layout[props.selected_key.key_index];
+    let is_alias_section = pk.origin == KeyOrigin::Alias;
     let binding = &props.data.layers[props.selected_key.layer_index].bindings[props.selected_key.key_index];
     
     let initial_text = if is_alias_section {
@@ -1406,54 +1481,67 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
         let current_text = current_text.clone();
         let on_close = props.on_close.clone();
         let is_valid = is_valid;
-        let is_laptop = props.is_laptop;
+        let _is_laptop = props.is_laptop;
         Callback::from(move |e: MouseEvent| {
             if !is_valid { return; }
             let mut new_data = data.clone();
             let text = (*current_text).clone().trim().to_string();
             
-            let num_standard = new_data.defsrc.len();
-            let num_unmapped = new_data.unmapped_names.len();
-            let num_physical_src = num_standard + num_unmapped;
-            let is_alias_section = sk.key_index >= num_physical_src;
-
-            if is_alias_section {
-                // Editing an existing alias value (RHS)
-                let _name = new_data.defsrc.get(sk.key_index)
-                    .or_else(|| new_data.unmapped_names.get(sk.key_index - num_standard))
-                    .cloned();
-                // This is a bit tricky if sk.key_index points to an alias but we use defsrc.
-                // Actually, the UI shows standard + unmapped + aliases.
-                // If i >= num_physical_src, it's an alias.
-                let mut sorted_alias_names: Vec<String> = new_data.aliases.keys().cloned().collect();
-                sorted_alias_names.sort();
-                if let Some(alias_name) = sorted_alias_names.get(sk.key_index - num_physical_src) {
-                    new_data.aliases.insert(alias_name.clone(), text);
-                }
-            } else if let Some((name, val)) = text.split_once('=') {
-                // Creating or updating an alias (name = val)
-                let name = name.trim();
-                let val = val.trim();
-                if !name.is_empty() && !val.is_empty() {
-                    new_data.aliases.insert(name.to_string(), val.to_string());
-                    new_data.layers[sk.layer_index].bindings[sk.key_index] = format!("@{}", name);
+            // Handle phantom key conversion
+            if sk.is_phantom {
+                // Get the phantom key's name
+                let phantom_name = new_data.physical_layout.get(sk.key_index)
+                    .map(|pk| pk.name.clone())
+                    .unwrap_or_default();
+                
+                if !phantom_name.is_empty() {
+                    // 1. Add to defsrc
+                    new_data.defsrc.push(phantom_name.clone());
+                    
+                    // 2. Remove from phantom_keys
+                    new_data.phantom_keys.retain(|p| p.name.to_lowercase() != phantom_name.to_lowercase());
+                    
+                    // 3. Shift the binding to the end of standard keys for all layers
+                    let insert_idx = new_data.defsrc.len() - 1;
+                    let old_idx = sk.key_index;
+                    
+                    for (i, layer) in new_data.layers.iter_mut().enumerate() {
+                        let mut val = layer.bindings.remove(old_idx);
+                        if i == sk.layer_index {
+                            val = text.clone();
+                        }
+                        layer.bindings.insert(insert_idx, val);
+                    }
+                    
+                    // 4. Shift physical_layout to reflect the change
+                    let mut pk = new_data.physical_layout.remove(old_idx);
+                    pk.origin = KeyOrigin::Standard;
+                    new_data.physical_layout.insert(insert_idx, pk);
                 }
             } else {
-                // Normal binding
-                new_data.layers[sk.layer_index].bindings[sk.key_index] = text;
-            }
+                let pk = &new_data.physical_layout[sk.key_index];
+                let is_alias_section = pk.origin == KeyOrigin::Alias;
 
-            // Recompute everything to ensure consistency
-            let mut sorted_alias_names: Vec<String> = new_data.aliases.keys().cloned().collect();
-            sorted_alias_names.sort();
-            
-            new_data.physical_layout = layout::compute_standard_kanata_layout(&new_data.defsrc, &new_data.unmapped_names, &sorted_alias_names, crate::is_mac(), is_laptop);
-            
-            for layer in &mut new_data.layers {
-                let current_bindings = layer.bindings.clone();
-                // bindings are standard + unmapped + aliases
-                layer.bindings = current_bindings.into_iter().take(num_physical_src).collect();
-                layer.bindings.extend(sorted_alias_names.clone());
+                if is_alias_section {
+                    // Editing an existing alias value (RHS)
+                    let mut sorted_alias_names: Vec<String> = new_data.aliases.keys().cloned().collect();
+                    sorted_alias_names.sort();
+                    let num_non_alias = new_data.defsrc.len() + new_data.phantom_keys.len() + new_data.unmapped_names.len();
+                    if let Some(alias_name) = sorted_alias_names.get(sk.key_index - num_non_alias) {
+                        new_data.aliases.insert(alias_name.clone(), text);
+                    }
+                } else if let Some((name, val)) = text.split_once('=') {
+                    // Creating or updating an alias (name = val)
+                    let name = name.trim();
+                    let val = val.trim();
+                    if !name.is_empty() && !val.is_empty() {
+                        new_data.aliases.insert(name.to_string(), val.to_string());
+                        new_data.layers[sk.layer_index].bindings[sk.key_index] = format!("@{}", name);
+                    }
+                } else {
+                    // Normal binding update
+                    new_data.layers[sk.layer_index].bindings[sk.key_index] = text;
+                }
             }
 
             on_update.emit(new_data);

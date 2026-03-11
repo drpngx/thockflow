@@ -128,6 +128,8 @@ pub fn parse_physical_layouts(layouts: &keymap::PhysicalLayouts) -> (u32, Vec<(S
                 rotation: key_data.r,
                 rx: key_data.rx,
                 ry: key_data.ry,
+                origin: crate::keymap::KeyOrigin::Standard,
+                name: String::new(),
             });
         }
         parsed_layouts.push((name, keys));
@@ -201,6 +203,7 @@ pub fn to_keymap_data(
         unmapped_names: vec![],
         process_unmapped_keys: ProcessUnmappedKeys::No,
         defvars: vec![],
+        phantom_keys: vec![],
     }
 }
 

@@ -2,7 +2,7 @@
 // To regenerate, run:
 // bazel run //server:zmk_layouts
 
-use super::PhysicalKey;
+use super::{PhysicalKey, KeyOrigin};
 
 pub struct ZmkLayout {
     pub name: &'static str,
@@ -24,6 +24,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -33,6 +35,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -42,6 +46,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -51,6 +57,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -60,6 +68,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -69,6 +79,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -78,6 +90,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -87,6 +101,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -96,6 +112,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/keebio/bdn9/bdn9-layouts.dtsi",
@@ -112,6 +130,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -121,6 +141,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -130,6 +152,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -139,6 +163,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -148,6 +174,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -157,6 +185,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -166,6 +196,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -175,6 +207,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -184,6 +218,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -193,6 +229,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -202,6 +240,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -211,6 +251,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -220,6 +262,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -229,6 +273,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -238,6 +284,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -247,6 +295,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -256,6 +306,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -265,6 +317,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -274,6 +328,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -283,6 +339,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -292,6 +350,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -301,6 +361,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -310,6 +372,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -319,6 +383,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -328,6 +394,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -337,6 +405,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -346,6 +416,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -355,6 +427,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -364,6 +438,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -373,6 +449,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -382,6 +460,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -391,6 +471,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -400,6 +482,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -409,6 +493,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/a_dux/a_dux-layouts.dtsi",
@@ -425,6 +511,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -434,6 +522,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -443,6 +533,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -452,6 +544,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -461,6 +555,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -470,6 +566,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -479,6 +577,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -488,6 +588,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -497,6 +599,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -506,6 +610,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -515,6 +621,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -524,6 +632,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -533,6 +643,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -542,6 +654,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -551,6 +665,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -560,6 +676,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -569,6 +687,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -578,6 +698,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -587,6 +709,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -596,6 +720,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -605,6 +731,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -614,6 +742,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -623,6 +753,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -632,6 +764,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -641,6 +775,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -650,6 +786,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -659,6 +797,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -668,6 +808,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -677,6 +819,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -686,6 +830,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -695,6 +841,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 400,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -704,6 +852,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 4500,
                 rx: 400,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -713,6 +863,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -4500,
                 rx: 1300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -722,6 +874,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -731,6 +885,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -740,6 +896,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -749,6 +907,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -758,6 +918,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -767,6 +929,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -776,6 +940,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -785,6 +951,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -794,6 +962,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -803,6 +973,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 400,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -812,6 +984,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 400,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -821,6 +995,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 4500,
                 rx: 400,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -830,6 +1006,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -4500,
                 rx: 1300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -839,6 +1017,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -848,6 +1028,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -857,6 +1039,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -866,6 +1050,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/kyria/kyria-layouts.dtsi",
@@ -882,6 +1068,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -891,6 +1079,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -900,6 +1090,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -909,6 +1101,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -918,6 +1112,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -927,6 +1123,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -936,6 +1134,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -945,6 +1145,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -954,6 +1156,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -963,6 +1167,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -972,6 +1178,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -981,6 +1189,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -990,6 +1200,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -999,6 +1211,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1008,6 +1222,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1017,6 +1233,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1026,6 +1244,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1035,6 +1255,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1044,6 +1266,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1053,6 +1277,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1062,6 +1288,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1071,6 +1299,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1080,6 +1310,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1089,6 +1321,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1098,6 +1332,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1107,6 +1343,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1116,6 +1354,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 4500,
                 rx: 300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1125,6 +1365,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -4500,
                 rx: 1200,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1134,6 +1376,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1200,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1143,6 +1387,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1152,6 +1398,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1161,6 +1409,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1170,6 +1420,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1179,6 +1431,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1188,6 +1442,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1197,6 +1453,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1206,6 +1464,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1215,6 +1475,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1224,6 +1486,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 4500,
                 rx: 300,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1233,6 +1497,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -4500,
                 rx: 1200,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1242,6 +1508,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1200,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1251,6 +1519,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1200,
                 ry: 792,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1260,6 +1530,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1269,6 +1541,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/kyria/kyria-layouts.dtsi",
@@ -1285,6 +1559,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1294,6 +1570,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1303,6 +1581,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1312,6 +1592,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1321,6 +1603,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1330,6 +1614,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1339,6 +1625,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1348,6 +1636,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1357,6 +1647,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1366,6 +1658,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1375,6 +1669,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/tester_xiao/tester_xiao-layouts.dtsi",
@@ -1391,6 +1687,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1400,6 +1698,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1409,6 +1709,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1418,6 +1720,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1427,6 +1731,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1436,6 +1742,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1445,6 +1753,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1454,6 +1764,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1463,6 +1775,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1472,6 +1786,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1481,6 +1797,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/tester_xiao/tester_xiao-layouts.dtsi",
@@ -1497,6 +1815,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1506,6 +1826,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1515,6 +1837,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1524,6 +1848,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1533,6 +1859,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1542,6 +1870,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1551,6 +1881,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1560,6 +1892,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1569,6 +1903,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1578,6 +1914,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1587,6 +1925,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1596,6 +1936,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1605,6 +1947,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1614,6 +1958,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1623,6 +1969,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1632,6 +1980,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1641,6 +1991,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1650,6 +2002,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1659,6 +2013,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1668,6 +2024,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1677,6 +2035,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1686,6 +2046,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1695,6 +2057,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1704,6 +2068,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1713,6 +2079,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1722,6 +2090,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1731,6 +2101,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1740,6 +2112,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1749,6 +2123,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1758,6 +2134,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1767,6 +2145,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1776,6 +2156,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1785,6 +2167,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1794,6 +2178,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1803,6 +2189,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1812,6 +2200,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1821,6 +2211,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1830,6 +2222,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1839,6 +2233,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1848,6 +2244,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1857,6 +2255,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1866,6 +2266,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1875,6 +2277,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1884,6 +2288,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1893,6 +2299,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1902,6 +2310,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1911,6 +2321,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 550,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1920,6 +2332,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 550,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1929,6 +2343,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1150,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1938,6 +2354,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1150,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1947,6 +2365,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1956,6 +2376,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1965,6 +2387,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1974,6 +2398,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1983,6 +2409,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -1992,6 +2420,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2001,6 +2431,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2010,6 +2442,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2019,6 +2453,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2028,6 +2464,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2037,6 +2475,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1000,
                 rx: 450,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2046,6 +2486,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 550,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2055,6 +2497,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 550,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2064,6 +2508,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1150,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2073,6 +2519,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1150,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2082,6 +2530,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1000,
                 rx: 1250,
                 ry: 435,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2091,6 +2541,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2100,6 +2552,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2109,6 +2563,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2118,6 +2574,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/redox/redox-layouts.dtsi",
@@ -2134,6 +2592,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2143,6 +2603,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2152,6 +2614,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2161,6 +2625,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2170,6 +2636,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2179,6 +2647,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2188,6 +2658,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2197,6 +2669,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2206,6 +2680,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2215,6 +2691,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2224,6 +2702,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2233,6 +2713,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2242,6 +2724,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2251,6 +2735,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2260,6 +2746,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2269,6 +2757,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2278,6 +2768,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2287,6 +2779,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2296,6 +2790,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2305,6 +2801,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2314,6 +2812,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2323,6 +2823,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2332,6 +2834,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2341,6 +2845,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2350,6 +2856,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2359,6 +2867,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2368,6 +2878,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2377,6 +2889,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2386,6 +2900,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2395,6 +2911,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2404,6 +2922,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2413,6 +2933,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2422,6 +2944,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2431,6 +2955,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2440,6 +2966,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2449,6 +2977,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2458,6 +2988,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2467,6 +2999,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2476,6 +3010,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2485,6 +3021,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2494,6 +3032,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2503,6 +3043,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2512,6 +3054,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2521,6 +3065,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2530,6 +3076,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2539,6 +3087,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2548,6 +3098,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2557,6 +3109,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2566,6 +3120,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2575,6 +3131,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2584,6 +3142,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2593,6 +3153,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2602,6 +3164,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2611,6 +3175,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2620,6 +3186,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2629,6 +3197,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/jiran/jiran-layouts.dtsi",
@@ -2645,6 +3215,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2654,6 +3226,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2663,6 +3237,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2672,6 +3248,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2681,6 +3259,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2690,6 +3270,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2699,6 +3281,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2708,6 +3292,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2717,6 +3303,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2726,6 +3314,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2735,6 +3325,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2744,6 +3336,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2753,6 +3347,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2762,6 +3358,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2771,6 +3369,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2780,6 +3380,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2789,6 +3391,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2798,6 +3402,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/tester_pro_micro/tester_pro_micro-layouts.dtsi",
@@ -2814,6 +3420,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2823,6 +3431,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2832,6 +3442,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2841,6 +3453,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2850,6 +3464,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2859,6 +3475,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2868,6 +3486,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2877,6 +3497,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2886,6 +3508,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2895,6 +3519,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2904,6 +3530,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2913,6 +3541,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2922,6 +3552,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2931,6 +3563,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2940,6 +3574,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2949,6 +3585,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2958,6 +3596,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2967,6 +3607,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/tester_pro_micro/tester_pro_micro-layouts.dtsi",
@@ -2983,6 +3625,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -2992,6 +3636,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3001,6 +3647,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3010,6 +3658,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3019,6 +3669,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3028,6 +3680,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3037,6 +3691,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3046,6 +3702,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3055,6 +3713,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3064,6 +3724,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3073,6 +3735,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3082,6 +3746,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3091,6 +3757,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3100,6 +3768,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3109,6 +3779,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3118,6 +3790,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3127,6 +3801,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3136,6 +3812,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3145,6 +3823,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3154,6 +3834,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3163,6 +3845,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3172,6 +3856,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3181,6 +3867,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3190,6 +3878,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3199,6 +3889,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3208,6 +3900,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/tester_rpi_pico/tester_rpi_pico-layouts.dtsi",
@@ -3224,6 +3918,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3233,6 +3929,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3242,6 +3940,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3251,6 +3951,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3260,6 +3962,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3269,6 +3973,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3278,6 +3984,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3287,6 +3995,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3296,6 +4006,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3305,6 +4017,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3314,6 +4028,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3323,6 +4039,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3332,6 +4050,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3341,6 +4061,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3350,6 +4072,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3359,6 +4083,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3368,6 +4094,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3377,6 +4105,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3386,6 +4116,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3395,6 +4127,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3404,6 +4138,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3413,6 +4149,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3422,6 +4160,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3431,6 +4171,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3440,6 +4182,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3449,6 +4193,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/tester_rpi_pico/tester_rpi_pico-layouts.dtsi",
@@ -3465,6 +4211,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3474,6 +4222,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3483,6 +4233,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3492,6 +4244,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3501,6 +4255,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3510,6 +4266,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3519,6 +4277,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3528,6 +4288,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3537,6 +4299,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3546,6 +4310,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3555,6 +4321,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3564,6 +4332,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/boardsource3x4/boardsource3x4-layouts.dtsi",
@@ -3580,6 +4350,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3589,6 +4361,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3598,6 +4372,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3607,6 +4383,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3616,6 +4394,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3625,6 +4405,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3634,6 +4416,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3643,6 +4427,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3652,6 +4438,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3661,6 +4449,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3670,6 +4460,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3679,6 +4471,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/boardsource3x4/boardsource3x4-layouts.dtsi",
@@ -3695,6 +4489,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3704,6 +4500,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3713,6 +4511,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3722,6 +4522,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3731,6 +4533,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3740,6 +4544,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3749,6 +4555,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3758,6 +4566,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3767,6 +4577,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3776,6 +4588,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3785,6 +4599,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3794,6 +4610,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3803,6 +4621,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3812,6 +4632,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3821,6 +4643,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3830,6 +4654,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3839,6 +4665,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3848,6 +4676,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3857,6 +4687,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3866,6 +4698,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3875,6 +4709,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3884,6 +4720,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3893,6 +4731,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3902,6 +4742,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3911,6 +4753,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3920,6 +4764,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3929,6 +4775,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3938,6 +4786,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3947,6 +4797,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3956,6 +4808,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3965,6 +4819,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3974,6 +4830,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3983,6 +4841,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -3992,6 +4852,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4001,6 +4863,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4010,6 +4874,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4019,6 +4885,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4028,6 +4896,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4037,6 +4907,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4046,6 +4918,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4055,6 +4929,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4064,6 +4940,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4073,6 +4951,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4082,6 +4962,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4091,6 +4973,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4100,6 +4984,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4109,6 +4995,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4118,6 +5006,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4127,6 +5017,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4136,6 +5028,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4145,6 +5039,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4154,6 +5050,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4163,6 +5061,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4172,6 +5072,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4181,6 +5083,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4190,6 +5094,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 625,
                 ry: 475,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4199,6 +5105,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1025,
                 ry: 475,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4208,6 +5116,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4217,6 +5127,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4226,6 +5138,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/lotus58/lotus58-layouts.dtsi",
@@ -4242,6 +5156,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4251,6 +5167,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4260,6 +5178,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4269,6 +5189,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4278,6 +5200,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4287,6 +5211,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4296,6 +5222,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4305,6 +5233,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4314,6 +5244,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -4323,6 +5255,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -4332,6 +5266,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4341,6 +5277,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4350,6 +5288,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4359,6 +5299,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4368,6 +5310,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4377,6 +5321,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4386,6 +5332,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4395,6 +5343,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4404,6 +5354,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4413,6 +5365,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 175,
@@ -4422,6 +5376,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4431,6 +5387,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4440,6 +5398,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4449,6 +5409,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4458,6 +5420,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4467,6 +5431,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4476,6 +5442,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4485,6 +5453,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 150,
@@ -4494,6 +5464,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4503,6 +5475,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4512,6 +5486,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 325,
@@ -4521,6 +5497,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 300,
@@ -4530,6 +5508,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4539,6 +5519,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4548,6 +5530,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/qaz/qaz-layouts.dtsi",
@@ -4564,6 +5548,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4573,6 +5559,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4582,6 +5570,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4591,6 +5581,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4600,6 +5592,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4609,6 +5603,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4618,6 +5614,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4627,6 +5625,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4636,6 +5636,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -4645,6 +5647,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -4654,6 +5658,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4663,6 +5669,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4672,6 +5680,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4681,6 +5691,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4690,6 +5702,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4699,6 +5713,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4708,6 +5724,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4717,6 +5735,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4726,6 +5746,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4735,6 +5757,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 175,
@@ -4744,6 +5768,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4753,6 +5779,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4762,6 +5790,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4771,6 +5801,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4780,6 +5812,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4789,6 +5823,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4798,6 +5834,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4807,6 +5845,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 150,
@@ -4816,6 +5856,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4825,6 +5867,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4834,6 +5878,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4843,6 +5889,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 225,
@@ -4852,6 +5900,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 200,
@@ -4861,6 +5911,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4870,6 +5922,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4879,6 +5933,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4888,6 +5944,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/qaz/qaz-layouts.dtsi",
@@ -4904,6 +5962,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4913,6 +5973,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4922,6 +5984,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4931,6 +5995,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4940,6 +6006,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4949,6 +6017,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4958,6 +6028,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4967,6 +6039,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -4976,6 +6050,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -4985,6 +6061,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -4994,6 +6072,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5003,6 +6083,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5012,6 +6094,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5021,6 +6105,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5030,6 +6116,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5039,6 +6127,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5048,6 +6138,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5057,6 +6149,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5066,6 +6160,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5075,6 +6171,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 175,
@@ -5084,6 +6182,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5093,6 +6193,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5102,6 +6204,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5111,6 +6215,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5120,6 +6226,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5129,6 +6237,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5138,6 +6248,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5147,6 +6259,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 150,
@@ -5156,6 +6270,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5165,6 +6281,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5174,6 +6292,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 625,
@@ -5183,6 +6303,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5192,6 +6314,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5201,6 +6325,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/qaz/qaz-layouts.dtsi",
@@ -5217,6 +6343,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5226,6 +6354,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5235,6 +6365,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5244,6 +6376,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/zmk_uno/zmk_uno-layouts.dtsi",
@@ -5260,6 +6394,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5269,6 +6405,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5278,6 +6416,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5287,6 +6427,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/zmk_uno/zmk_uno-layouts.dtsi",
@@ -5303,6 +6445,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5312,6 +6456,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5321,6 +6467,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5330,6 +6478,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5339,6 +6489,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5348,6 +6500,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5357,6 +6511,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5366,6 +6522,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/zmk_uno/zmk_uno_split-layouts.dtsi",
@@ -5382,6 +6540,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5391,6 +6551,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5400,6 +6562,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5409,6 +6573,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5418,6 +6584,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5427,6 +6595,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5436,6 +6606,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5445,6 +6617,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/zmk_uno/zmk_uno_split-layouts.dtsi",
@@ -5461,6 +6635,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5470,6 +6646,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5479,6 +6657,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5488,6 +6668,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5497,6 +6679,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5506,6 +6690,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5515,6 +6701,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5524,6 +6712,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5533,6 +6723,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5542,6 +6734,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5551,6 +6745,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5560,6 +6756,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5569,6 +6767,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5578,6 +6778,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5587,6 +6789,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5596,6 +6800,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5605,6 +6811,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5614,6 +6822,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5623,6 +6833,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5632,6 +6844,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5641,6 +6855,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5650,6 +6866,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5659,6 +6877,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5668,6 +6888,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5677,6 +6899,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5686,6 +6910,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5695,6 +6921,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5704,6 +6932,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5713,6 +6943,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5722,6 +6954,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/hummingbird/hummingbird-layouts.dtsi",
@@ -5738,6 +6972,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5747,6 +6983,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5756,6 +6994,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5765,6 +7005,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5774,6 +7016,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5783,6 +7027,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5792,6 +7038,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5801,6 +7049,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5810,6 +7060,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5819,6 +7071,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5828,6 +7082,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5837,6 +7093,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5846,6 +7104,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5855,6 +7115,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5864,6 +7126,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5873,6 +7137,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5882,6 +7148,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5891,6 +7159,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5900,6 +7170,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5909,6 +7181,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5918,6 +7192,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5927,6 +7203,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5936,6 +7214,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5945,6 +7225,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5954,6 +7236,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5963,6 +7247,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5972,6 +7258,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5981,6 +7269,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5990,6 +7280,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -5999,6 +7291,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6008,6 +7302,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6017,6 +7313,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6026,6 +7324,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6035,6 +7335,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6044,6 +7346,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6053,6 +7357,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6062,6 +7368,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6071,6 +7379,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6080,6 +7390,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6089,6 +7401,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1200,
                 rx: 550,
                 ry: 412,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6098,6 +7412,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 2400,
                 rx: 648,
                 ry: 433,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6107,6 +7423,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -2400,
                 rx: 952,
                 ry: 433,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6116,6 +7434,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1200,
                 rx: 1050,
                 ry: 412,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6125,6 +7445,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/shields/jorne/jorne-layouts.dtsi",
@@ -6141,6 +7463,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6150,6 +7474,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6159,6 +7485,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6168,6 +7496,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6177,6 +7507,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6186,6 +7518,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6195,6 +7529,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6204,6 +7540,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6213,6 +7551,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6222,6 +7562,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6231,6 +7573,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6240,6 +7584,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6249,6 +7595,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6258,6 +7606,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6267,6 +7617,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6276,6 +7628,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6285,6 +7639,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6294,6 +7650,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6303,6 +7661,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6312,6 +7672,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6321,6 +7683,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6330,6 +7694,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6339,6 +7705,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6348,6 +7716,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6357,6 +7727,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6366,6 +7738,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6375,6 +7749,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6384,6 +7760,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6393,6 +7771,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6402,6 +7782,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6411,6 +7793,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6420,6 +7804,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6429,6 +7815,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6438,6 +7826,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6447,6 +7837,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6456,6 +7848,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 525,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6465,6 +7859,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 525,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6474,6 +7870,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1275,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6483,6 +7881,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1275,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6492,6 +7892,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6501,6 +7903,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6510,6 +7914,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6519,6 +7925,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6528,6 +7936,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6537,6 +7947,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6546,6 +7958,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6555,6 +7969,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6564,6 +7980,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6573,6 +7991,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6582,6 +8002,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6591,6 +8013,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6600,6 +8024,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6609,6 +8035,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 525,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6618,6 +8046,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1275,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6627,6 +8057,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6636,6 +8068,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6645,6 +8079,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6654,6 +8090,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6663,6 +8101,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6672,6 +8112,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6681,6 +8123,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6690,6 +8134,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6699,6 +8145,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6708,6 +8156,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6717,6 +8167,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6726,6 +8178,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 525,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6735,6 +8189,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 525,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6744,6 +8200,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 1500,
                 rx: 525,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6753,6 +8211,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1275,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6762,6 +8222,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1275,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6771,6 +8233,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -1500,
                 rx: 1275,
                 ry: 400,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6780,6 +8244,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6789,6 +8255,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6798,6 +8266,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6807,6 +8277,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 125,
@@ -6816,6 +8288,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/kinesis/adv360pro/adv360pro-layouts.dtsi",
@@ -6832,6 +8306,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6841,6 +8317,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6850,6 +8328,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6859,6 +8339,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6868,6 +8350,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6877,6 +8361,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6886,6 +8372,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6895,6 +8383,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6904,6 +8394,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6913,6 +8405,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6922,6 +8416,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6931,6 +8427,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6940,6 +8438,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6949,6 +8449,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6958,6 +8460,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6967,6 +8471,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6976,6 +8482,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6985,6 +8493,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -6994,6 +8504,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7003,6 +8515,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7012,6 +8526,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7021,6 +8537,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7030,6 +8548,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7039,6 +8559,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7048,6 +8570,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7057,6 +8581,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7066,6 +8592,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7075,6 +8603,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7084,6 +8614,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7093,6 +8625,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7102,6 +8636,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7111,6 +8647,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7120,6 +8658,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7129,6 +8669,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7138,6 +8680,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7147,6 +8691,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7156,6 +8702,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7165,6 +8713,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7174,6 +8724,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7183,6 +8735,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7192,6 +8746,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7201,6 +8757,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7210,6 +8768,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7219,6 +8779,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7228,6 +8790,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7237,6 +8801,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7246,6 +8812,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7255,6 +8823,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7264,6 +8834,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7273,6 +8845,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7282,6 +8856,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7291,6 +8867,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7300,6 +8878,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 3000,
                 rx: 450,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7309,6 +8889,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 4500,
                 rx: 450,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7318,6 +8900,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 6000,
                 rx: 450,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7327,6 +8911,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -6000,
                 rx: 1350,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7336,6 +8922,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -4500,
                 rx: 1350,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7345,6 +8933,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -3000,
                 rx: 1350,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7354,6 +8944,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7363,6 +8955,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7372,6 +8966,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7381,6 +8977,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7390,6 +8988,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7399,6 +8999,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7408,6 +9010,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7417,6 +9021,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7426,6 +9032,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7435,6 +9043,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7444,6 +9054,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7453,6 +9065,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 2000,
                 rx: 450,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7462,6 +9076,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 4000,
                 rx: 450,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7471,6 +9087,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 6000,
                 rx: 450,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7480,6 +9098,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -6000,
                 rx: 1350,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7489,6 +9109,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -4000,
                 rx: 1350,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7498,6 +9120,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: -2000,
                 rx: 1350,
                 ry: 925,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7507,6 +9131,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7516,6 +9142,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7525,6 +9153,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7534,6 +9164,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
             PhysicalKey {
                 width: 100,
@@ -7543,6 +9175,8 @@ pub const ZMK_LAYOUTS: &[ZmkLayout] = &[
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             },
         ],
         source_file: "app/boards/moergo/glove80/glove80-layouts.dtsi",

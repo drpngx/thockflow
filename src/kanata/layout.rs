@@ -1,9 +1,9 @@
-use crate::keymap::PhysicalKey;
+use crate::keymap::{KeyOrigin, PhysicalKey};
 use std::collections::{BTreeMap, HashMap};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref STANDARD_108_LAYOUT: HashMap<&'static str, (i32, i32)> = {
+    pub static ref STANDARD_108_LAYOUT: HashMap<&'static str, (i32, i32)> = {
         let mut m = HashMap::new();
         // Row 0: Function row
         m.insert("esc", (0, 0));
@@ -158,7 +158,7 @@ lazy_static! {
         m
     };
 
-    static ref MAC_LAYOUT: HashMap<&'static str, (i32, i32)> = {
+    pub static ref MAC_LAYOUT: HashMap<&'static str, (i32, i32)> = {
         let mut m = STANDARD_108_LAYOUT.clone();
         let r5_y = 5200;
         // Mac bottom row: Ctrl, Opt, Cmd, Space, Cmd, Opt, Ctrl
@@ -174,7 +174,7 @@ lazy_static! {
         m
     };
 
-    static ref WIN_LAPTOP_LAYOUT: HashMap<&'static str, (i32, i32)> = {
+    pub static ref WIN_LAPTOP_LAYOUT: HashMap<&'static str, (i32, i32)> = {
         let mut m = HashMap::new();
         // Row 0: Function row
         m.insert("esc", (0, 0));
@@ -291,7 +291,7 @@ lazy_static! {
         m
     };
 
-    static ref MACBOOK_LAYOUT: HashMap<&'static str, (i32, i32)> = {
+    pub static ref MACBOOK_LAYOUT: HashMap<&'static str, (i32, i32)> = {
         let mut m = HashMap::new();
         // Row 0: Function row (Mac style: Escape then F1-F12, then TouchID/Power)
         m.insert("esc", (0, 0));
@@ -415,6 +415,18 @@ pub fn is_standard_key(name: &str, is_mac: bool, is_laptop: bool) -> bool {
     layout.contains_key(name.to_lowercase().as_str())
 }
 
+/// Get the (x, y) position of a key in the standard layout.
+/// Returns (0, 0) if the key is not found.
+pub fn get_key_position(name: &str, is_mac: bool, is_laptop: bool) -> (i32, i32) {
+    let layout = match (is_mac, is_laptop) {
+        (true, true) => &*MACBOOK_LAYOUT,
+        (true, false) => &*MAC_LAYOUT,
+        (false, true) => &*WIN_LAPTOP_LAYOUT,
+        (false, false) => &*STANDARD_108_LAYOUT,
+    };
+    layout.get(name.to_lowercase().as_str()).copied().unwrap_or((0, 0))
+}
+
 /// Computes physical layout using standard keyboard positions.
 /// Only keys present in standard 108-key layout are shown.
 /// Aliases are added at the bottom as special keys.
@@ -440,6 +452,8 @@ pub fn compute_standard_kanata_layout(key_names: &[String], unmapped_names: &[St
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             });
         }
     }
@@ -460,7 +474,9 @@ pub fn compute_standard_kanata_layout(key_names: &[String], unmapped_names: &[St
             rotation: 0,
             rx: 0,
             ry: 0,
-        });
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            });
     }
 
     // 3. Process aliases at the bottom
@@ -480,7 +496,9 @@ pub fn compute_standard_kanata_layout(key_names: &[String], unmapped_names: &[St
             rotation: 0,
             rx: 0,
             ry: 0,
-        });
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            });
     }
 
     layout
@@ -535,6 +553,8 @@ pub fn compute_compact_kanata_layout(key_positions: &[(usize, usize)]) -> Vec<Ph
                 rotation: 0,
                 rx: 0,
                 ry: 0,
+                origin: KeyOrigin::Standard,
+                name: String::new(),
             }
         })
         .collect()

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::marker::PhantomData;
 
@@ -14,8 +14,9 @@ use futures::future::BoxFuture;
 use futures::ready;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use thockflow::keymap::{parse_raw_bindings, Defvar, KeymapData, Layer, LayerType, PhysicalKey, ProcessUnmappedKeys, VarType};
+use thockflow::keymap::{parse_raw_bindings, Defvar, KeymapData, KeyOrigin, Layer, LayerType, PhantomKey, PhysicalKey, ProcessUnmappedKeys, VarType};
 use thockflow::ServerAppProps;
+use tree_sitter_devicetree;
 use tree_sitter_scheme;
 use tokio_util::task::LocalPoolHandle;
 use tower::Service;
@@ -559,6 +560,8 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                             rotation: cap[5].parse().unwrap_or(0),
                                             rx: cap[6].parse().unwrap_or(0),
                                             ry: cap[7].parse().unwrap_or(0),
+                                            origin: KeyOrigin::Standard,
+                                            name: String::new(),
                                         });
                                     }
                                 }
@@ -685,6 +688,8 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                     rotation: k.rotation,
                     rx: k.rx,
                     ry: k.ry,
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
                 })
                 .collect();
         }
@@ -708,6 +713,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         unmapped_names: Vec::new(),
         process_unmapped_keys: ProcessUnmappedKeys::No,
         defvars: Vec::new(),
+        phantom_keys: Vec::new(),
     })
 }
 
@@ -858,7 +864,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -867,7 +875,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
             ],
             layers: vec![Layer {
                 name: "new_layer_0".to_string(),
@@ -882,7 +892,9 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
-        };
+        
+        phantom_keys: vec![],
+    };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         assert!(result.contains("new_layer_0"));
@@ -913,7 +925,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -922,7 +936,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
             ],
             layers: vec![
                 Layer {
@@ -946,7 +962,9 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
-        };
+        
+        phantom_keys: vec![],
+    };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         // Layer 0: "&kp LONG_BINDING" (16) + " " + "&kp B"
@@ -978,7 +996,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -987,7 +1007,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
             ],
             layers: vec![
                 Layer {
@@ -1011,7 +1033,9 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
-        };
+        
+        phantom_keys: vec![],
+    };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         println!("Result:\n{}", result);
@@ -1089,7 +1113,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -1098,7 +1124,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                },
+                origin: KeyOrigin::Standard,
+                name: String::new(),
+            },
             ],
             layers: vec![Layer {
                 name: "layer_0".to_string(),
@@ -1113,7 +1141,9 @@ mod tests {
             unmapped_names: Vec::new(),
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
-        };
+        
+        phantom_keys: vec![],
+    };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         println!("Result:\n{}", result);
@@ -1689,6 +1719,126 @@ mod tests {
         // Should have 2 layers
         assert_eq!(result.layers.len(), 2, "Expected 2 layers");
     }
+
+    // ============================================================================
+    // Phantom Key Tests
+    // ============================================================================
+
+    #[test]
+    fn test_phantom_keys_computed_when_key_missing_from_defsrc() {
+        let content = r#"
+(defsrc
+  f1   f2   f3
+)
+
+(deflayer base
+  f1   f2   f3
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // Should have phantom keys (esc and many others are not in defsrc)
+        assert!(!result.phantom_keys.is_empty(), "Expected phantom keys when defsrc is missing standard keys");
+        
+        // Check that esc is a phantom key
+        let has_esc_phantom = result.phantom_keys.iter().any(|p| p.name == "esc");
+        assert!(has_esc_phantom, "Expected 'esc' to be a phantom key");
+        
+        // Physical layout should include both standard and phantom keys
+        let phantom_count = result.physical_layout.iter()
+            .filter(|pk| pk.origin == KeyOrigin::Phantom)
+            .count();
+        assert!(phantom_count > 0, "Expected phantom keys in physical_layout");
+        
+        // Check that 'esc' is in physical_layout as a phantom
+        let esc_phantom = result.physical_layout.iter()
+            .find(|pk| pk.name == "esc" && pk.origin == KeyOrigin::Phantom);
+        assert!(esc_phantom.is_some(), "Expected 'esc' phantom key in physical_layout");
+    }
+
+    #[test]
+    fn test_no_phantom_keys_when_all_keys_present() {
+        let content = r#"
+(defsrc
+  esc  f1   f2   f3   f4   f5   f6   f7   f8   f9   f10  f11  f12
+)
+
+(deflayer base
+  esc  f1   f2   f3   f4   f5   f6   f7   f8   f9   f10  f11  f12
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse successfully");
+
+        // These keys are in defsrc, so they shouldn't be phantoms
+        let has_f1_phantom = result.phantom_keys.iter().any(|p| p.name == "f1");
+        assert!(!has_f1_phantom, "Expected 'f1' NOT to be a phantom key since it's in defsrc");
+    }
+
+    #[test]
+    fn test_phantom_keys_repro() {
+        let content = r#"
+(defsrc
+  a b c
+)
+
+(deflayer base
+  a b c
+)
+"#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse");
+        assert!(result.phantom_keys.len() > 100);
+    }
+        
+    #[test]
+    fn test_phantom_keys_serialization() {
+        let content = r#"
+    (defsrc
+    a
+    )
+
+    (deflayer base
+    a
+    )
+    "#;
+        let result = parse_kanata_with_tree_sitter(content, false, false).expect("Should parse");
+        let json = serde_json::to_string(&result).expect("Should serialize");
+
+        println!("JSON OUTPUT:\n{}", json);
+
+        // Check if "phantom_keys" field exists and is not empty
+        assert!(json.contains("\"phantom_keys\":[{"), "JSON should contain phantom_keys array");        
+        // Check if "origin":"Phantom" exists
+        assert!(json.contains("\"origin\":\"Phantom\""), "JSON should contain Phantom origin");
+        
+        // Check if physical_layout has many items
+        assert!(result.physical_layout.len() > 100);
+    }
+
+    #[test]
+    fn test_phantom_key_addition() {
+        let content = r#"
+(defsrc
+  a b c
+)
+
+(deflayer base
+  a b c
+)
+"#;
+        let mut data = parse_kanata_with_tree_sitter(content, false, false).unwrap();
+        
+        let phantom = data.phantom_keys.iter().find(|p| p.name == "esc").unwrap().clone();
+        
+        data.defsrc.push(phantom.name.clone());
+        let insert_idx = data.defsrc.len() - 1;
+        data.layers[0].bindings.insert(insert_idx, "esc".to_string());
+        
+        let new_content = generate_kanata_kbd(content, &data).unwrap();
+        
+        let new_data = parse_kanata_with_tree_sitter(&new_content, false, false).unwrap();
+        assert!(new_data.defsrc.contains(&"esc".to_string()));
+        assert!(new_data.layers[0].bindings.contains(&"esc".to_string()));
+    }
 }
 
 static LOCAL_POOL: Lazy<LocalPoolHandle> = Lazy::new(|| LocalPoolHandle::new(num_cpus::get()));
@@ -2002,6 +2152,174 @@ fn detect_var_type(value: &str) -> VarType {
     VarType::Unknown
 }
 
+/// Compute phantom keys - keys in the physical layout but not in defsrc
+fn compute_phantom_keys(
+    defsrc: &[String],
+    is_mac: bool,
+    is_laptop: bool,
+) -> Vec<PhantomKey> {
+    use thockflow::kanata::layout;
+    
+    // Get the appropriate layout
+    let layout_map = match (is_mac, is_laptop) {
+        (true, true) => &*layout::MACBOOK_LAYOUT,
+        (true, false) => &*layout::MAC_LAYOUT,
+        (false, true) => &*layout::WIN_LAPTOP_LAYOUT,
+        (false, false) => &*layout::STANDARD_108_LAYOUT,
+    };
+
+    let defsrc_set: HashSet<_> = defsrc.iter().map(|s| s.to_lowercase()).collect();
+    let mut defsrc_positions = HashSet::new();
+    for name in &defsrc_set {
+        if let Some(&(x, y)) = layout_map.get(name.as_str()) {
+            defsrc_positions.insert((x, y));
+        }
+    }
+    let mut phantom_keys = Vec::new();
+    let mut used_positions = HashSet::new();
+
+    for (name, &(x, y)) in layout_map.iter() {
+        // Skip single-character aliases like ".", ",", etc. - they're duplicates
+        if name.len() == 1 && !name.chars().next().unwrap().is_alphanumeric() {
+            continue;
+        }
+        
+        // Skip if this position is already occupied by a standard key
+        if defsrc_positions.contains(&(x, y)) {
+            continue;
+        }
+        
+        // Skip if we already added a phantom key at this position
+        if used_positions.contains(&(x, y)) {
+            continue;
+        }
+        
+        // Check if this key is already in defsrc
+        if !defsrc_set.contains(name.to_lowercase().as_str()) {
+            used_positions.insert((x, y));
+            phantom_keys.push(PhantomKey {
+                name: name.to_string(),
+                position: (x, y),
+            });
+        }
+    }
+
+    phantom_keys
+}
+
+/// Compute physical layout including phantom keys at their proper positions
+fn compute_physical_layout_with_phantoms(
+    key_names: &[String],
+    unmapped_names: &[String],
+    phantom_keys: &[PhantomKey],
+    alias_names: &[String],
+    is_mac: bool,
+    is_laptop: bool,
+) -> Vec<PhysicalKey> {
+    use thockflow::kanata::layout;
+    
+    let layout_map = match (is_mac, is_laptop) {
+        (true, true) => &*layout::MACBOOK_LAYOUT,
+        (true, false) => &*layout::MAC_LAYOUT,
+        (false, true) => &*layout::WIN_LAPTOP_LAYOUT,
+        (false, false) => &*layout::STANDARD_108_LAYOUT,
+    };
+
+    let mut layout = Vec::new();
+    let key_width = 1000;
+    let key_height = 1000;
+
+    // 1. Process standard keys from defsrc (at their proper positions, in defsrc order)
+    for name in key_names {
+        if let Some(&(x, y)) = layout_map.get(name.to_lowercase().as_str()) {
+            layout.push(PhysicalKey {
+                x,
+                y,
+                width: key_width,
+                height: key_height,
+                rotation: 0,
+                rx: 0,
+                ry: 0,
+                origin: KeyOrigin::Standard,
+                name: name.clone(),
+            });
+        }
+    }
+
+    // 2. Process phantom keys at their proper positions
+    // Phantom keys are sorted by Y then X to maintain visual layout
+    let mut phantom_layout: Vec<PhysicalKey> = phantom_keys.iter().map(|phantom| {
+        PhysicalKey {
+            x: phantom.position.0,
+            y: phantom.position.1,
+            width: key_width,
+            height: key_height,
+            rotation: 0,
+            rx: 0,
+            ry: 0,
+            origin: KeyOrigin::Phantom,
+            name: phantom.name.clone(),
+        }
+    }).collect();
+    
+    // Sort phantom keys by Y then X for visual ordering
+    phantom_layout.sort_by(|a, b| {
+        let y_diff = (a.y / 10).cmp(&(b.y / 10));
+        if y_diff == std::cmp::Ordering::Equal {
+            a.x.cmp(&b.x)
+        } else {
+            y_diff
+        }
+    });
+    
+    layout.extend(phantom_layout);
+
+    // 3. Process unmapped keys at the bottom
+    let unmapped_y_start = 6500;
+    let unmapped_margin = 100;
+    let unmapped_cols = 10;
+
+    for (i, name) in unmapped_names.iter().enumerate() {
+        let col = i % unmapped_cols;
+        let row = i / unmapped_cols;
+        layout.push(PhysicalKey {
+            x: col as i32 * (key_width + unmapped_margin),
+            y: unmapped_y_start + row as i32 * (key_height + unmapped_margin),
+            width: key_width,
+            height: key_height,
+            rotation: 0,
+            rx: 0,
+            ry: 0,
+            origin: KeyOrigin::Unmapped,
+            name: name.clone(),
+        });
+    }
+
+    // 4. Process aliases at the bottom (below unmapped)
+    let alias_y_start = 8000;
+    let alias_margin = 100;
+    let alias_cols = 10;
+    
+    for (i, name) in alias_names.iter().enumerate() {
+        let col = i % alias_cols;
+        let row = i / alias_cols;
+        
+        layout.push(PhysicalKey {
+            x: col as i32 * (key_width + alias_margin),
+            y: alias_y_start + row as i32 * (key_height + alias_margin),
+            width: key_width,
+            height: key_height,
+            rotation: 0,
+            rx: 0,
+            ry: 0,
+            origin: KeyOrigin::Alias,
+            name: name.clone(),
+        });
+    }
+
+    layout
+}
+
 fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -> Result<KeymapData> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_scheme::LANGUAGE.into())?;
@@ -2148,7 +2466,27 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
     let mut sorted_alias_names: Vec<String> = aliases.keys().cloned().collect();
     sorted_alias_names.sort();
 
-    let physical_layout = thockflow::kanata::layout::compute_standard_kanata_layout(&key_names, &unmapped_names, &sorted_alias_names, is_mac, is_laptop);
+    // Compute phantom keys (keys in physical layout but not in defsrc)
+    // We always compute phantom keys so users can visually discover and add them to their config
+    let should_show_phantoms = true;
+    println!("DEBUG: should_show_phantoms={}, process_unmapped_keys={:?}", should_show_phantoms, process_unmapped_keys);
+    let phantom_keys = if should_show_phantoms {
+        let keys = compute_phantom_keys(&key_names, is_mac, is_laptop);
+        println!("DEBUG: compute_phantom_keys returned {} keys", keys.len());
+        keys
+    } else {
+        vec![]
+    };
+
+    // Compute physical layout including phantom keys at their proper positions
+    let physical_layout = compute_physical_layout_with_phantoms(
+        &key_names, 
+        &unmapped_names, 
+        &phantom_keys,
+        &sorted_alias_names, 
+        is_mac, 
+        is_laptop
+    );
 
 
     fn collect_bindings<'a>(node: tree_sitter::Node<'a>, source: &'a [u8], bindings: &mut Vec<String>, is_first: &mut bool, layer_name: &mut String) {
@@ -2184,16 +2522,49 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
             collect_bindings(child, source, &mut raw_bindings, &mut is_first, &mut layer_name);
         }
         if !raw_bindings.is_empty() {
+            // Build bindings in the order of physical_layout
             let mut bindings = Vec::new();
-            for &idx in &filtered_indices {
-                bindings.push(raw_bindings.get(idx).cloned().unwrap_or_else(|| "_".to_string()));
+            
+            // Track how many of each type we've added
+            let mut standard_count = 0;
+            let mut unmapped_count = 0;
+            
+            for pk in &physical_layout {
+                match pk.origin {
+                    KeyOrigin::Standard => {
+                        // Get binding from raw_bindings using filtered_indices
+                        if let Some(&raw_idx) = filtered_indices.get(standard_count) {
+                            bindings.push(raw_bindings.get(raw_idx).cloned().unwrap_or_else(|| "_".to_string()));
+                        } else {
+                            bindings.push("_".to_string());
+                        }
+                        standard_count += 1;
+                    }
+                    KeyOrigin::Unmapped => {
+                        // Get binding from raw_bindings using unmapped_indices
+                        if let Some(&raw_idx) = unmapped_indices.get(unmapped_count) {
+                            bindings.push(raw_bindings.get(raw_idx).cloned().unwrap_or_else(|| "_".to_string()));
+                        } else {
+                            bindings.push("_".to_string());
+                        }
+                        unmapped_count += 1;
+                    }
+                    KeyOrigin::Phantom => {
+                        // Phantom keys start with transparent binding
+                        bindings.push("_".to_string());
+                    }
+                    KeyOrigin::Alias => {
+                        // Aliases are just the alias name itself (not from raw_bindings)
+                        // These are added at the end
+                    }
+                }
             }
-            for &idx in &unmapped_indices {
-                bindings.push(raw_bindings.get(idx).cloned().unwrap_or_else(|| "_".to_string()));
-            }
+            
+            // Add alias bindings at the end
             for alias_name in &sorted_alias_names {
                 bindings.push(alias_name.clone());
             }
+            
             layers.push(Layer {
                 name: layer_name,
                 bindings,
@@ -2212,10 +2583,39 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
 
     for map_node in deflayermap_nodes {
         if let Some(layer) = parse_deflayermap(map_node, source, &key_names, Some(&base_bindings), &process_unmapped_keys) {
-            // Add unmapped and alias bindings for consistency
-            let mut full_bindings = layer.bindings.clone();
-
-            // Add unmapped keys (already in bindings from parse_deflayermap, but we need to add aliases)
+            // Build bindings in the order of physical_layout (like we do for deflayer)
+            let mut full_bindings = Vec::new();
+            
+            // Track position in layer.bindings (which is ordered by key_names)
+            let key_names_lower: Vec<String> = key_names.iter().map(|s| s.to_lowercase()).collect();
+            
+            for pk in &physical_layout {
+                match pk.origin {
+                    KeyOrigin::Standard => {
+                        // Find index in key_names
+                        if let Some(idx) = key_names_lower.iter().position(|n| n == &pk.name.to_lowercase()) {
+                            full_bindings.push(layer.bindings.get(idx).cloned().unwrap_or_else(|| "_".to_string()));
+                        } else {
+                            full_bindings.push("_".to_string());
+                        }
+                    }
+                    KeyOrigin::Unmapped => {
+                        // Unmapped keys come after standard in the original deflayermap bindings
+                        // Find position in unmapped_names
+                        // For now, use "_" as default
+                        full_bindings.push("_".to_string());
+                    }
+                    KeyOrigin::Phantom => {
+                        // Phantom keys start with transparent binding
+                        full_bindings.push("_".to_string());
+                    }
+                    KeyOrigin::Alias => {
+                        // Aliases added at end
+                    }
+                }
+            }
+            
+            // Add alias bindings at the end
             for alias_name in &sorted_alias_names {
                 full_bindings.push(alias_name.clone());
             }
@@ -2239,10 +2639,109 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
         unmapped_names,
         process_unmapped_keys,
         defvars,
+        phantom_keys,
     })
 }
 
 fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
+    struct Replacement {
+        start: usize,
+        end: usize,
+        text: String,
+    }
+
+    fn collect_keys<'a>(
+        node: tree_sitter::Node<'a>,
+        source: &[u8],
+        keys: &mut Vec<String>,
+        is_first: &mut bool,
+    ) {
+        if node.kind() == "symbol" || node.kind() == "boolean" || node.kind() == "number" {
+            let text = node.utf8_text(source).unwrap_or("").to_string();
+            if *is_first && text == "defsrc" {
+                *is_first = false;
+                return;
+            }
+            keys.push(text.to_lowercase());
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            collect_keys(child, source, keys, is_first);
+        }
+    }
+
+    fn update_bindings<'a>(
+        node: tree_sitter::Node<'a>,
+        source: &[u8],
+        target_bindings: &[String],
+        binding_idx: &mut usize,
+        num_standard_keys: usize,
+        replacements: &mut Vec<Replacement>,
+    ) {
+        let kind = node.kind();
+        if kind == "symbol" || kind == "boolean" || kind == "number" || kind == "list" {
+            let text = node.utf8_text(source).unwrap_or("");
+            if text == "deflayer" || text == "base" {
+                // Skip deflayer and layer name
+                // Actually we need to skip the first two symbols of deflayer (deflayer + name)
+                // This recursion makes it tricky.
+                return;
+            }
+
+            // If it's a list, we need to check if it's an action or just a group of keys
+            // In Kanata, (action ...) is a single binding.
+            // But [...] or other lists might be just grouping.
+            // Tree-sitter-scheme might be grouping [ ] as a list.
+
+            if kind == "list" {
+                // Check if this list is a single action (starts with '(')
+                if text.starts_with('(') {
+                    if *binding_idx < num_standard_keys {
+                        if let Some(new_binding) = target_bindings.get(*binding_idx) {
+                            if text != new_binding {
+                                replacements.push(Replacement {
+                                    start: node.start_byte(),
+                                    end: node.end_byte(),
+                                    text: new_binding.clone(),
+                                });
+                            }
+                        }
+                    }
+                    *binding_idx += 1;
+                    return;
+                }
+
+                // If it's not a single action action, recurse into it
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    update_bindings(
+                        child,
+                        source,
+                        target_bindings,
+                        binding_idx,
+                        num_standard_keys,
+                        replacements,
+                    );
+                }
+                return;
+            }
+
+            // It's a single symbol/number/boolean binding
+            if *binding_idx < num_standard_keys {
+                if let Some(new_binding) = target_bindings.get(*binding_idx) {
+                    if text != new_binding {
+                        replacements.push(Replacement {
+                            start: node.start_byte(),
+                            end: node.end_byte(),
+                            text: new_binding.clone(),
+                        });
+                    }
+                }
+            }
+            *binding_idx += 1;
+        }
+    }
+
     let mut content = original.to_string();
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&tree_sitter_scheme::LANGUAGE.into())?;
@@ -2252,15 +2751,94 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
     let root = tree.root_node();
     let source = content.as_bytes();
 
+    let defsrc_nodes = find_kanata_node(root, source, "defsrc");
+
+    // 1. Identify new keys in defsrc (phantom key additions)
+    let original_defsrc_keys = if let Some(defsrc_node) = defsrc_nodes.first() {
+        let mut keys = Vec::new();
+        let mut is_first = true;
+        collect_keys(*defsrc_node, source, &mut keys, &mut is_first);
+        keys
+    } else {
+        Vec::new()
+    };
+
+    let original_defsrc_set: HashSet<_> = original_defsrc_keys.iter().cloned().collect();
+    
+    // Add new keys to content using the specialized helper functions
+    // We do this BEFORE other replacements because it modifies the string in-place
+    // and we need to re-parse or adjust offsets if we want to combine them.
+    // Actually, it's safer to do it first and then re-parse for the other replacements.
+    
+    let mut modified_content = original.to_string();
+    let mut added_any = false;
+    
+    // Check for is_mac and is_laptop from the data or some other way.
+    // KeymapData doesn't seem to store these.
+    // However, the parse_kanata_api takes them.
+    // For now, let's assume false/false or try to detect from content if possible.
+    // In many cases we don't have them here. 
+    // Let's use false, false as defaults, which is standard 108.
+    let is_mac = false; 
+    let is_laptop = false;
+
+    for key_name in &data.defsrc {
+        if !original_defsrc_set.contains(&key_name.to_lowercase()) {
+            println!("DEBUG [generate_kanata_kbd]: Found new key to insert: {}", key_name);
+            // New key found!
+            match insert_key_into_defsrc(&mut modified_content, key_name, is_mac, is_laptop) {
+                Ok(_) => {
+                    println!("DEBUG [generate_kanata_kbd]: Successfully inserted {} into defsrc", key_name);
+                    // Now we need to find the index where it was inserted in defsrc to update layers
+                    // Re-parse to get the new defsrc order
+                    let mut parser = tree_sitter::Parser::new();
+                    parser.set_language(&tree_sitter_scheme::LANGUAGE.into()).unwrap();
+                    let new_tree = parser.parse(modified_content.as_bytes(), None).unwrap();
+                    let new_root = new_tree.root_node();
+                    let new_defsrc_nodes = find_kanata_node(new_root, modified_content.as_bytes(), "defsrc");
+                    
+                    if let Some(defsrc_node) = new_defsrc_nodes.first() {
+                        let mut new_keys = Vec::new();
+                        let mut is_first = true;
+                        collect_keys(*defsrc_node, modified_content.as_bytes(), &mut new_keys, &mut is_first);
+                        
+                        println!("DEBUG [generate_kanata_kbd]: Re-parsed defsrc, new_keys length: {}", new_keys.len());
+                        if let Some(idx) = new_keys.iter().position(|k| k == &key_name.to_lowercase()) {
+                            println!("DEBUG [generate_kanata_kbd]: Adding binding slot '_' to all layers for key {} at index {}", key_name, idx);
+                            match add_binding_to_all_layers(&mut modified_content, "_", idx + 1) {
+                                Ok(_) => println!("DEBUG [generate_kanata_kbd]: Successfully added '_' bindings to layers"),
+                                Err(e) => println!("DEBUG [generate_kanata_kbd]: Failed to add bindings to layers: {}", e),
+                            }
+                            added_any = true;
+                        } else {
+                            println!("DEBUG [generate_kanata_kbd]: Failed to find newly inserted key {} in parsed defsrc!", key_name);
+                        }
+                    } else {
+                        println!("DEBUG [generate_kanata_kbd]: Failed to find defsrc node after insertion!");
+                    }
+                }
+                Err(e) => {
+                    println!("DEBUG [generate_kanata_kbd]: Failed to insert key into defsrc: {}", e);
+                }
+            }
+        }
+    }
+
+    // If we added keys, we must re-parse the modified_content for subsequent replacements
+    if added_any {
+        content = modified_content;
+    }
+
+    let tree = parser
+        .parse(content.as_bytes(), None)
+        .ok_or_else(|| anyhow::anyhow!("Failed to re-parse KBD"))?;
+    let root = tree.root_node();
+    let source = content.as_bytes();
+
     let deflayer_nodes = find_kanata_node(root, source, "deflayer");
     let defalias_nodes = find_kanata_node(root, source, "defalias");
     let deflayermap_nodes = find_kanata_node(root, source, "deflayermap");
 
-    struct Replacement {
-        start: usize,
-        end: usize,
-        text: String,
-    }
     let mut replacements = Vec::new();
 
     // Handle defalias
@@ -2299,70 +2877,6 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
     // The aliases are handled via Replacement in defalias above.
     let num_standard_keys = data.defsrc.len();
 
-    fn update_bindings<'a>(
-        node: tree_sitter::Node<'a>,
-        source: &[u8],
-        target_bindings: &[String],
-        binding_idx: &mut usize,
-        num_standard_keys: usize,
-        replacements: &mut Vec<Replacement>,
-    ) {
-        let kind = node.kind();
-        if kind == "symbol" || kind == "boolean" || kind == "number" || kind == "list" {
-            let text = node.utf8_text(source).unwrap_or("");
-            if text == "deflayer" || text == "base" { // Skip deflayer and layer name
-                // Actually we need to skip the first two symbols of deflayer (deflayer + name)
-                // This recursion makes it tricky.
-                return;
-            }
-            
-            // If it's a list, we need to check if it's an action or just a group of keys
-            // In Kanata, (action ...) is a single binding.
-            // But [...] or other lists might be just grouping.
-            // Tree-sitter-scheme might be grouping [ ] as a list.
-            
-            if kind == "list" {
-                // Check if this list is a single action (starts with '(')
-                if text.starts_with('(') {
-                    if *binding_idx < num_standard_keys {
-                        if let Some(new_binding) = target_bindings.get(*binding_idx) {
-                            if text != new_binding {
-                                replacements.push(Replacement {
-                                    start: node.start_byte(),
-                                    end: node.end_byte(),
-                                    text: new_binding.clone(),
-                                });
-                            }
-                        }
-                    }
-                    *binding_idx += 1;
-                    return;
-                }
-                
-                // If it's not a single action action, recurse into it
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    update_bindings(child, source, target_bindings, binding_idx, num_standard_keys, replacements);
-                }
-                return;
-            }
-
-            // It's a single symbol/number/boolean binding
-            if *binding_idx < num_standard_keys {
-                if let Some(new_binding) = target_bindings.get(*binding_idx) {
-                    if text != new_binding {
-                        replacements.push(Replacement {
-                            start: node.start_byte(),
-                            end: node.end_byte(),
-                            text: new_binding.clone(),
-                        });
-                    }
-                }
-            }
-            *binding_idx += 1;
-        }
-    }
-
     for (i, layer_node) in deflayer_nodes.iter().enumerate() {
         if i < data.layers.len() {
             let target_layer = &data.layers[i];
@@ -2389,7 +2903,14 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
                         symbol_count += 1;
                     } else {
                         // Recurse to find all actual bindings
-                        update_bindings(child, source, &target_layer.bindings, &mut binding_idx, num_standard_keys, &mut replacements);
+                        update_bindings(
+                            child,
+                            source,
+                            &target_layer.bindings,
+                            &mut binding_idx,
+                            num_standard_keys,
+                            &mut replacements,
+                        );
                     }
                 }
             }
@@ -2398,7 +2919,8 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
 
     // Handle deflayermap updates
     // Find deflayermap layers in data
-    let deflayermap_layers: Vec<_> = data.layers.iter()
+    let deflayermap_layers: Vec<_> = data.layers
+        .iter()
         .filter(|l| matches!(l.layer_type, LayerType::Deflayermap))
         .collect();
 
@@ -2411,11 +2933,11 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
                 let kind = child.kind();
                 if kind == "symbol" || kind == "boolean" || kind == "number" {
                     let text = child.utf8_text(source).unwrap_or("");
-                    
+
                     if text == "deflayermap" {
                         continue;
                     }
-                    
+
                     if symbol_count == 0 {
                         // Layer name
                         if text != target_layer.name {
@@ -2456,6 +2978,108 @@ fn generate_kanata_kbd(original: &str, data: &KeymapData) -> Result<String> {
     }
 
     Ok(content)
+}
+
+/// Insert a key into defsrc at the correct position based on standard layout order
+fn insert_key_into_defsrc(
+    content: &mut String,
+    key_name: &str,
+    _is_mac: bool,
+    _is_laptop: bool,
+) -> Result<(), String> {
+    // Parse the content to find defsrc
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_scheme::LANGUAGE.into())
+        .map_err(|e| format!("Failed to set language: {}", e))?;
+    
+    let tree = parser.parse(content.as_bytes(), None)
+        .ok_or("Failed to parse content")?;
+    
+    let source = content.as_bytes();
+    let root = tree.root_node();
+
+    // Find defsrc node
+    let defsrc_nodes = find_kanata_node(root, source, "defsrc");
+    if defsrc_nodes.is_empty() {
+        return Err("No defsrc found".to_string());
+    }
+    
+    let defsrc_node = defsrc_nodes[0];
+
+    // Find the last key in defsrc
+    let mut last_key_end = defsrc_node.start_byte();
+    let mut inner_cursor = defsrc_node.walk();
+    for child in defsrc_node.children(&mut inner_cursor) {
+        let kind = child.kind();
+        if kind == "symbol" || kind == "boolean" || kind == "number" {
+            let text = child.utf8_text(source).unwrap_or("");
+            if text != "defsrc" {
+                last_key_end = child.end_byte();
+            }
+        }
+    }
+    
+    // Insert the key
+    content.insert_str(last_key_end, &format!(" {}", key_name));
+    
+    Ok(())
+}
+
+/// Add a binding slot to all deflayer blocks
+fn add_binding_to_all_layers(
+    content: &mut String,
+    binding: &str,
+    _insert_idx: usize, // No longer used, always appends
+) -> Result<(), String> {
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_scheme::LANGUAGE.into())
+        .map_err(|e| format!("Failed to set language: {}", e))?;
+    
+    let tree = parser.parse(content.as_bytes(), None)
+        .ok_or("Failed to parse content")?;
+    
+    let source = content.as_bytes();
+    let root = tree.root_node();
+
+    #[allow(dead_code)]
+    struct Replacement {
+        start: usize,
+        end: usize,
+        text: String,
+    }
+    
+    let mut replacements = Vec::new();
+
+    let deflayer_nodes = find_kanata_node(root, source, "deflayer");
+    
+    for layer_node in deflayer_nodes {
+        // Find the last binding in the layer
+        let mut last_binding_end = layer_node.start_byte();
+        let mut inner_cursor = layer_node.walk();
+        for child in layer_node.children(&mut inner_cursor) {
+            let kind = child.kind();
+            if kind == "symbol" || kind == "boolean" || kind == "number" || kind == "list" {
+                let text = child.utf8_text(source).unwrap_or("");
+                if text != "deflayer" {
+                    last_binding_end = child.end_byte();
+                }
+            }
+        }
+        
+        replacements.push(Replacement {
+            start: last_binding_end,
+            end: last_binding_end,
+            text: format!(" {}", binding),
+        });
+    }
+    
+    // Apply replacements in reverse order
+    replacements.sort_by_key(|r| std::cmp::Reverse(r.start));
+    for r in replacements {
+        content.insert_str(r.start, &r.text);
+    }
+    
+    Ok(())
 }
 
 async fn parse_kanata_api(Json(req): Json<KeymapRequest>) -> impl IntoResponse {

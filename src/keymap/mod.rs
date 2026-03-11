@@ -207,7 +207,17 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+/// Origin/type of a key in the physical layout
+#[derive(Clone, Copy, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub enum KeyOrigin {
+    #[default]
+    Standard,      // In defsrc, standard key
+    Unmapped,      // In defsrc, non-standard key
+    Alias,         // Alias entry (not a physical key)
+    Phantom,       // NOT in defsrc, available in physical layout
+}
+
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct PhysicalKey {
     pub x: i32,
     pub y: i32,
@@ -218,6 +228,35 @@ pub struct PhysicalKey {
     pub rx: i32,
     #[serde(default)]
     pub ry: i32,
+    #[serde(default)]
+    pub origin: KeyOrigin,
+    #[serde(default)]
+    pub name: String,
+}
+
+impl PhysicalKey {
+    /// Const constructor for PhysicalKey with required fields only.
+    /// Origin defaults to Standard, name defaults to empty.
+    pub const fn new(x: i32, y: i32, width: i32, height: i32, rotation: i32, rx: i32, ry: i32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            rotation,
+            rx,
+            ry,
+            origin: KeyOrigin::Standard,
+            name: String::new(),
+        }
+    }
+}
+
+/// Represents a key that exists in the physical layout but not in defsrc
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct PhantomKey {
+    pub name: String,           // Key name (e.g., "f13", "calc")
+    pub position: (i32, i32),   // Physical position (x, y) in layout units
 }
 
 /// Type of layer definition in kanata
@@ -274,7 +313,7 @@ pub struct Defvar {
     pub var_type: VarType,   // Auto-detected type
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct KeymapData {
     pub physical_layout: Vec<PhysicalKey>,
     pub layers: Vec<Layer>,
@@ -289,6 +328,9 @@ pub struct KeymapData {
     pub process_unmapped_keys: ProcessUnmappedKeys,
     #[serde(default)]
     pub defvars: Vec<Defvar>,
+    /// Phantom keys - available in physical layout but not in defsrc
+    #[serde(default)]
+    pub phantom_keys: Vec<PhantomKey>,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.
@@ -592,10 +634,11 @@ pub fn generate_svg(data: &KeymapData, is_kanata: bool, is_mac: bool, is_laptop:
     svg
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct SelectedKey {
     pub layer_index: usize,
     pub key_index: usize,
+    pub is_phantom: bool,
 }
 
 #[derive(Serialize)]
@@ -1074,6 +1117,7 @@ pub fn KeymapRenderer(props: &RendererProps) -> Html {
                 selected_key.set(Some(SelectedKey {
                     layer_index: *current_layer,
                     key_index,
+                    is_phantom: false,
                 }));
             }
         })

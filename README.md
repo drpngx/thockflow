@@ -42,7 +42,7 @@ I want to generate long quotes for a typing practice. They don't have to be actu
 Vial:
 - broken mouse scroll down weird character
 - broken pre-shifted position in layout
-- layout menu with moves and quick populate
+- save keymap
 - serialize to json
 - check the save
 - save svg
@@ -56,20 +56,30 @@ Tidy:
 - tree-sitter goes in a sandboxed process
 - implement C-o and C-s for all tabs
 - implement the layer menu everywhere (about quick fill and kanata shadow keys)
+We need to improve the Kanata tab. The layout must have a menu, exactly like we have in the `keymap` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
+
+We need to improve the Vial tab. The layout must have a menu, exactly like we have in the `keymap` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
+
+We need to improve the ZMK Studio tab. The layout must have a menu, exactly like we have in the `keymap` tab. The menu contains: move up, move down, rename, duplicate, delete, and then all to none, trans to none, none to trans, quick assignment. We need a design and implementation doc with error checking and edge cases, that contains planning for exhaustive tests.
+
 - test write paths
 
 
 Finish basic implementing Kanata:
 - process-unmapped-keys and shadow keys
-We need to improve the Kanata tab. We will add keys in the layout that are not in the `defsrc`. We will just draw the outline of the key without filling it out. It will be availabe to the `j` menu. If the user modifies it from its basic state, then it will be added to the `defsrc` in its proper place unless `process-unmapped-keys=yes`. We need a design and implementation doc that contains planning for extensive tests.
 - support `none` as XX ✗ ∅ •: display and parse
 We need to improve the Kanata tab. We need to support the `none` key. It can be added in the config and completion as `XX ✗ ∅ •` and we will always display it as ∅.
 - pre-modified keys: C-S-c
-We need to improve the Kanata tab. We will pre-modified keys support such as `C-S-a` which means control-shift-a. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#output-chordscombos We need to modify the comletion so that we can see `C-`, etc. If we select this, then we will see the next keys, so `C-` can complete to `C-S-` or `C-a`. We need a design and implementation doc that contains planning for extensive tests.
+We need to improve the Kanata tab. We will pre-modified keys support such as `C-S-a` which means control-shift-a. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#output-chordscombos We need to modify the completion so that we can see `C-`, etc. If we select this, then we will see the next keys, so `C-` can complete to `C-S-` or `C-a`. We need a design and implementation doc that contains planning for extensive tests.
 - mousemove variants, setmouse, mousemove-speed
+We need to improve the Kanata tab. We will add support for mousemove variants, setmouse, and mousemove-speed. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#mouse-movement We need a design and implementation doc that contains planning for extensive tests.
 - cmd
+We need to improve the Kanata tab. We will add support for the `cmd` action which takes strings. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc The command can be unquoted strings for instance `(cmd bazel build -c opt //...)` We need a design and implementation doc that contains planning for extensive tests.
 - clipboard variants
+We need to improve the Kanata tab. We will add support for clipboard ring. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#clipboard-actions We need a design and implementation doc that contains planning for extensive tests.
 - defchords
+We need to improve the Kanata tab. We will add support for defchords. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#input-chords--combos-v2 We need to be mindful of the parameters types for completion. We need a design and implementation doc that contains planning for extensive tests.
+- is_laptop: true detection using proper BatteryManager and screen size
 
 
 Mod-tap optimizer:

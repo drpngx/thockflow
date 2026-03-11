@@ -112,6 +112,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
                                             rotation: cap[5].parse().unwrap_or(0),
                                             rx: cap[6].parse().unwrap_or(0),
                                             ry: cap[7].parse().unwrap_or(0),
+                                            ..Default::default()
                                         });
                                     }
                                 }
@@ -228,6 +229,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
                     rotation: k.rotation,
                     rx: k.rx,
                     ry: k.ry,
+                    ..Default::default()
                 })
                 .collect();
         }
@@ -251,6 +253,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         defsrc: Vec::new(),
         unmapped_names: Vec::new(),
         process_unmapped_keys: thockflow::keymap::ProcessUnmappedKeys::No,
+        ..Default::default()
     })
 }
 
