@@ -66,11 +66,6 @@ We need to improve the ZMK Studio tab. The layout must have a menu, exactly like
 
 
 Finish basic implementing Kanata:
-- process-unmapped-keys and shadow keys
-- support `none` as XX ✗ ∅ •: display and parse
-We need to improve the Kanata tab. We need to support the `none` key. It can be added in the config and completion as `XX ✗ ∅ •` and we will always display it as ∅.
-- pre-modified keys: C-S-c
-We need to improve the Kanata tab. We will pre-modified keys support such as `C-S-a` which means control-shift-a. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#output-chordscombos We need to modify the completion so that we can see `C-`, etc. If we select this, then we will see the next keys, so `C-` can complete to `C-S-` or `C-a`. We need a design and implementation doc that contains planning for extensive tests.
 - mousemove variants, setmouse, mousemove-speed
 We need to improve the Kanata tab. We will add support for mousemove variants, setmouse, and mousemove-speed. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#mouse-movement We need a design and implementation doc that contains planning for extensive tests.
 - cmd

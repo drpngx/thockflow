@@ -15,6 +15,7 @@ pub mod layout;
 fn format_kanata_keycode(kc: &str, is_mac: bool) -> String {
     match kc {
         "_" => "▽".to_string(),
+        "none" => "∅".to_string(),
         "ent" | "enter" | "ret" => "⏎".to_string(),
         "bspc" | "backspace" => "⌫".to_string(),
         "spc" | "space" => "SPACE".to_string(),
@@ -304,6 +305,21 @@ impl<'a> KanataValidator<'a> {
             return false;
         }
 
+        // Check for output chord (e.g., C-a, C-S-tab)
+        if has_modifier_prefix(text) {
+            let modifiers = get_current_modifiers(text);
+            // Check for duplicate modifiers
+            if has_duplicate_modifiers(&modifiers) {
+                return false;
+            }
+            let base = get_base_key(text);
+            // Empty base is ok during typing, but if there's a base, it must be valid
+            if base.is_empty() {
+                return true; // Partial chord like "C-"
+            }
+            return KANATA_KEYS.contains(&base);
+        }
+
         KANATA_KEYS.contains(&text) || self.data.aliases.contains_key(text)
     }
 
@@ -346,7 +362,7 @@ impl<'a> KanataValidator<'a> {
 }
 
 static KANATA_KEYS: &[&str] = &[
-    "_", "lsft", "rsft", "lctl", "rctl", "lalt", "ralt", "lmet", "rmet",
+    "_", "none", "lsft", "rsft", "lctl", "rctl", "lalt", "ralt", "lmet", "rmet",
     "caps", "esc", "ent", "bspc", "spc", "tab", "del", "ins",
     "up", "down", "left", "right", "pgup", "pgdn", "home", "end",
     "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
@@ -355,6 +371,180 @@ static KANATA_KEYS: &[&str] = &[
     "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
     "comm", "dot", "slsh", "scln", "apos", "lbkt", "rbkt", "bksl", "grv", "min", "eql",
 ];
+
+/// Output chord modifier prefixes
+const OUTPUT_CHORD_MODIFIERS: &[&str] = &["C-", "RC-", "A-", "RA-", "AG-", "S-", "RS-", "M-", "RM-"];
+
+/// Represents a parsed output chord
+#[derive(Debug, Clone, PartialEq)]
+struct OutputChord {
+    modifiers: Vec<String>,
+    key: String,
+}
+
+/// Parse an output chord string into modifiers and base key
+/// Returns None if the string doesn't start with any modifier prefix
+fn parse_output_chord(input: &str) -> Option<OutputChord> {
+    let input = input.to_lowercase();
+    let mut modifiers = Vec::new();
+    let mut remaining = input.as_str();
+    
+    // Keep extracting modifier prefixes
+    while let Some(modifier) = extract_modifier_prefix(remaining) {
+        modifiers.push(modifier.to_string());
+        remaining = &remaining[modifier.len()..];
+    }
+    
+    if modifiers.is_empty() {
+        return None;
+    }
+    
+    Some(OutputChord {
+        modifiers,
+        key: remaining.to_string(),
+    })
+}
+
+/// Extract a modifier prefix from the start of a string
+fn extract_modifier_prefix(s: &str) -> Option<&str> {
+    for &modifier in OUTPUT_CHORD_MODIFIERS {
+        if s.starts_with(modifier.to_lowercase().as_str()) {
+            return Some(&s[..modifier.len()]);
+        }
+    }
+    None
+}
+
+/// Check if a string has any modifier prefix
+fn has_modifier_prefix(input: &str) -> bool {
+    let lower = input.to_lowercase();
+    OUTPUT_CHORD_MODIFIERS.iter().any(|&m| lower.starts_with(m.to_lowercase().as_str()))
+}
+
+/// Get the base key from an output chord (strips all modifier prefixes)
+fn get_base_key(input: &str) -> &str {
+    let lower = input.to_lowercase();
+    let mut start = 0;
+    
+    while let Some(modifier) = extract_modifier_prefix(&lower[start..]) {
+        start += modifier.len();
+    }
+    
+    &input[start..]
+}
+
+/// Get the current modifier prefixes from an input string
+fn get_current_modifiers(input: &str) -> Vec<String> {
+    let lower = input.to_lowercase();
+    let mut modifiers = Vec::new();
+    let mut pos = 0;
+    
+    while let Some(modifier) = extract_modifier_prefix(&lower[pos..]) {
+        modifiers.push(modifier.to_string());
+        pos += modifier.len();
+    }
+    
+    modifiers
+}
+
+/// Check if there are duplicate modifiers (RA- and AG- are treated as equivalent)
+fn has_duplicate_modifiers(modifiers: &[String]) -> bool {
+    let mut has_left_ctrl = false;
+    let mut has_right_ctrl = false;
+    let mut has_left_alt = false;
+    let mut has_right_alt = false;  // Covers both RA- and AG-
+    let mut has_left_shift = false;
+    let mut has_right_shift = false;
+    let mut has_left_meta = false;
+    let mut has_right_meta = false;
+    
+    for m in modifiers {
+        let m_lower = m.to_lowercase();
+        match m_lower.as_str() {
+            "c-" => {
+                if has_left_ctrl { return true; }
+                has_left_ctrl = true;
+            }
+            "rc-" => {
+                if has_right_ctrl { return true; }
+                has_right_ctrl = true;
+            }
+            "a-" => {
+                if has_left_alt { return true; }
+                has_left_alt = true;
+            }
+            "ra-" | "ag-" => {
+                if has_right_alt { return true; }
+                has_right_alt = true;
+            }
+            "s-" => {
+                if has_left_shift { return true; }
+                has_left_shift = true;
+            }
+            "rs-" => {
+                if has_right_shift { return true; }
+                has_right_shift = true;
+            }
+            "m-" => {
+                if has_left_meta { return true; }
+                has_left_meta = true;
+            }
+            "rm-" => {
+                if has_right_meta { return true; }
+                has_right_meta = true;
+            }
+            _ => {}
+        }
+    }
+    
+    false
+}
+
+/// Get available next modifiers given current prefixes
+fn get_available_modifiers(current: &[String]) -> Vec<&'static str> {
+    let mut has_left_ctrl = false;
+    let mut has_right_ctrl = false;
+    let mut has_left_alt = false;
+    let mut has_right_alt = false;
+    let mut has_left_shift = false;
+    let mut has_right_shift = false;
+    let mut has_left_meta = false;
+    let mut has_right_meta = false;
+    
+    for m in current {
+        let m_lower = m.to_lowercase();
+        match m_lower.as_str() {
+            "c-" => has_left_ctrl = true,
+            "rc-" => has_right_ctrl = true,
+            "a-" => has_left_alt = true,
+            "ra-" | "ag-" => has_right_alt = true,
+            "s-" => has_left_shift = true,
+            "rs-" => has_right_shift = true,
+            "m-" => has_left_meta = true,
+            "rm-" => has_right_meta = true,
+            _ => {}
+        }
+    }
+    
+    let mut available = Vec::new();
+    if !has_left_ctrl { available.push("C-"); }
+    if !has_right_ctrl { available.push("RC-"); }
+    if !has_left_alt { available.push("A-"); }
+    if !has_right_alt { available.push("RA-"); }
+    if !has_right_alt { available.push("AG-"); }  // AG- is same as RA-
+    if !has_left_shift { available.push("S-"); }
+    if !has_right_shift { available.push("RS-"); }
+    if !has_left_meta { available.push("M-"); }
+    if !has_right_meta { available.push("RM-"); }
+    
+    available
+}
+
+/// Check if a string is a valid modifier prefix (for completion)
+fn is_modifier_prefix_str(s: &str) -> bool {
+    let lower = s.to_lowercase();
+    OUTPUT_CHORD_MODIFIERS.iter().any(|&m| m.to_lowercase().starts_with(&lower))
+}
 
 fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
     let mut suggestions = Vec::new();
@@ -476,6 +666,62 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
                     let var_suggestion = format!("${}", defvar.name);
                     if var_suggestion.to_lowercase().contains(query) {
                         suggestions.push(var_suggestion);
+                    }
+                }
+            }
+        }
+    }
+
+    // Handle output chord suggestions (e.g., C-, C-S-, C-a)
+    // This applies to both Action and non-Action contexts
+    if !query.starts_with('(') && !query.starts_with('$') {
+        let query_lower = query.to_lowercase();
+        
+        // Check if query is a partial modifier name (e.g., "C" for "C-")
+        if query.len() >= 1 && query.len() <= 3 && !query.contains('-') {
+            for &modifier in OUTPUT_CHORD_MODIFIERS {
+                let mod_lower = modifier.to_lowercase();
+                if mod_lower.starts_with(&query_lower) && mod_lower != query_lower {
+                    suggestions.push(modifier.to_string());
+                }
+            }
+        }
+        
+        // Check if query has modifier prefixes
+        if has_modifier_prefix(query) {
+            let current_mods = get_current_modifiers(query);
+            let base_key = get_base_key(query);
+            
+            // If no duplicate modifiers, suggest more modifiers and base keys
+            if !has_duplicate_modifiers(&current_mods) {
+                let prefix_str = current_mods.join("");
+                
+                // Suggest additional modifiers
+                for modifier in get_available_modifiers(&current_mods) {
+                    let suggestion = format!("{}{}", prefix_str, modifier);
+                    if !suggestions.contains(&suggestion) {
+                        suggestions.push(suggestion);
+                    }
+                }
+                
+                // Suggest base keys
+                if base_key.is_empty() {
+                    // Query ends with '-', suggest all keys with prefix
+                    for &key in KANATA_KEYS {
+                        let suggestion = format!("{}{}", prefix_str, key);
+                        if !suggestions.contains(&suggestion) {
+                            suggestions.push(suggestion);
+                        }
+                    }
+                } else {
+                    // Query has partial base key, suggest matching keys
+                    for &key in KANATA_KEYS {
+                        if key.to_lowercase().starts_with(&base_key.to_lowercase()) {
+                            let suggestion = format!("{}{}", prefix_str, key);
+                            if !suggestions.contains(&suggestion) {
+                                suggestions.push(suggestion);
+                            }
+                        }
                     }
                 }
             }
@@ -804,6 +1050,216 @@ mod tests {
         let (_, suggestions) = get_suggestions("(caps-word ", &data);
         assert!(suggestions.contains(&"$tap-timeout".to_string()));
         assert!(!suggestions.contains(&"$my-key".to_string()));
+    }
+
+    // ============================================================================
+    // Output Chord Tests
+    // ============================================================================
+
+    #[test]
+    fn test_parse_output_chord_simple() {
+        let chord = parse_output_chord("C-a").unwrap();
+        assert_eq!(chord.modifiers, vec!["C-"]);
+        assert_eq!(chord.key, "a");
+    }
+
+    #[test]
+    fn test_parse_output_chord_multiple() {
+        let chord = parse_output_chord("C-S-a").unwrap();
+        assert_eq!(chord.modifiers, vec!["C-", "S-"]);
+        assert_eq!(chord.key, "a");
+    }
+
+    #[test]
+    fn test_parse_output_chord_right_mods() {
+        let chord = parse_output_chord("RC-RS-M-tab").unwrap();
+        assert_eq!(chord.modifiers, vec!["RC-", "RS-", "M-"]);
+        assert_eq!(chord.key, "tab");
+    }
+
+    #[test]
+    fn test_parse_output_chord_altgr() {
+        let chord = parse_output_chord("AG-a").unwrap();
+        assert_eq!(chord.modifiers, vec!["AG-"]);
+        assert_eq!(chord.key, "a");
+        
+        let chord2 = parse_output_chord("RA-a").unwrap();
+        assert_eq!(chord2.modifiers, vec!["RA-"]);
+    }
+
+    #[test]
+    fn test_parse_output_chord_not_a_chord() {
+        assert!(parse_output_chord("a").is_none());
+        assert!(parse_output_chord("esc").is_none());
+        assert!(parse_output_chord("_").is_none());
+    }
+
+    #[test]
+    fn test_get_base_key() {
+        assert_eq!(get_base_key("C-S-a"), "a");
+        assert_eq!(get_base_key("C-esc"), "esc");
+        assert_eq!(get_base_key("a"), "a");
+        assert_eq!(get_base_key("M-spc"), "spc");
+    }
+
+    #[test]
+    fn test_has_modifier_prefix() {
+        assert!(has_modifier_prefix("C-a"));
+        assert!(has_modifier_prefix("S-tab"));
+        assert!(!has_modifier_prefix("a"));
+        assert!(!has_modifier_prefix("esc"));
+    }
+
+    #[test]
+    fn test_has_duplicate_modifiers() {
+        assert!(has_duplicate_modifiers(&["C-".to_string(), "C-".to_string()]));
+        assert!(has_duplicate_modifiers(&["RA-".to_string(), "AG-".to_string()])); // RA and AG are equivalent
+        assert!(!has_duplicate_modifiers(&["C-".to_string(), "S-".to_string()]));
+        assert!(!has_duplicate_modifiers(&["C-".to_string(), "RC-".to_string()]));
+    }
+
+    #[test]
+    fn test_get_available_modifiers() {
+        let available = get_available_modifiers(&["C-".to_string()]);
+        assert!(available.contains(&"S-"));
+        assert!(available.contains(&"A-"));
+        assert!(available.contains(&"M-"));
+        assert!(available.contains(&"RC-"));
+        assert!(!available.contains(&"C-")); // No duplicates
+    }
+
+    #[test]
+    fn test_validate_output_chord_simple() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        assert!(validator.validate_action("C-a"));
+        assert!(validator.validate_action("S-1"));
+        assert!(validator.validate_action("M-tab"));
+    }
+
+    #[test]
+    fn test_validate_output_chord_multiple() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        assert!(validator.validate_action("C-S-a"));
+        assert!(validator.validate_action("C-A-del"));
+        assert!(validator.validate_action("C-S-M-a"));
+    }
+
+    #[test]
+    fn test_validate_output_chord_partial() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        // Partial chord (ends with -) is valid during typing
+        assert!(validator.validate_action("C-"));
+        assert!(validator.validate_action("C-S-"));
+    }
+
+    #[test]
+    fn test_validate_output_chord_invalid_base() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        assert!(!validator.validate_action("C-invalidkey"));
+    }
+
+    #[test]
+    fn test_validate_output_chord_duplicate() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        // Duplicate C- should be invalid
+        assert!(!validator.validate_action("C-C-a"));
+        assert!(!validator.validate_action("S-C-S-a"));
+        // RA- and AG- are duplicates
+        assert!(!validator.validate_action("RA-AG-a"));
+    }
+
+    #[test]
+    fn test_validate_output_chord_all_modifiers() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        // Test all modifier variants
+        assert!(validator.validate_action("C-a"));
+        assert!(validator.validate_action("RC-a"));
+        assert!(validator.validate_action("A-a"));
+        assert!(validator.validate_action("RA-a"));
+        assert!(validator.validate_action("AG-a"));
+        assert!(validator.validate_action("S-a"));
+        assert!(validator.validate_action("RS-a"));
+        assert!(validator.validate_action("M-a"));
+        assert!(validator.validate_action("RM-a"));
+    }
+
+    #[test]
+    fn test_suggestions_modifier_prefix() {
+        let data = create_test_data_with_defvars();
+        let (_prefix, suggestions) = get_suggestions("C", &data);
+        assert!(suggestions.contains(&"C-".to_string()), "Should suggest C- for query 'C'. Suggestions: {:?}", suggestions);
+    }
+
+    #[test]
+    fn test_suggestions_after_prefix() {
+        let data = create_test_data_with_defvars();
+        let (_prefix, suggestions) = get_suggestions("C-", &data);
+        // Should suggest more modifiers and base keys
+        assert!(suggestions.contains(&"C-S-".to_string()), "Should suggest C-S-. Suggestions: {:?}", suggestions);
+        assert!(suggestions.contains(&"C-a".to_string()), "Should suggest C-a. Suggestions: {:?}", suggestions);
+        assert!(suggestions.contains(&"C-esc".to_string()), "Should suggest C-esc. Suggestions: {:?}", suggestions);
+    }
+
+    #[test]
+    fn test_suggestions_multiple_prefixes() {
+        let data = create_test_data_with_defvars();
+        let (_prefix, suggestions) = get_suggestions("C-S-", &data);
+        // After C-S-, can add A-, M-, RC-, RS-, RM-, AG-, RA- but not C- or S-
+        assert!(suggestions.contains(&"C-S-a".to_string()), "Should suggest C-S-a");
+        assert!(suggestions.contains(&"C-S-M-".to_string()), "Should suggest C-S-M-");
+        assert!(!suggestions.contains(&"C-S-C-".to_string()), "Should NOT suggest duplicate C-");
+        assert!(!suggestions.contains(&"C-S-S-".to_string()), "Should NOT suggest duplicate S-");
+    }
+
+    #[test]
+    fn test_suggestions_partial_base() {
+        let data = create_test_data_with_defvars();
+        let (_prefix, suggestions) = get_suggestions("C-a", &data);
+        // Should suggest base keys starting with 'a' with C- prefix
+        assert!(suggestions.contains(&"C-a".to_string()), "Should suggest C-a");
+        // Should not suggest keys not starting with 'a'
+        assert!(!suggestions.contains(&"C-b".to_string()), "Should NOT suggest C-b when query is C-a");
+    }
+
+    #[test]
+    fn test_suggestions_all_modifiers() {
+        let data = create_test_data_with_defvars();
+        let modifiers = ["C", "RC", "A", "RA", "AG", "S", "RS", "M", "RM"];
+        for m in &modifiers {
+            let query = format!("{}", m);
+            let (_prefix, suggestions) = get_suggestions(&query, &data);
+            assert!(
+                suggestions.contains(&format!("{}-", m)),
+                "Should suggest {}- for query {}",
+                m,
+                query
+            );
+        }
+    }
+
+    #[test]
+    fn test_output_chord_in_action() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        // Output chords should work inside actions
+        assert!(validator.validate_action("(tap-hold 200 200 C-a C-S-a)"));
+        assert!(validator.validate_action("(multi C-c C-v)"));
+    }
+
+    #[test]
+    fn test_output_chord_case_insensitive() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        // Should be case insensitive
+        assert!(validator.validate_action("c-a"));
+        assert!(validator.validate_action("C-A"));
+        assert!(validator.validate_action("c-s-tab"));
     }
 }
 
@@ -1744,7 +2200,7 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                                             current_text.set(format!("{}{}", prefix, s_clone.clone()));
                                             show_suggestions.set(false);
                                         });
-                                        let display = if s == "_" { "transparent (▽)".to_string() } else { s.clone() };
+                                        let display = if s == "_" { "transparent (▽)".to_string() } else if s == "none" { "none (∅)".to_string() } else { s.clone() };
                                         html! {
                                             <button onclick={onclick} class={classes!("text-left", "px-3", "py-2", "text-xs", "rounded-lg", "transition-colors", "font-mono", "border", "truncate",
                                                 if is_active { "bg-blue-600 text-white border-blue-400" } else { "hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border-transparent hover:border-blue-200 dark:hover:border-blue-800 text-gray-700 dark:text-gray-300" }
