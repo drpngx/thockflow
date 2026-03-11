@@ -313,6 +313,29 @@ pub struct Defvar {
     pub var_type: VarType,   // Auto-detected type
 }
 
+/// Release behaviour for defchordsv2
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub enum ReleaseBehaviour {
+    FirstRelease,
+    AllReleased,
+}
+
+impl Default for ReleaseBehaviour {
+    fn default() -> Self {
+        ReleaseBehaviour::FirstRelease
+    }
+}
+
+/// A chord definition for defchordsv2
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+pub struct ChordV2 {
+    pub keys: Vec<String>,           // 2+ participating keys
+    pub action: String,              // Action to activate
+    pub timeout: u32,                // Milliseconds
+    pub release_behaviour: ReleaseBehaviour,
+    pub disabled_layers: Vec<String>,
+}
+
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct KeymapData {
     pub physical_layout: Vec<PhysicalKey>,
@@ -331,6 +354,9 @@ pub struct KeymapData {
     /// Phantom keys - available in physical layout but not in defsrc
     #[serde(default)]
     pub phantom_keys: Vec<PhantomKey>,
+    /// defchordsv2 definitions
+    #[serde(default)]
+    pub chordsv2: Vec<ChordV2>,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.

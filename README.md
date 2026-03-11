@@ -66,14 +66,8 @@ We need to improve the ZMK Studio tab. The layout must have a menu, exactly like
 
 
 Finish basic implementing Kanata:
-- mousemove variants, setmouse, mousemove-speed
-We need to improve the Kanata tab. We will add support for mousemove variants, setmouse, and mousemove-speed. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#mouse-movement We need a design and implementation doc that contains planning for extensive tests.
 - cmd
 We need to improve the Kanata tab. We will add support for the `cmd` action which takes strings. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc The command can be unquoted strings for instance `(cmd bazel build -c opt //...)` We need a design and implementation doc that contains planning for extensive tests.
-- clipboard variants
-We need to improve the Kanata tab. We will add support for clipboard ring. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#clipboard-actions We need a design and implementation doc that contains planning for extensive tests.
-- defchords
-We need to improve the Kanata tab. We will add support for defchords. You can see how it's done here: https://github.com/jtroo/kanata/blob/main/docs/config.adoc#input-chords--combos-v2 We need to be mindful of the parameters types for completion. We need a design and implementation doc that contains planning for extensive tests.
 - is_laptop: true detection using proper BatteryManager and screen size
 
 

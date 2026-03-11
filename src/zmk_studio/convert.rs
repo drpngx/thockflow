@@ -204,6 +204,7 @@ pub fn to_keymap_data(
         process_unmapped_keys: ProcessUnmappedKeys::No,
         defvars: vec![],
         phantom_keys: vec![],
+        chordsv2: vec![],
     }
 }
 

@@ -166,6 +166,8 @@ enum ParamType {
     Action,
     Layer,
     Any,
+    String,     // String argument (for cmd, clipboard)
+    ClipboardId,// Clipboard save ID (0-65535)
 }
 
 static KANATA_ACTIONS: &[KanataActionInfo] = &[
@@ -239,6 +241,107 @@ static KANATA_ACTIONS: &[KanataActionInfo] = &[
         params: &[ParamType::Any],
         description: "Send a unicode character.",
     },
+    // Mouse movement actions
+    KanataActionInfo {
+        name: "movemouse-up",
+        params: &[ParamType::Integer, ParamType::Integer],
+        description: "Move mouse cursor up. Params: interval_ms distance_px",
+    },
+    KanataActionInfo {
+        name: "movemouse-down",
+        params: &[ParamType::Integer, ParamType::Integer],
+        description: "Move mouse cursor down. Params: interval_ms distance_px",
+    },
+    KanataActionInfo {
+        name: "movemouse-left",
+        params: &[ParamType::Integer, ParamType::Integer],
+        description: "Move mouse cursor left. Params: interval_ms distance_px",
+    },
+    KanataActionInfo {
+        name: "movemouse-right",
+        params: &[ParamType::Integer, ParamType::Integer],
+        description: "Move mouse cursor right. Params: interval_ms distance_px",
+    },
+    // Accelerated mouse movement actions
+    KanataActionInfo {
+        name: "movemouse-accel-up",
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Integer, ParamType::Integer],
+        description: "Accelerated mouse up. Params: interval_ms accel_time_ms min_px max_px",
+    },
+    KanataActionInfo {
+        name: "movemouse-accel-down",
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Integer, ParamType::Integer],
+        description: "Accelerated mouse down. Params: interval_ms accel_time_ms min_px max_px",
+    },
+    KanataActionInfo {
+        name: "movemouse-accel-left",
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Integer, ParamType::Integer],
+        description: "Accelerated mouse left. Params: interval_ms accel_time_ms min_px max_px",
+    },
+    KanataActionInfo {
+        name: "movemouse-accel-right",
+        params: &[ParamType::Integer, ParamType::Integer, ParamType::Integer, ParamType::Integer],
+        description: "Accelerated mouse right. Params: interval_ms accel_time_ms min_px max_px",
+    },
+    // Set absolute mouse position
+    KanataActionInfo {
+        name: "setmouse",
+        params: &[ParamType::Integer, ParamType::Integer],
+        description: "Set absolute mouse position. Params: x y (platform-specific)",
+    },
+    // Modify mouse movement speed
+    KanataActionInfo {
+        name: "movemouse-speed",
+        params: &[ParamType::Integer],
+        description: "Modify mouse movement speed. Param: percentage (50=half, 200=double)",
+    },
+    // cmd actions
+    KanataActionInfo {
+        name: "cmd",
+        params: &[ParamType::String],  // Variadic: at least 1 required (binary)
+        description: "Execute a binary with arguments. Example: (cmd echo hello)",
+    },
+    KanataActionInfo {
+        name: "cmd-log",
+        params: &[ParamType::String, ParamType::String],
+        description: "Set cmd log levels. Params: stdout-level stderr-level (debug|info|warn|error|none)",
+    },
+    KanataActionInfo {
+        name: "cmd-output-keys",
+        params: &[ParamType::String],  // Variadic: at least 1 required
+        description: "Execute command and parse stdout as keys to type.",
+    },
+    // Clipboard actions
+    KanataActionInfo {
+        name: "clipboard-set",
+        params: &[ParamType::String],
+        description: "Set clipboard to string. Example: (clipboard-set \"hello\")",
+    },
+    KanataActionInfo {
+        name: "clipboard-save",
+        params: &[ParamType::ClipboardId],
+        description: "Save clipboard to ID (0-65535). Example: (clipboard-save 0)",
+    },
+    KanataActionInfo {
+        name: "clipboard-restore",
+        params: &[ParamType::ClipboardId],
+        description: "Restore clipboard from ID. Example: (clipboard-restore 0)",
+    },
+    KanataActionInfo {
+        name: "clipboard-save-swap",
+        params: &[ParamType::ClipboardId, ParamType::ClipboardId],
+        description: "Swap two clipboard save IDs. Example: (clipboard-save-swap 0 1)",
+    },
+    KanataActionInfo {
+        name: "clipboard-cmd-set",
+        params: &[ParamType::String],  // Variadic: binary + args
+        description: "Set clipboard from command output. Example: (clipboard-cmd-set echo hello)",
+    },
+    KanataActionInfo {
+        name: "clipboard-save-cmd-set",
+        params: &[ParamType::ClipboardId, ParamType::String],  // ID + variadic
+        description: "Set save ID from command output. Example: (clipboard-save-cmd-set 0 echo hello)",
+    },
 ];
 
 struct KanataValidator<'a> {
@@ -283,11 +386,67 @@ impl<'a> KanataValidator<'a> {
 
                 if params.len() != action.params.len() { return false; }
 
+                // Check if this is a mouse action for special validation
+                let is_mouse_action = action.name.starts_with("movemouse") || action.name == "setmouse";
+                
+                // Handle variadic actions
+                let is_variadic = matches!(action.name, 
+                    "cmd" | "cmd-output-keys" | "clipboard-cmd-set" | "multi" | "macro"
+                );
+                let is_clipboard_save_cmd_set = action.name == "clipboard-save-cmd-set";
+                
+                // Special validation for variadic actions
+                if is_variadic {
+                    // Must have at least the minimum required params
+                    let min_params = match action.name {
+                        "cmd" | "cmd-output-keys" | "clipboard-cmd-set" => 1,
+                        _ => 1, // multi, macro
+                    };
+                    if params.len() < min_params {
+                        return false;
+                    }
+                    // All params must be valid strings (or for macro/multi, they're actions)
+                    if action.name == "cmd" || action.name == "cmd-output-keys" || action.name.starts_with("clipboard-") {
+                        // String params - any string is valid (can be quoted or unquoted)
+                        return true;
+                    }
+                    // For multi/macro, recursively validate
+                    return params.iter().all(|&p| self.validate_action(p) || KANATA_KEYS.contains(&p));
+                }
+                
+                // Special validation for clipboard-save-cmd-set: ID + at least 1 string
+                if is_clipboard_save_cmd_set {
+                    if params.len() < 2 {
+                        return false;
+                    }
+                    // First param must be valid clipboard ID
+                    if let Ok(n) = params[0].parse::<u32>() {
+                        if n > 65535 {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                    // Rest are strings (command + args)
+                    return true;
+                }
+                
+                // Standard fixed-param validation
+                if params.len() != action.params.len() { return false; }
+
                 for (i, &p_type) in action.params.iter().enumerate() {
                     let val = params[i];
                     match p_type {
                         ParamType::Timeout | ParamType::Integer => {
-                            if val.parse::<u32>().is_err() { return false; }
+                            match val.parse::<u32>() {
+                                Ok(n) => {
+                                    // Mouse actions require values in range [1, 65535]
+                                    if is_mouse_action && (n < 1 || n > 65535) {
+                                        return false;
+                                    }
+                                }
+                                Err(_) => return false,
+                            }
                         }
                         ParamType::Layer => {
                             if !self.data.layers.iter().any(|l| l.name == val) { return false; }
@@ -296,6 +455,26 @@ impl<'a> KanataValidator<'a> {
                             if !self.validate_action(val) && !KANATA_KEYS.contains(&val) {
                                 return false;
                             }
+                        }
+                        ParamType::ClipboardId => {
+                            match val.parse::<u32>() {
+                                Ok(n) => {
+                                    if n > 65535 {
+                                        return false;
+                                    }
+                                }
+                                Err(_) => return false,
+                            }
+                        }
+                        ParamType::String => {
+                            // For cmd-log, validate log levels
+                            if action.name == "cmd-log" {
+                                let valid_levels = ["debug", "info", "warn", "error", "none"];
+                                if !valid_levels.contains(&val.to_lowercase().as_str()) {
+                                    return false;
+                                }
+                            }
+                            // Other strings are always valid (quoted or unquoted)
                         }
                         ParamType::Any => {}
                     }
@@ -599,15 +778,29 @@ fn get_suggestions(text: &str, data: &KeymapData) -> (String, Vec<String>) {
             }
         }
     } else if expected_type == Some(ParamType::Integer) || expected_type == Some(ParamType::Timeout) {
-        // Suggest integer literals
-        for t in ["50", "100", "200", "250", "300", "1000"] {
-            if t.contains(query) {
-                suggestions.push(t.to_string());
+        // Check if we're completing a mouse action parameter
+        let mouse_action = get_current_mouse_action(&lower_text);
+        
+        if let Some((action_name, param_idx)) = mouse_action {
+            // Mouse action-specific suggestions
+            let mouse_suggestions = get_mouse_action_suggestions(&action_name, param_idx);
+            for s in mouse_suggestions {
+                if s.contains(query) {
+                    suggestions.push(s);
+                }
+            }
+        } else {
+            // Default integer suggestions for timeouts
+            for t in ["50", "100", "200", "250", "300", "1000"] {
+                if t.contains(query) {
+                    suggestions.push(t.to_string());
+                }
             }
         }
+        
         // Suggest integer variables
         for defvar in &data.defvars {
-            if matches_type(&defvar.var_type, &expected_type.unwrap()) {
+            if matches_type(&defvar.var_type, &ParamType::Integer) {
                 let var_suggestion = format!("${}", defvar.name);
                 if var_suggestion.to_lowercase().contains(query) || query.starts_with('$') {
                     suggestions.push(var_suggestion);
@@ -770,6 +963,88 @@ fn matches_type(var_type: &VarType, param_type: &ParamType) -> bool {
         (VarType::List, ParamType::Any) => true,
         _ => false,
     }
+}
+
+/// Detect if we're currently completing a mouse action parameter
+/// Returns Some((action_name, param_index)) if inside a mouse action, None otherwise
+fn get_current_mouse_action(text: &str) -> Option<(String, usize)> {
+    if let Some(last_open) = text.rfind('(') {
+        let after_open = &text[last_open + 1..];
+        let parts: Vec<&str> = after_open.split_whitespace().collect();
+        
+        if parts.is_empty() {
+            return None;
+        }
+        
+        let action_name = parts[0];
+        
+        // Check if this is a mouse action
+        if action_name.starts_with("movemouse") || action_name == "setmouse" {
+            let param_idx = if after_open.ends_with(' ') {
+                parts.len() - 1
+            } else {
+                parts.len().saturating_sub(2)
+            };
+            return Some((action_name.to_string(), param_idx));
+        }
+    }
+    
+    None
+}
+
+/// Get suggestion values for mouse action parameters
+fn get_mouse_action_suggestions(action_name: &str, param_idx: usize) -> Vec<String> {
+    let mut suggestions = Vec::new();
+    
+    if action_name.starts_with("movemouse-accel") {
+        // movemouse-accel-*: interval, accel_time, min, max
+        match param_idx {
+            0 => {
+                // Interval: typical values 1-10ms
+                suggestions.extend(["1", "2", "5", "10"].iter().map(|&s| s.to_string()));
+            }
+            1 => {
+                // Acceleration time: typical values 500-2000ms
+                suggestions.extend(["500", "1000", "1500", "2000"].iter().map(|&s| s.to_string()));
+            }
+            2 | 3 => {
+                // Min/max distance: typical values 1-20 pixels
+                suggestions.extend(["1", "2", "5", "10", "20"].iter().map(|&s| s.to_string()));
+            }
+            _ => {}
+        }
+    } else if action_name.starts_with("movemouse") && action_name != "movemouse-speed" {
+        // movemouse-* (basic): interval, distance
+        match param_idx {
+            0 => {
+                // Interval: typical values 1-50ms
+                suggestions.extend(["1", "5", "10", "20", "50"].iter().map(|&s| s.to_string()));
+            }
+            1 => {
+                // Distance: typical values 1-50 pixels
+                suggestions.extend(["1", "5", "10", "20", "50"].iter().map(|&s| s.to_string()));
+            }
+            _ => {}
+        }
+    } else if action_name == "setmouse" {
+        // setmouse: x, y coordinates
+        match param_idx {
+            0 => {
+                // X coordinate: common screen positions
+                suggestions.extend(["0", "960", "1920", "32768"].iter().map(|&s| s.to_string()));
+            }
+            1 => {
+                // Y coordinate: common screen positions  
+                suggestions.extend(["0", "540", "1080", "32768"].iter().map(|&s| s.to_string()));
+            }
+            _ => {}
+        }
+    } else if action_name == "movemouse-speed" {
+        // movemouse-speed: percentage
+        suggestions.extend(["25", "50", "75", "100", "150", "200", "300"].iter().map(|&s| s.to_string()));
+    }
+    
+    suggestions
 }
 
 #[cfg(test)]
@@ -1260,6 +1535,581 @@ mod tests {
         assert!(validator.validate_action("c-a"));
         assert!(validator.validate_action("C-A"));
         assert!(validator.validate_action("c-s-tab"));
+    }
+
+    // ============================================================================
+    // Mouse Movement Tests
+    // ============================================================================
+
+    #[test]
+    fn test_mouse_actions_exist() {
+        let mouse_actions = [
+            "movemouse-up", "movemouse-down", "movemouse-left", "movemouse-right",
+            "movemouse-accel-up", "movemouse-accel-down", "movemouse-accel-left", "movemouse-accel-right",
+            "setmouse", "movemouse-speed"
+        ];
+        
+        for action_name in &mouse_actions {
+            assert!(KANATA_ACTIONS.iter().any(|a| a.name == *action_name),
+                "Mouse action {} should exist", action_name);
+        }
+    }
+
+    #[test]
+    fn test_movemouse_params() {
+        let action = KANATA_ACTIONS.iter().find(|a| a.name == "movemouse-up").unwrap();
+        assert_eq!(action.params.len(), 2);
+        assert_eq!(action.params[0], ParamType::Integer);
+        assert_eq!(action.params[1], ParamType::Integer);
+    }
+
+    #[test]
+    fn test_movemouse_accel_params() {
+        let action = KANATA_ACTIONS.iter().find(|a| a.name == "movemouse-accel-up").unwrap();
+        assert_eq!(action.params.len(), 4);
+        assert!(action.params.iter().all(|&p| p == ParamType::Integer));
+    }
+
+    #[test]
+    fn test_setmouse_params() {
+        let action = KANATA_ACTIONS.iter().find(|a| a.name == "setmouse").unwrap();
+        assert_eq!(action.params.len(), 2);
+        assert_eq!(action.params[0], ParamType::Integer);
+        assert_eq!(action.params[1], ParamType::Integer);
+    }
+
+    #[test]
+    fn test_movemouse_speed_params() {
+        let action = KANATA_ACTIONS.iter().find(|a| a.name == "movemouse-speed").unwrap();
+        assert_eq!(action.params.len(), 1);
+        assert_eq!(action.params[0], ParamType::Integer);
+    }
+
+    #[test]
+    fn test_validate_movemouse_basic() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(movemouse-up 1 1)"));
+        assert!(validator.validate_action("(movemouse-down 10 5)"));
+        assert!(validator.validate_action("(movemouse-left 50 100)"));
+        assert!(validator.validate_action("(movemouse-right 100 50)"));
+    }
+
+    #[test]
+    fn test_validate_movemouse_accel() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(movemouse-accel-up 1 1000 1 5)"));
+        assert!(validator.validate_action("(movemouse-accel-down 5 500 2 10)"));
+        assert!(validator.validate_action("(movemouse-accel-left 10 2000 1 20)"));
+        assert!(validator.validate_action("(movemouse-accel-right 2 750 3 15)"));
+    }
+
+    #[test]
+    fn test_validate_setmouse() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(setmouse 0 0)"));
+        assert!(validator.validate_action("(setmouse 960 540)"));
+        assert!(validator.validate_action("(setmouse 32768 32768)"));
+    }
+
+    #[test]
+    fn test_validate_movemouse_speed() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(movemouse-speed 50)"));
+        assert!(validator.validate_action("(movemouse-speed 100)"));
+        assert!(validator.validate_action("(movemouse-speed 200)"));
+    }
+
+    #[test]
+    fn test_validate_movemouse_invalid_params() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Too few params
+        assert!(!validator.validate_action("(movemouse-up 1)"));
+        assert!(!validator.validate_action("(movemouse-accel-up 1 1000 1)"));
+        
+        // Too many params
+        assert!(!validator.validate_action("(movemouse-up 1 1 1)"));
+        assert!(!validator.validate_action("(setmouse 0 0 0)"));
+        
+        // Invalid (non-integer) params
+        assert!(!validator.validate_action("(movemouse-up abc 1)"));
+        assert!(!validator.validate_action("(movemouse-speed fast)"));
+    }
+
+    #[test]
+    fn test_validate_movemouse_range() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Valid boundary values
+        assert!(validator.validate_action("(movemouse-up 1 1)"));
+        assert!(validator.validate_action("(movemouse-up 65535 65535)"));
+        
+        // Invalid: zero
+        assert!(!validator.validate_action("(movemouse-up 0 1)"));
+        assert!(!validator.validate_action("(movemouse-up 1 0)"));
+        
+        // Invalid: negative
+        assert!(!validator.validate_action("(movemouse-up -1 1)"));
+    }
+
+    #[test]
+    fn test_suggestions_movemouse_actions() {
+        let data = create_test_data_with_defvars();
+        
+        // Typing "(move" should suggest movemouse actions
+        let (_, suggestions) = get_suggestions("(move", &data);
+        assert!(suggestions.iter().any(|s| s.contains("movemouse-up")));
+        assert!(suggestions.iter().any(|s| s.contains("movemouse-accel-up")));
+        assert!(suggestions.iter().any(|s| s.contains("movemouse-speed")));
+    }
+
+    #[test]
+    fn test_suggestions_movemouse_first_param() {
+        let data = create_test_data_with_defvars();
+        
+        // After typing "(movemouse-up ", should suggest integers
+        let (_, suggestions) = get_suggestions("(movemouse-up ", &data);
+        
+        // Should have integer suggestions
+        assert!(suggestions.iter().any(|s| s.parse::<u32>().is_ok()),
+            "Should suggest integer values for interval");
+    }
+
+    #[test]
+    fn test_get_mouse_action_suggestions() {
+        // Test basic movemouse suggestions
+        let suggestions = get_mouse_action_suggestions("movemouse-up", 0);
+        assert!(suggestions.contains(&"1".to_string()));
+        assert!(suggestions.contains(&"5".to_string()));
+        
+        let suggestions = get_mouse_action_suggestions("movemouse-up", 1);
+        assert!(suggestions.contains(&"1".to_string()));
+        assert!(suggestions.contains(&"10".to_string()));
+        
+        // Test accel suggestions
+        let suggestions = get_mouse_action_suggestions("movemouse-accel-up", 0);
+        assert!(suggestions.contains(&"1".to_string()));
+        
+        let suggestions = get_mouse_action_suggestions("movemouse-accel-up", 1);
+        assert!(suggestions.contains(&"1000".to_string()));
+        
+        // Test setmouse suggestions
+        let suggestions = get_mouse_action_suggestions("setmouse", 0);
+        assert!(suggestions.contains(&"0".to_string()));
+        assert!(suggestions.contains(&"960".to_string()));
+        
+        // Test speed suggestions
+        let suggestions = get_mouse_action_suggestions("movemouse-speed", 0);
+        assert!(suggestions.contains(&"50".to_string()));
+        assert!(suggestions.contains(&"100".to_string()));
+        assert!(suggestions.contains(&"200".to_string()));
+    }
+
+    #[test]
+    fn test_get_current_mouse_action() {
+        // Basic movemouse
+        let result = get_current_mouse_action("(movemouse-up 1");
+        assert_eq!(result, Some(("movemouse-up".to_string(), 1)));
+        
+        // Accel movemouse
+        let result = get_current_mouse_action("(movemouse-accel-down 5 500");
+        assert_eq!(result, Some(("movemouse-accel-down".to_string(), 2)));
+        
+        // setmouse
+        let result = get_current_mouse_action("(setmouse 0");
+        assert_eq!(result, Some(("setmouse".to_string(), 1)));
+        
+        // Non-mouse action
+        let result = get_current_mouse_action("(tap-hold 200");
+        assert_eq!(result, None);
+        
+        // Not inside action
+        let result = get_current_mouse_action("movemouse-up");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_mouse_in_multi() {
+        // Mouse actions can be combined with other actions
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(multi (movemouse-up 1 1) (movemouse-right 1 1))"));
+        assert!(validator.validate_action("(multi (movemouse-speed 200) (movemouse-left 5 10))"));
+    }
+
+    #[test]
+    fn test_mouse_in_tap_hold() {
+        // Mouse actions can be used in tap-hold
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(tap-hold 200 200 (movemouse-up 1 1) (movemouse-down 1 1))"));
+    }
+
+    #[test]
+    fn test_complex_mouse_layer() {
+        // Test all mouse actions are valid
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Basic movemouse
+        assert!(validator.validate_action("(movemouse-up 1 1)"));
+        assert!(validator.validate_action("(movemouse-down 1 1)"));
+        assert!(validator.validate_action("(movemouse-left 1 1)"));
+        assert!(validator.validate_action("(movemouse-right 1 1)"));
+        
+        // Accel movemouse
+        assert!(validator.validate_action("(movemouse-accel-up 1 1000 1 5)"));
+        assert!(validator.validate_action("(movemouse-accel-down 1 1000 1 5)"));
+        assert!(validator.validate_action("(movemouse-accel-left 1 1000 1 5)"));
+        assert!(validator.validate_action("(movemouse-accel-right 1 1000 1 5)"));
+        
+        // Set position and speed
+        assert!(validator.validate_action("(setmouse 960 540)"));
+        assert!(validator.validate_action("(movemouse-speed 200)"));
+        assert!(validator.validate_action("(movemouse-speed 50)"));
+    }
+
+    // ============================================================================
+    // cmd Action Tests
+    // ============================================================================
+
+    #[test]
+    fn test_cmd_actions_exist() {
+        assert!(KANATA_ACTIONS.iter().any(|a| a.name == "cmd"));
+        assert!(KANATA_ACTIONS.iter().any(|a| a.name == "cmd-log"));
+        assert!(KANATA_ACTIONS.iter().any(|a| a.name == "cmd-output-keys"));
+    }
+
+    #[test]
+    fn test_validate_cmd_simple() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(cmd echo hello)"));
+        assert!(validator.validate_action("(cmd ls -la)"));
+        assert!(validator.validate_action("(cmd bazel build -c opt //...)"));
+    }
+
+    #[test]
+    fn test_validate_cmd_quoted() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(cmd echo \"hello world\")"));
+        assert!(validator.validate_action("(cmd powershell.exe -c \"Get-Date\")"));
+    }
+
+    #[test]
+    fn test_validate_cmd_log() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(cmd-log info error)"));
+        assert!(validator.validate_action("(cmd-log debug none)"));
+        assert!(validator.validate_action("(cmd-log warn info)"));
+        assert!(validator.validate_action("(cmd-log ERROR DEBUG)")); // Case insensitive
+    }
+
+    #[test]
+    fn test_validate_cmd_log_invalid() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Invalid log levels
+        assert!(!validator.validate_action("(cmd-log invalid error)"));
+        assert!(!validator.validate_action("(cmd-log info invalid)"));
+        
+        // Wrong number of params
+        assert!(!validator.validate_action("(cmd-log info)"));
+        assert!(!validator.validate_action("(cmd-log info error extra)"));
+    }
+
+    #[test]
+    fn test_validate_cmd_no_args() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // cmd requires at least binary name
+        assert!(!validator.validate_action("(cmd)"));
+        assert!(!validator.validate_action("(cmd-output-keys)"));
+    }
+
+    #[test]
+    fn test_validate_cmd_output_keys() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(cmd-output-keys xclip -o)"));
+        assert!(validator.validate_action("(cmd-output-keys echo hello)"));
+    }
+
+    // ============================================================================
+    // Clipboard Action Tests
+    // ============================================================================
+
+    #[test]
+    fn test_clipboard_actions_exist() {
+        let actions = [
+            "clipboard-set", "clipboard-save", "clipboard-restore",
+            "clipboard-save-swap", "clipboard-cmd-set", "clipboard-save-cmd-set"
+        ];
+        for action in &actions {
+            assert!(KANATA_ACTIONS.iter().any(|a| a.name == *action),
+                "Clipboard action {} should exist", action);
+        }
+    }
+
+    #[test]
+    fn test_validate_clipboard_set() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(clipboard-set \"hello\")"));
+        assert!(validator.validate_action("(clipboard-set hello)"));
+    }
+
+    #[test]
+    fn test_validate_clipboard_save_restore() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Valid IDs: 0-65535
+        assert!(validator.validate_action("(clipboard-save 0)"));
+        assert!(validator.validate_action("(clipboard-save 65535)"));
+        assert!(validator.validate_action("(clipboard-restore 12345)"));
+    }
+
+    #[test]
+    fn test_validate_clipboard_save_invalid_id() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(!validator.validate_action("(clipboard-save -1)"));
+        assert!(!validator.validate_action("(clipboard-save 65536)"));
+        assert!(!validator.validate_action("(clipboard-save abc)"));
+    }
+
+    #[test]
+    fn test_validate_clipboard_save_swap() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(clipboard-save-swap 0 1)"));
+        assert!(validator.validate_action("(clipboard-save-swap 100 200)"));
+        
+        // Invalid IDs
+        assert!(!validator.validate_action("(clipboard-save-swap 0 65536)"));
+    }
+
+    #[test]
+    fn test_validate_clipboard_cmd_set() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(clipboard-cmd-set echo hello)"));
+        assert!(validator.validate_action("(clipboard-cmd-set powershell.exe -c Get-Date)"));
+        
+        // Needs at least binary
+        assert!(!validator.validate_action("(clipboard-cmd-set)"));
+    }
+
+    #[test]
+    fn test_validate_clipboard_save_cmd_set() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        assert!(validator.validate_action("(clipboard-save-cmd-set 0 echo hello)"));
+        assert!(validator.validate_action("(clipboard-save-cmd-set 5 powershell.exe -c Get-Date)"));
+        
+        // Needs at least ID + binary
+        assert!(!validator.validate_action("(clipboard-save-cmd-set 0)"));
+        assert!(!validator.validate_action("(clipboard-save-cmd-set)"));
+    }
+
+    #[test]
+    fn test_clipboard_in_macro() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Common use case: save, do something, restore
+        assert!(validator.validate_action(
+            "(macro (clipboard-save 0) 20 C-v (clipboard-restore 0))"
+        ));
+    }
+
+    // ============================================================================
+    // defchordsv2 Tests
+    // ============================================================================
+
+    #[test]
+    fn test_chordv2_release_behaviour_enum() {
+        use crate::keymap::{ReleaseBehaviour};
+        
+        assert_eq!(ReleaseBehaviour::FirstRelease, ReleaseBehaviour::FirstRelease);
+        assert_eq!(ReleaseBehaviour::AllReleased, ReleaseBehaviour::AllReleased);
+        assert_ne!(ReleaseBehaviour::FirstRelease, ReleaseBehaviour::AllReleased);
+    }
+
+    #[test]
+    fn test_chordv2_types_exist() {
+        // Test that ChordV2 can be created
+        use crate::keymap::{ChordV2, ReleaseBehaviour};
+        
+        let chord = ChordV2 {
+            keys: vec!["a".to_string(), "s".to_string()],
+            action: "c".to_string(),
+            timeout: 200,
+            release_behaviour: ReleaseBehaviour::AllReleased,
+            disabled_layers: vec![],
+        };
+        
+        assert_eq!(chord.keys.len(), 2);
+        assert_eq!(chord.timeout, 200);
+    }
+
+    #[test]
+    fn test_chordv2_minimum_keys_validation() {
+        use crate::keymap::{ChordV2, ReleaseBehaviour};
+        
+        // Valid: 2 keys
+        let chord = ChordV2 {
+            keys: vec!["a".to_string(), "s".to_string()],
+            action: "c".to_string(),
+            timeout: 200,
+            release_behaviour: ReleaseBehaviour::AllReleased,
+            disabled_layers: vec![],
+        };
+        assert!(chord.keys.len() >= 2);
+        
+        // Valid: 3 keys
+        let chord = ChordV2 {
+            keys: vec!["a".to_string(), "s".to_string(), "d".to_string()],
+            action: "c".to_string(),
+            timeout: 200,
+            release_behaviour: ReleaseBehaviour::AllReleased,
+            disabled_layers: vec![],
+        };
+        assert!(chord.keys.len() >= 2);
+    }
+
+    #[test]
+    fn test_chordv2_timeout_validation() {
+        // Timeout must be positive
+        let timeout: u32 = 200;
+        assert!(timeout > 0);
+        
+        let timeout: u32 = 1;
+        assert!(timeout > 0);
+    }
+
+    #[test]
+    fn test_chordv2_keymap_data_integration() {
+        use crate::keymap::{ChordV2, ReleaseBehaviour, KeymapData};
+        
+        let mut data = KeymapData::default();
+        
+        data.chordsv2.push(ChordV2 {
+            keys: vec!["a".to_string(), "s".to_string()],
+            action: "c".to_string(),
+            timeout: 200,
+            release_behaviour: ReleaseBehaviour::AllReleased,
+            disabled_layers: vec![],
+        });
+        
+        assert_eq!(data.chordsv2.len(), 1);
+        assert_eq!(data.chordsv2[0].keys, vec!["a", "s"]);
+    }
+
+    // ============================================================================
+    // Integration Tests
+    // ============================================================================
+
+    #[test]
+    fn test_cmd_and_clipboard_integration() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // cmd setting clipboard
+        assert!(validator.validate_action("(clipboard-cmd-set echo hello)"));
+        
+        // Complex macro with clipboard
+        assert!(validator.validate_action(
+            "(macro (clipboard-save 0) (clipboard-cmd-set echo \"hello world\") 100 C-v (clipboard-restore 0))"
+        ));
+    }
+
+    #[test]
+    fn test_cmd_in_macro() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // cmd can be used in macro sequences
+        assert!(validator.validate_action(
+            "(macro esc (cmd notify-send \"Hello\") 100 esc)"
+        ));
+    }
+
+    #[test]
+    fn test_cmd_in_tap_hold() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // cmd can be used in tap-hold
+        assert!(validator.validate_action(
+            "(tap-hold 200 200 (cmd echo tap) (cmd echo hold))"
+        ));
+    }
+
+    #[test]
+    fn test_cmd_complex_real_world() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // Real-world complex commands
+        assert!(validator.validate_action(
+            "(cmd bazel build -c opt //src/...)"
+        ));
+        
+        assert!(validator.validate_action(
+            "(cmd git status --short)"
+        ));
+        
+        assert!(validator.validate_action(
+            "(cmd powershell.exe -Command \"Get-Process | Select-Object Name, CPU\")"
+        ));
+        
+        assert!(validator.validate_action(
+            "(cmd wtype \"special characters: àáâãäå\")"
+        ));
+    }
+
+    #[test]
+    fn test_all_new_actions_in_multi() {
+        let data = create_test_data_with_defvars();
+        let validator = KanataValidator::new(&data);
+        
+        // cmd in multi
+        assert!(validator.validate_action("(multi (cmd echo hello) esc)"));
+        
+        // clipboard in multi
+        assert!(validator.validate_action("(multi (clipboard-set \"test\") esc)"));
+        
+        // Combined
+        assert!(validator.validate_action(
+            "(multi (clipboard-save 0) (cmd echo done) (clipboard-restore 0))"
+        ));
     }
 }
 
@@ -2092,6 +2942,8 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                         ParamType::Action => "action",
                         ParamType::Layer => "layer",
                         ParamType::Any => "any",
+                        ParamType::String => "string",
+                        ParamType::ClipboardId => "clipboard-id",
                     }).collect();
                 }
             }
@@ -2109,6 +2961,8 @@ fn KanataBindingPopup(props: &PopupProps) -> Html {
                     ParamType::Action => "action",
                     ParamType::Layer => "layer",
                     ParamType::Any => "any",
+                    ParamType::String => "string",
+                    ParamType::ClipboardId => "clipboard-id",
                 }).collect();
             }
         }
