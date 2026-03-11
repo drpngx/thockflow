@@ -1,4 +1,5 @@
 use gloo_net::http::Request;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
@@ -7,10 +8,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::keymap::{
     show_open_file_picker, BindingParts, FileSystemFileHandle, FileSystemWritableFileStream,
-    KeyOrigin, KeymapData, SelectedKey, VarType,
+    KeyOrigin, KeymapData, Layer, SelectedKey, VarType,
 };
 
 pub mod layout;
+pub mod layer_menu;
 
 /// Extension trait for Navigator to access the Battery API
 #[wasm_bindgen]
@@ -1107,6 +1109,7 @@ mod tests {
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
             phantom_keys: Vec::new(),
+            chordsv2: Vec::new(),
         };
         data.aliases.insert("myalias".to_string(), "lsft".to_string());
 
@@ -1153,6 +1156,7 @@ mod tests {
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
             phantom_keys: Vec::new(),
+            chordsv2: Vec::new(),
         };
         let (_, suggestions) = get_suggestions("_", &data);
         assert!(suggestions.contains(&"_".to_string()));
@@ -1179,6 +1183,7 @@ mod tests {
             process_unmapped_keys: ProcessUnmappedKeys::No,
             defvars: Vec::new(),
             phantom_keys: Vec::new(),
+            chordsv2: Vec::new(),
         };
 
         // Add test variables
@@ -2510,30 +2515,215 @@ fn KanataRenderer(props: &RendererProps) -> Html {
     let jump_mode_active = use_state(|| false);
     let jump_input = use_state(|| String::new());
     let container_ref = use_node_ref();
+    
+    // Layer menu state
+    let menu_state = use_state(|| layer_menu::LayerMenuState::default());
 
     let hint_chars = "asdfghjklqwertyuiopzxcvbnm";
-    let mut hint_map = std::collections::HashMap::new();
-    let mut layer_hint_map = std::collections::HashMap::new();
-
     let num_keys = props.data.physical_layout.len();
     let num_layers = props.data.layers.len();
 
-    for i in 0..num_keys {
-        if i < hint_chars.len() * hint_chars.len() {
-            let h = format!(
-                "{}{}",
-                hint_chars.chars().nth(i / hint_chars.len()).unwrap(),
-                hint_chars.chars().nth(i % hint_chars.len()).unwrap()
-            );
-            hint_map.insert(h, i);
-        }
-    }
-    for i in 0..num_layers {
-        if i < hint_chars.len() {
-            let h = format!("l{}", hint_chars.chars().nth(i).unwrap());
-            layer_hint_map.insert(h, i);
-        }
-    }
+    // Build hint map including menu targets
+    let (hint_map, key_hints, layer_hints) = layer_menu::build_hint_map(
+        num_keys,
+        num_layers,
+        menu_state.menu_open_index,
+    );
+    
+    // Create layer operation closures
+    let on_update = props.on_update.clone();
+    let current_layer = props.current_layer.clone();
+    let data = props.data.clone();
+    
+    // Move layer up/down
+    let move_layer = {
+        let on_update = on_update.clone();
+        let current_layer = current_layer.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize, up: bool| {
+            let mut new_data = data.clone();
+            let layers = &mut new_data.layers;
+            
+            // Guards
+            if up && idx == 0 { 
+                menu_state.set(layer_menu::LayerMenuState::default());
+                return; 
+            }
+            if !up && idx >= layers.len().saturating_sub(1) { 
+                menu_state.set(layer_menu::LayerMenuState::default());
+                return; 
+            }
+            
+            let target = if up { idx - 1 } else { idx + 1 };
+            layers.swap(idx, target);
+            
+            // Sync current_layer if it moved
+            let current = *current_layer;
+            if current == idx {
+                current_layer.set(target);
+            } else if current == target {
+                current_layer.set(idx);
+            }
+            
+            on_update.emit(new_data);
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize, bool)>
+    };
+    
+    // Rename layer
+    let rename_layer = {
+        let on_update = on_update.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize| {
+            let current_name = data.layers[idx].name.clone();
+            let window = web_sys::window().unwrap();
+            
+            if let Ok(Some(new_name)) = window.prompt_with_message_and_default(
+                "Rename layer:",
+                &current_name
+            ) {
+                let trimmed = new_name.trim();
+                if !trimmed.is_empty() && trimmed.len() <= 32 {
+                    let mut new_data = data.clone();
+                    new_data.layers[idx].name = trimmed.to_string();
+                    on_update.emit(new_data);
+                }
+            }
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize)>
+    };
+    
+    // Duplicate layer
+    let duplicate_layer = {
+        let on_update = on_update.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize| {
+            let mut new_data = data.clone();
+            
+            // Max layers limit
+            if new_data.layers.len() >= 32 {
+                menu_state.set(layer_menu::LayerMenuState::default());
+                return;
+            }
+            
+            let new_layer = Layer {
+                name: format!("{} (copy)", new_data.layers[idx].name),
+                bindings: new_data.layers[idx].bindings.clone(),
+                layer_type: new_data.layers[idx].layer_type.clone(),
+                source_layer: new_data.layers[idx].source_layer.clone(),
+                key_bindings: new_data.layers[idx].key_bindings.clone(),
+            };
+            
+            new_data.layers.insert(idx + 1, new_layer);
+            on_update.emit(new_data);
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize)>
+    };
+    
+    // Delete layer
+    let delete_layer = {
+        let on_update = on_update.clone();
+        let current_layer = current_layer.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize| {
+            // Prevent deleting last layer
+            if data.layers.len() <= 1 {
+                menu_state.set(layer_menu::LayerMenuState::default());
+                return;
+            }
+            
+            let window = web_sys::window().unwrap();
+            let confirmed = window
+                .confirm_with_message(&format!(
+                    "Delete layer '{}'? This cannot be undone.",
+                    data.layers[idx].name
+                ))
+                .unwrap_or(false);
+            
+            if confirmed {
+                let mut new_data = data.clone();
+                new_data.layers.remove(idx);
+                
+                // Adjust current_layer if necessary
+                let current = *current_layer;
+                if current >= new_data.layers.len() {
+                    current_layer.set(new_data.layers.len().saturating_sub(1));
+                } else if current == idx && current > 0 {
+                    current_layer.set(current - 1);
+                }
+                
+                on_update.emit(new_data);
+            }
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize)>
+    };
+    
+    // Reset all keys to "_"
+    let reset_layer = {
+        let on_update = on_update.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize| {
+            let mut new_data = data.clone();
+            let key_count = new_data.layers[idx].bindings.len();
+            new_data.layers[idx].bindings = vec!["_".to_string(); key_count];
+            on_update.emit(new_data);
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize)>
+    };
+    
+    // Convert "_" to "none"
+    let trans_to_none = {
+        let on_update = on_update.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize| {
+            let mut new_data = data.clone();
+            for binding in new_data.layers[idx].bindings.iter_mut() {
+                if binding == "_" {
+                    *binding = "none".to_string();
+                }
+            }
+            on_update.emit(new_data);
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize)>
+    };
+    
+    // Convert "none" to "_"
+    let none_to_trans = {
+        let on_update = on_update.clone();
+        let menu_state = menu_state.clone();
+        let data = data.clone();
+        Rc::new(move |idx: usize| {
+            let mut new_data = data.clone();
+            for binding in new_data.layers[idx].bindings.iter_mut() {
+                if binding == "none" {
+                    *binding = "_".to_string();
+                }
+            }
+            on_update.emit(new_data);
+            menu_state.set(layer_menu::LayerMenuState::default());
+        }) as Rc<dyn Fn(usize)>
+    };
+    
+    // Start quick assign mode - starts at first non-phantom key
+    let start_quick_assign = {
+        let menu_state = menu_state.clone();
+        let first_non_phantom = non_phantom_keys.first().copied();
+        Rc::new(move || {
+            menu_state.set(layer_menu::LayerMenuState {
+                menu_open_index: None,
+                focus_index: 0,
+                quick_assign_index: first_non_phantom,
+            });
+        }) as Rc<dyn Fn()>
+    };
+    
+
 
     {
         let container_ref = container_ref.clone();
@@ -2548,28 +2738,147 @@ fn KanataRenderer(props: &RendererProps) -> Html {
         });
     }
 
+    // Pre-compute phantom key indices and non-phantom key list for quick assign
+    let phantom_indices: std::collections::HashSet<usize> = props.data.physical_layout.iter()
+        .enumerate()
+        .filter(|(_, pk)| pk.origin == KeyOrigin::Phantom)
+        .map(|(i, _)| i)
+        .collect();
+    
+    // List of non-phantom key indices for quick assign mode
+    let non_phantom_keys: Vec<usize> = (0..num_keys)
+        .filter(|i| !phantom_indices.contains(i))
+        .collect();
+
     let on_keydown = {
         let jump_mode_active = jump_mode_active.clone();
         let jump_input = jump_input.clone();
         let selected_key = props.selected_key.clone();
         let current_layer = props.current_layer.clone();
         let hint_map = hint_map.clone();
-        let layer_hint_map = layer_hint_map.clone();
-        // Pre-compute which keys are phantoms to avoid borrowing props in closure
-        let phantom_indices: std::collections::HashSet<usize> = props.data.physical_layout.iter()
-            .enumerate()
-            .filter(|(_, pk)| pk.origin == KeyOrigin::Phantom)
-            .map(|(i, _)| i)
-            .collect();
+        let menu_state = menu_state.clone();
+        // Clone individual closures
+        let move_layer = move_layer.clone();
+        let rename_layer = rename_layer.clone();
+        let duplicate_layer = duplicate_layer.clone();
+        let delete_layer = delete_layer.clone();
+        let reset_layer = reset_layer.clone();
+        let trans_to_none = trans_to_none.clone();
+        let none_to_trans = none_to_trans.clone();
+        let start_quick_assign = start_quick_assign.clone();
+        // Clone props data to avoid borrowing issues
+        let props_data = props.data.clone();
+        let props_on_update = props.on_update.clone();
+        // Clone non-phantom keys list for quick assign
+        let non_phantom_keys = non_phantom_keys.clone();
 
         Callback::from(move |e: KeyboardEvent| {
             if selected_key.is_some() {
                 return;
             }
+            
+            // Handle menu keyboard navigation when menu is open
+            if let Some(lmi) = menu_state.menu_open_index {
+                match e.key().as_str() {
+                    "ArrowDown" => {
+                        let new_focus = (menu_state.focus_index + 1) % 9;
+                        menu_state.set(layer_menu::LayerMenuState {
+                            menu_open_index: Some(lmi),
+                            focus_index: new_focus,
+                            quick_assign_index: menu_state.quick_assign_index,
+                        });
+                        e.prevent_default();
+                        return;
+                    }
+                    "ArrowUp" => {
+                        let new_focus = (menu_state.focus_index + 8) % 9;
+                        menu_state.set(layer_menu::LayerMenuState {
+                            menu_open_index: Some(lmi),
+                            focus_index: new_focus,
+                            quick_assign_index: menu_state.quick_assign_index,
+                        });
+                        e.prevent_default();
+                        return;
+                    }
+                    "Enter" => {
+                        match menu_state.focus_index {
+                            0 => move_layer(lmi, true),
+                            1 => move_layer(lmi, false),
+                            2 => rename_layer(lmi),
+                            3 => duplicate_layer(lmi),
+                            4 => delete_layer(lmi),
+                            5 => reset_layer(lmi),
+                            6 => trans_to_none(lmi),
+                            7 => none_to_trans(lmi),
+                            8 => start_quick_assign(),
+                            _ => {}
+                        }
+                        e.prevent_default();
+                        return;
+                    }
+                    "Escape" => {
+                        menu_state.set(layer_menu::LayerMenuState::default());
+                        e.prevent_default();
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+            
+            // Handle quick assign mode
+            if menu_state.quick_assign_index.is_some() {
+                if e.key() == "Escape" {
+                    menu_state.set(layer_menu::LayerMenuState::default());
+                    e.prevent_default();
+                    return;
+                }
+                
+                // Single character key assignment
+                if e.key().len() == 1 {
+                    let key = e.key();
+                    if let Some(first) = key.chars().next() {
+                        if let Some(idx) = menu_state.quick_assign_index {
+                            let mut new_data = props_data.clone();
+                            if idx < new_data.layers[*current_layer].bindings.len() {
+                                // Convert to kanata key format
+                                let kanata_key = if first.is_ascii_alphabetic() {
+                                    first.to_ascii_lowercase().to_string()
+                                } else if first.is_ascii_digit() {
+                                    first.to_string()
+                                } else {
+                                    return;
+                                };
+                                
+                                new_data.layers[*current_layer].bindings[idx] = kanata_key;
+                                
+                                // Find next non-phantom key
+                                let current_pos = non_phantom_keys.iter().position(|&i| i == idx);
+                                let next_idx = if let Some(pos) = current_pos {
+                                    let next_pos = (pos + 1) % non_phantom_keys.len();
+                                    non_phantom_keys[next_pos]
+                                } else {
+                                    // If current key not found (shouldn't happen), start from beginning
+                                    non_phantom_keys.first().copied().unwrap_or(0)
+                                };
+                                
+                                menu_state.set(layer_menu::LayerMenuState {
+                                    menu_open_index: None,
+                                    focus_index: 0,
+                                    quick_assign_index: Some(next_idx),
+                                });
+                                
+                                props_on_update.emit(new_data);
+                                e.prevent_default();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
 
             if *jump_mode_active {
                 match e.key().as_str() {
-                    "Escape" => {
+                    "Enter" | "Escape" => {
                         jump_mode_active.set(false);
                         jump_input.set(String::new());
                         e.prevent_default();
@@ -2578,20 +2887,44 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                         let mut new_input = (*jump_input).clone();
                         new_input.push_str(key);
 
-                        if let Some(&idx) = hint_map.get(&new_input) {
-                            let is_phantom = phantom_indices.contains(&idx);
-                            selected_key.set(Some(SelectedKey {
-                                layer_index: *current_layer,
-                                key_index: idx,
-                                is_phantom,
-                            }));
+                        if let Some(target) = hint_map.get(&new_input) {
+                            match target {
+                                layer_menu::HintTarget::Key(idx) => {
+                                    let is_phantom = phantom_indices.contains(idx);
+                                    selected_key.set(Some(SelectedKey {
+                                        layer_index: *current_layer,
+                                        key_index: *idx,
+                                        is_phantom,
+                                    }));
+                                }
+                                layer_menu::HintTarget::Layer(idx) => {
+                                    current_layer.set(*idx);
+                                }
+                                layer_menu::HintTarget::LayerMenu(idx) => {
+                                    menu_state.set(layer_menu::LayerMenuState {
+                                        menu_open_index: Some(*idx),
+                                        focus_index: 0,
+                                        quick_assign_index: None,
+                                    });
+                                }
+                                layer_menu::HintTarget::Menu(l_idx, m_idx) => {
+                                    match *m_idx {
+                                        0 => move_layer(*l_idx, true),
+                                        1 => move_layer(*l_idx, false),
+                                        2 => rename_layer(*l_idx),
+                                        3 => duplicate_layer(*l_idx),
+                                        4 => delete_layer(*l_idx),
+                                        5 => reset_layer(*l_idx),
+                                        6 => trans_to_none(*l_idx),
+                                        7 => none_to_trans(*l_idx),
+                                        8 => start_quick_assign(),
+                                        _ => {}
+                                    }
+                                }
+                            }
                             jump_mode_active.set(false);
                             jump_input.set(String::new());
-                        } else if let Some(&l_idx) = layer_hint_map.get(&new_input) {
-                            current_layer.set(l_idx);
-                            jump_mode_active.set(false);
-                            jump_input.set(String::new());
-                        } else if hint_map.keys().any(|h| h.starts_with(&new_input)) || layer_hint_map.keys().any(|h| h.starts_with(&new_input)) {
+                        } else if hint_map.keys().any(|h| h.starts_with(&new_input)) {
                             jump_input.set(new_input);
                         }
                         e.prevent_default();
@@ -2605,6 +2938,40 @@ fn KanataRenderer(props: &RendererProps) -> Html {
             }
         })
     };
+    
+    // Click outside to close menu
+    {
+        let menu_state = menu_state.clone();
+        use_effect(move || {
+            let click_listener = wasm_bindgen::closure::Closure::wrap(
+                Box::new(move |e: web_sys::MouseEvent| {
+                    // Check if click is outside menu
+                    if let Some(target) = e.target() {
+                        if let Ok(element) = target.dyn_into::<web_sys::Element>() {
+                            // Close menu if clicking outside
+                            if !element.closest("[data-layer-menu]").unwrap_or(None).is_some() {
+                                menu_state.set(layer_menu::LayerMenuState::default());
+                            }
+                        }
+                    }
+                }) as Box<dyn FnMut(web_sys::MouseEvent)>
+            );
+            
+            let window = web_sys::window().unwrap();
+            window.add_event_listener_with_callback(
+                "click",
+                click_listener.as_ref().unchecked_ref(),
+            ).unwrap();
+            
+            move || {
+                window.remove_event_listener_with_callback(
+                    "click",
+                    click_listener.as_ref().unchecked_ref(),
+                ).unwrap();
+                drop(click_listener);
+            }
+        });
+    }
 
     let layer = &props.data.layers[*props.current_layer];
 
@@ -2642,25 +3009,144 @@ fn KanataRenderer(props: &RendererProps) -> Html {
             <div class="flex flex-wrap gap-2 mb-4 relative">
                 { for props.data.layers.iter().enumerate().map(|(i, l)| {
                     let is_active = i == *props.current_layer;
-                    let onclick = { let cl = props.current_layer.clone(); Callback::from(move |_| cl.set(i)) };
-                    let hint = layer_hint_map.iter().find(|(_, &idx)| idx == i).map(|(h, _)| h);
-                    let show_hint = *jump_mode_active && hint.map(|h| h.starts_with(&*jump_input)).unwrap_or(false);
+                    let is_menu_open = menu_state.menu_open_index == Some(i);
+                    let onclick = { 
+                        let cl = props.current_layer.clone(); 
+                        let ms = menu_state.clone();
+                        Callback::from(move |e: MouseEvent| {
+                            e.stop_propagation();
+                            cl.set(i);
+                            ms.set(layer_menu::LayerMenuState::default());
+                        }) 
+                    };
+                    
+                    // Layer hint (to select layer)
+                    let layer_hint = layer_hints.get(i).cloned().unwrap_or_default();
+                    let show_layer_hint = *jump_mode_active && !layer_hint.is_empty() 
+                        && layer_hint.starts_with(&*jump_input);
+                    
+                    // Menu trigger hint
+                    let menu_trigger_hint = hint_map.iter()
+                        .find(|(_, t)| **t == layer_menu::HintTarget::LayerMenu(i))
+                        .map(|(h, _)| h.clone())
+                        .unwrap_or_default();
+                    let show_menu_trigger_hint = *jump_mode_active && !menu_trigger_hint.is_empty()
+                        && menu_trigger_hint.starts_with(&*jump_input);
+                    
                     html! {
-                        <div class="relative">
-                            <button onclick={onclick} class={classes!("px-4", "py-1.5", "rounded-md", "shadow-sm", "font-medium", "transition-all", "relative",
+                        <div class="relative" data-layer-menu={if is_menu_open { "open" } else { "" }}>
+                            <button onclick={onclick} class={classes!("px-4", "py-1.5", "rounded-md", "shadow-sm", "font-medium", "transition-all", "relative", "flex", "items-center", "gap-2",
                                 if is_active { "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400" } else { "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 bg-gray-100 dark:bg-gray-800" }
                             )}>
                                 {&l.name}
-                                { if show_hint {
-                                    let h = hint.unwrap();
+                                
+                                // Menu trigger (chevron)
+                                <span
+                                    onclick={let ms = menu_state.clone(); Callback::from(move |e: MouseEvent| {
+                                        e.stop_propagation();
+                                        if ms.menu_open_index == Some(i) {
+                                            ms.set(layer_menu::LayerMenuState::default());
+                                        } else {
+                                            ms.set(layer_menu::LayerMenuState {
+                                                menu_open_index: Some(i),
+                                                focus_index: 0,
+                                                quick_assign_index: None,
+                                            });
+                                        }
+                                    })}
+                                    class="hover:bg-black/10 dark:hover:bg-white/10 rounded p-1 relative"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                    { if show_menu_trigger_hint {
+                                        let h = &menu_trigger_hint;
+                                        let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
+                                        html! { <div class="absolute -top-2 -right-2 bg-blue-400 dark:bg-blue-600 px-1 z-50 font-bold text-[10px] text-black dark:text-white rounded-md shadow-sm pointer-events-none"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
+                                    } else { html! {} }}
+                                </span>
+                                
+                                // Layer hint badge
+                                { if show_layer_hint {
+                                    let h = &layer_hint;
                                     let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
                                     html! { <div class="absolute top-0 left-0 bg-yellow-400 dark:bg-yellow-600 px-0.5 z-30 font-bold text-[10px] text-black dark:text-white rounded-tl-md rounded-br-md shadow-sm pointer-events-none leading-tight border-r border-b border-yellow-500 dark:border-yellow-700"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
                                 } else { html! {} }}
                             </button>
+                            
+                            // Dropdown menu
+                            { if is_menu_open {
+                                let menu_items: Vec<(&str, Callback<MouseEvent>)> = vec![
+                                    ("Move Up", Callback::from({ let op = move_layer.clone(); move |_| op(i, true) })),
+                                    ("Move Down", Callback::from({ let op = move_layer.clone(); move |_| op(i, false) })),
+                                    ("Rename", Callback::from({ let op = rename_layer.clone(); move |_| op(i) })),
+                                    ("Duplicate", Callback::from({ let op = duplicate_layer.clone(); move |_| op(i) })),
+                                    ("Delete", Callback::from({ let op = delete_layer.clone(); move |_| op(i) })),
+                                    ("Reset all to None", Callback::from({ let op = reset_layer.clone(); move |_| op(i) })),
+                                    ("Trans → None", Callback::from({ let op = trans_to_none.clone(); move |_| op(i) })),
+                                    ("None → Trans", Callback::from({ let op = none_to_trans.clone(); move |_| op(i) })),
+                                    ("Quick Assignment", Callback::from({ let op = start_quick_assign.clone(); move |_| op() })),
+                                ];
+                                
+                                html! {
+                                    <div class="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 py-1 overflow-hidden">
+                                        { for menu_items.into_iter().enumerate().map(|(j, (label, cb))| {
+                                            let is_focused = menu_state.focus_index == j;
+                                            let menu_hint = hint_map.iter()
+                                                .find(|(_, t)| **t == layer_menu::HintTarget::Menu(i, j))
+                                                .map(|(h, _)| h.clone())
+                                                .unwrap_or_default();
+                                            let show_menu_hint = *jump_mode_active && !menu_hint.is_empty()
+                                                && menu_hint.starts_with(&*jump_input);
+                                            
+                                            let class = classes!("w-full", "text-left", "px-4", "py-2", "text-sm", "relative",
+                                                if is_focused { "bg-blue-100 dark:bg-blue-900/40" } else { "hover:bg-gray-100 dark:hover:bg-gray-700" },
+                                                if j == 4 { "text-red-500" } else if j == 5 { "text-orange-500" } else if j == 8 { "font-bold text-blue-500" } else { "" }
+                                            );
+                                            
+                                            html! {
+                                                <>
+                                                    { if j == 5 || j == 8 { 
+                                                        html! { <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div> } 
+                                                    } else { html! {} }}
+                                                    <button onclick={cb} class={class}>
+                                                        {label}
+                                                        { if show_menu_hint {
+                                                            let h = &menu_hint;
+                                                            let (prefix, suffix) = if jump_input.is_empty() { ("", h.as_str()) } else { (&h[..jump_input.len()], &h[jump_input.len()..]) };
+                                                            html! { <div class="absolute top-0 right-0 bg-yellow-400 dark:bg-yellow-600 px-1 z-50 font-bold text-[10px] text-black dark:text-white rounded-bl-md shadow-sm pointer-events-none"><span class="opacity-40">{prefix}</span><span>{suffix}</span></div> }
+                                                        } else { html! {} }}
+                                                    </button>
+                                                </>
+                                            }
+                                        })}
+                                    </div>
+                                }
+                            } else { html! {} }}
                         </div>
                     }
                 })}
             </div>
+            
+            // Quick assign mode banner
+            { if let Some(idx) = menu_state.quick_assign_index {
+                html! {
+                    <div class="w-full mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-lg font-bold text-blue-800 dark:text-blue-300">{"Quick Assignment Mode"}</h3>
+                                <p class="text-sm text-blue-600 dark:text-blue-400">{format!("Press keys on your keyboard to assign. Currently editing key {} of {}", idx + 1, num_keys)}</p>
+                            </div>
+                            <button onclick={let ms = menu_state.clone(); Callback::from(move |_: MouseEvent| ms.set(layer_menu::LayerMenuState::default()))} 
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded-lg font-bold">
+                                {"Done"}
+                            </button>
+                        </div>
+                        <p class="text-xs text-blue-500 dark:text-blue-400 mt-2">{"Press Escape to exit, or click any key to jump to it."}</p>
+                    </div>
+                }
+            } else { html! {} }}
+            
 
             <div class={classes!("relative", "border", "dark:border-gray-600", "p-8", "rounded-xl", "bg-gray-50", "dark:bg-gray-800", "shadow-inner", "overflow-auto", "w-full", "max-w-full", "text-center")} style="min-height: 350px; height: 65vh;">
                 <div class="relative inline-block text-left" style={format!("width: {}px; height: {}px;", content_width, content_height)}>
@@ -2679,15 +3165,34 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                         let is_phantom = pk.origin == KeyOrigin::Phantom;
                         let onclick = { 
                             let sk = props.selected_key.clone(); 
-                            let cur_l = *props.current_layer; 
-                            Callback::from(move |_| sk.set(Some(SelectedKey { 
-                                layer_index: cur_l, 
-                                key_index: i,
-                                is_phantom,
-                            }))) 
+                            let cur_l = *props.current_layer;
+                            let ms = menu_state.clone();
+                            Callback::from(move |_| {
+                                if ms.quick_assign_index.is_some() {
+                                    // In quick assign mode, clicking jumps to that key
+                                    // But skip phantom keys - find next non-phantom
+                                    if is_phantom {
+                                        return; // Ignore clicks on phantom keys
+                                    }
+                                    ms.set(layer_menu::LayerMenuState {
+                                        menu_open_index: None,
+                                        focus_index: 0,
+                                        quick_assign_index: Some(i),
+                                    });
+                                } else {
+                                    sk.set(Some(SelectedKey { 
+                                        layer_index: cur_l, 
+                                        key_index: i,
+                                        is_phantom,
+                                    }));
+                                }
+                            }) 
                         };
-                        let hint = hint_map.iter().find(|(_, &idx)| idx == i).map(|(h, _)| h);
+                        let hint = key_hints.get(i);
                         let show_hint = *jump_mode_active && hint.map(|h| h.starts_with(&*jump_input)).unwrap_or(false);
+                        
+                        // Quick assign highlighting
+                        let is_quick_assign_target = menu_state.quick_assign_index == Some(i);
 
                         let is_alias_section = pk.y >= alias_y_threshold;
                         let is_unmapped_section = pk.y >= unmapped_y_threshold && pk.y < alias_y_threshold;
@@ -2711,16 +3216,17 @@ fn KanataRenderer(props: &RendererProps) -> Html {
                                     html! { <div class={classes!("absolute", "text-[8px]", "font-bold", "truncate", "text-center", label_color)} style={format!("left: {}px; top: {}px; width: {}px;", x, y - 12, w)}> {defsrc_name.clone()} </div> }
                                 } else { html! {} }}
 
-                                <div onclick={onclick} class={classes!("absolute", "flex", "flex-col", "items-center", "justify-center", "rounded", "cursor-pointer", "transition-all", "select-none",
-                                    if is_phantom {
-                                        // Phantom key styling: outline only, transparent fill
-                                        vec!["border-2", "border-dashed", "border-gray-400", "dark:border-gray-500", "bg-transparent", "hover:border-gray-600", "dark:hover:border-gray-400"]
+                                <div onclick={onclick} class={classes!("absolute", "flex", "flex-col", "items-center", "justify-center", "cursor-pointer", "transition-all", "select-none",
+                                    if is_quick_assign_target {
+                                        vec!["ring-4", "ring-blue-500", "z-40", "bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-600", "shadow-lg", "rounded"]
+                                    } else if is_phantom {
+                                        vec!["border-2", "border-dashed", "border-gray-400", "dark:border-gray-500", "bg-transparent", "hover:border-gray-600", "dark:hover:border-gray-400", "rounded"]
                                     } else if is_alias_section {
-                                        vec!["bg-blue-50/30", "dark:bg-blue-900/10", "border", "border-blue-200", "dark:border-blue-800"]
+                                        vec!["bg-blue-50/30", "dark:bg-blue-900/10", "border", "border-blue-200", "dark:border-blue-800", "rounded"]
                                     } else if is_unmapped_section {
-                                        vec!["bg-orange-50/30", "dark:bg-orange-900/10", "border", "border-orange-200", "dark:border-orange-800"]
+                                        vec!["bg-orange-50/30", "dark:bg-orange-900/10", "border", "border-orange-200", "dark:border-orange-800", "rounded"]
                                     } else {
-                                        vec!["bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-600", "hover:border-blue-400", "dark:hover:border-blue-500", "shadow-sm"]
+                                        vec!["bg-white", "dark:bg-gray-700", "border", "border-gray-300", "dark:border-gray-600", "hover:border-blue-400", "dark:hover:border-blue-500", "shadow-sm", "rounded"]
                                     }
                                 )} style={format!("left: {}px; top: {}px; width: {}px; height: {}px;", x, y, w, h)}>
 
