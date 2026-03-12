@@ -713,8 +713,8 @@ pub struct SelectedKey {
 }
 
 #[derive(Serialize)]
-struct KeymapRequest {
-    content: String,
+pub struct KeymapRequest {
+    pub content: String,
 }
 
 #[function_component]
@@ -2077,7 +2077,9 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
         let current_params = current_params.clone();
         let on_close = props.on_close.clone();
         Callback::from(move |e: MouseEvent| {
+            log::info!("Popup on_apply called!");
             if !is_valid {
+                log::warn!("Apply aborted: binding is not valid");
                 return;
             }
             let mut new_data = data.clone();
@@ -2102,6 +2104,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
                     new_data.includes.push(meta.include_file.to_string());
                 }
             }
+            log::info!("Emitting on_update with new binding");
             on_update.emit(new_data);
             on_close.emit(e);
         })

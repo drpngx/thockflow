@@ -14,7 +14,7 @@ use yew::prelude::*;
 
 use crate::keymap::{KeymapData, KeymapRenderer};
 
-use convert::{BehaviorCache, ProtoBinding, ProtoLayer};
+use convert::{BehaviorCache, ProtoLayer};
 use rpc::{NotificationOneOf, RpcClient};
 use transport::ZmkTransport;
 
@@ -114,14 +114,12 @@ pub fn ZmkStudioHome() -> Html {
                 // Set up notification callback
                 {
                     let lock_state_cb = lock_state_state.clone();
-                    let unsaved_cb = has_unsaved_changes.clone();
                     client.set_notification_callback(move |notif| match notif {
                         NotificationOneOf::CoreLockStateChanged(state) => {
                             lock_state_cb.set(state as u32);
                         }
-                        NotificationOneOf::KeymapUnsavedChanges(changed) => {
-                            unsaved_cb.set(changed);
-                        }
+                        // Ignore device unsaved changes notification - we manage this locally
+                        _ => {}
                     });
                 }
 
@@ -271,36 +269,33 @@ pub fn ZmkStudioHome() -> Html {
         })
     };
 
-    // --- Keymap update handler (diff and send RPCs) ---
+    // --- Keymap update handler (local changes only) ---
     let on_update = {
         let keymap_data = keymap_data.clone();
-        let rpc_client = rpc_client.clone();
-        let behavior_cache = behavior_cache.clone();
         let proto_layers = proto_layers.clone();
-        let error = error.clone();
         let has_unsaved_changes = has_unsaved_changes.clone();
 
         Callback::from(move |new_data: KeymapData| {
+            log::info!("on_update called!");
             let old_data = (*keymap_data).clone();
             keymap_data.set(Some(new_data.clone()));
+            
+            // Mark as having unsaved local changes
+            log::info!("Setting has_unsaved_changes = true");
+            has_unsaved_changes.set(true);
 
             // Sync proto_layers when layers are reordered/duplicated/deleted
-            // This ensures layer_id lookups remain correct after menu operations
             if let Some(ref old) = old_data {
                 if old.layers.len() != new_data.layers.len() ||
                    old.layers.iter().zip(new_data.layers.iter()).any(|(a, b)| a.name != b.name) {
-                    // Layer structure changed - sync proto_layers
                     let current_proto_layers = (*proto_layers).clone();
                     let mut new_proto_layers = Vec::new();
                     
                     for (idx, layer) in new_data.layers.iter().enumerate() {
-                        // Try to find matching proto_layer by name
                         let proto_layer = current_proto_layers.iter()
                             .find(|pl| pl.name == layer.name)
                             .cloned()
                             .unwrap_or_else(|| {
-                                // New layer (duplicated) - assign a temporary ID
-                                // The device will assign the real ID when saved
                                 ProtoLayer {
                                     id: (current_proto_layers.len() + idx) as u32,
                                     name: layer.name.clone(),
@@ -318,65 +313,11 @@ pub fn ZmkStudioHome() -> Html {
                     proto_layers.set(new_proto_layers);
                 }
             }
-
-            if let (Some(old), Some(client)) = (old_data, (*rpc_client).clone()) {
-                let cache = (*behavior_cache).clone();
-                let current_proto_layers = (*proto_layers).clone();
-                let error = error.clone();
-                let has_unsaved = has_unsaved_changes.clone();
-
-                spawn_local(async move {
-                    has_unsaved.set(true);
-                    // Diff old vs new and send set_layer_binding for each change
-                    for (layer_idx, (old_layer, new_layer)) in
-                        old.layers.iter().zip(new_data.layers.iter()).enumerate()
-                    {
-                        let layer_id = current_proto_layers
-                            .get(layer_idx)
-                            .map(|pl| pl.id)
-                            .unwrap_or(layer_idx as u32);
-
-                        for (key_idx, (old_binding, new_binding)) in
-                            old_layer.bindings.iter().zip(new_layer.bindings.iter()).enumerate()
-                        {
-                            if old_binding != new_binding {
-                                if let Some((behavior_id, param1, param2)) = convert::string_to_binding(new_binding, &cache) {
-                                    let behavior_id: i32 = behavior_id;
-                                    log::info!("Updating binding: layer={}, key={}, behavior={}, p1={}, p2={}", layer_id, key_idx, behavior_id, param1, param2);
-                                    if let Err(e) = client
-                                        .set_layer_binding(
-                                            layer_id,
-                                            key_idx as i32,
-                                            behavior_id,
-                                            param1,
-                                            param2,
-                                        )
-                                        .await
-                                    {
-                                        log::error!("Failed to set binding: {}", e);
-                                        error.set(Some(format!(
-                                            "Failed to update key: {}",
-                                            e
-                                        )));
-                                    }
-                                } else {
-                                    log::error!("Failed to parse binding string: {}", new_binding);
-                                    let behavior_name = new_binding.split_whitespace().next().unwrap_or("Unknown");
-                                    error.set(Some(format!(
-                                        "Unsupported behavior: '{}'. The keyboard firmware might not be compiled with support for this feature.",
-                                        behavior_name
-                                    )));
-                                    // Revert the unsaved state because this change was dropped locally and never sent to device.
-                                    has_unsaved.set(false);
-                                }                            }
-                        }
-                    }
-                });
-            }
+            // Changes are NOT sent to device here - only on Save to Flash
         })
     };
 
-    // --- Save handler ---
+    // --- Save handler (send all changes to device and save to flash) ---
     let on_save = {
         let rpc_client = rpc_client.clone();
         let error = error.clone();
@@ -386,71 +327,60 @@ pub fn ZmkStudioHome() -> Html {
         let proto_layers = proto_layers.clone();
 
         Callback::from(move |_: MouseEvent| {
-            if let Some(client) = (*rpc_client).clone() {
+            if let (Some(client), Some(data)) = ((*rpc_client).clone(), &*keymap_data) {
                 let error = error.clone();
                 let has_unsaved = has_unsaved_changes.clone();
-                let keymap_data = keymap_data.clone();
+                let data = data.clone();
                 let cache = (*behavior_cache).clone();
-                let proto_layers = proto_layers.clone();
+                let proto_layers = (*proto_layers).clone();
                 
                 spawn_local(async move {
-                    log::info!("Checking keyboard connection before saving...");
-                    match client.get_lock_state().await {
-                        Ok(_) => {
-                            log::info!("Connection check passed. Saving changes to flash...");
-                            match client.save_changes().await {
-                                Ok(_) => {
-                                    log::info!("Save successful. Verifying changes on device...");
-                                    has_unsaved.set(false);
-                                    
-                                    // Verify changes by fetching keymap again
-                                    match client.get_keymap().await {
-                                        Ok(data) => {
-                                            if let Some(existing) = &*keymap_data {
-                                                let (layers, _, _) = convert::parse_keymap(&data, &cache);
-                                                let verified_km = convert::to_keymap_data(
-                                                    existing.physical_layout.clone(),
-                                                    &layers,
-                                                    &cache,
-                                                );
-                                                
-                                                if verified_km != *existing {
-                                                    log::error!("Verification failed! Device keymap does not match local keymap.");
-                                                    
-                                                    // Log exactly what changed to console to help debug
-                                                    for (layer_idx, (old_layer, new_layer)) in existing.layers.iter().zip(verified_km.layers.iter()).enumerate() {
-                                                        for (key_idx, (old_binding, new_binding)) in old_layer.bindings.iter().zip(new_layer.bindings.iter()).enumerate() {
-                                                            if old_binding != new_binding {
-                                                                log::error!("Layer {}, Key {}: Expected '{}', but device returned '{}'", layer_idx, key_idx, old_binding, new_binding);
-                                                            }
-                                                        }
-                                                    }
+                    log::info!("Sending all bindings to device...");
+                    
+                    // Send ALL current bindings to the device
+                    let mut send_errors = false;
+                    for (layer_idx, layer) in data.layers.iter().enumerate() {
+                        let layer_id = proto_layers
+                            .get(layer_idx)
+                            .map(|pl| pl.id)
+                            .unwrap_or(layer_idx as u32);
 
-                                                    error.set(Some("Verification failed: The device did not correctly save the layout. Your changes might be lost on restart.".to_string()));
-                                                    
-                                                    // Sync back the real device state
-                                                    proto_layers.set(layers);
-                                                    keymap_data.set(Some(verified_km));
-                                                } else {
-                                                    log::info!("Verification successful! Device matches local state perfectly.");
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            log::warn!("Could not fetch keymap to verify save: {}", e);
-                                            error.set(Some(format!("Saved, but could not verify device state: {}", e)));
-                                        }
-                                    }
+                        for (key_idx, binding) in layer.bindings.iter().enumerate() {
+                            if let Some((behavior_id, param1, param2)) = convert::string_to_binding(binding, &cache) {
+                                let behavior_id: i32 = behavior_id;
+                                if let Err(e) = client
+                                    .set_layer_binding(
+                                        layer_id,
+                                        key_idx as i32,
+                                        behavior_id,
+                                        param1,
+                                        param2,
+                                    )
+                                    .await
+                                {
+                                    log::error!("Failed to set binding for layer {} key {}: {}", layer_idx, key_idx, e);
+                                    send_errors = true;
                                 }
-                                Err(e) => {
-                                    log::error!("Failed to save: {}", e);
-                                    error.set(Some(format!("Failed to save: {}", e)));
-                                }
+                            } else {
+                                log::warn!("Skipping unsupported binding: {}", binding);
                             }
                         }
+                    }
+                    
+                    if send_errors {
+                        error.set(Some("Failed to send some bindings to device. Please try again.".to_string()));
+                        return;
+                    }
+                    
+                    log::info!("All bindings sent. Saving to flash...");
+                    match client.save_changes().await {
+                        Ok(_) => {
+                            log::info!("Save to flash successful!");
+                            has_unsaved.set(false);
+                        }
                         Err(e) => {
-                            log::error!("Failed connection check: {}", e);
-                            error.set(Some(format!("Keyboard connection check failed: {}", e)));
+                            log::error!("Failed to save to flash: {}", e);
+                            error.set(Some(format!("Failed to save: {}", e)));
                         }
                     }
                 });
@@ -657,6 +587,173 @@ pub fn ZmkStudioHome() -> Html {
                                                         loading.set(false);
                                                         error.set(Some(format!("Network error: {}", e)));
                                                     }
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            loading.set(false);
+                                            error.set(Some(format!(
+                                                "Failed to read file content: {:?}",
+                                                e
+                                            )));
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    loading.set(false);
+                                    error.set(Some(format!(
+                                        "Failed to get file from handle: {:?}",
+                                        e
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // User cancelled file picker, not an error
+                        log::debug!("File picker cancelled: {:?}", e);
+                    }
+                }
+            });
+        })
+    };
+
+    // --- Load from keymap handler (local only) ---
+    let on_load_keymap = {
+        let keymap_data = keymap_data.clone();
+        let proto_layers = proto_layers.clone();
+        let error = error.clone();
+        let loading = loading.clone();
+        let has_unsaved_changes = has_unsaved_changes.clone();
+
+        Callback::from(move |_: MouseEvent| {
+            let keymap_data = keymap_data.clone();
+            let proto_layers = proto_layers.clone();
+            let error = error.clone();
+            let loading = loading.clone();
+            let has_unsaved_changes = has_unsaved_changes.clone();
+
+            spawn_local(async move {
+                // Open file picker to select a keymap file
+                let options = js_sys::Object::new();
+                let types = js_sys::Array::new();
+                let type0 = js_sys::Object::new();
+                js_sys::Reflect::set(&type0, &"description".into(), &"ZMK Keymap Files".into())
+                    .unwrap();
+                let accept = js_sys::Object::new();
+                let extensions = js_sys::Array::new();
+                extensions.push(&".keymap".into());
+                js_sys::Reflect::set(&accept, &"text/plain".into(), &extensions).unwrap();
+                js_sys::Reflect::set(&type0, &"accept".into(), &accept).unwrap();
+                types.push(&type0);
+                js_sys::Reflect::set(&options, &"types".into(), &types).unwrap();
+                js_sys::Reflect::set(
+                    &options,
+                    &"excludeAcceptAllOption".into(),
+                    &JsValue::from(true),
+                )
+                .unwrap();
+                js_sys::Reflect::set(&options, &"multiple".into(), &JsValue::from(false)).unwrap();
+
+                let picker_promise = crate::keymap::show_open_file_picker(&options);
+                let result = wasm_bindgen_futures::JsFuture::from(picker_promise).await;
+
+                match result {
+                    Ok(handles) => {
+                        let handles: js_sys::Array = handles.unchecked_into();
+                        if handles.length() > 0 {
+                            let handle_val = handles.get(0);
+                            let handle: crate::keymap::FileSystemFileHandle = handle_val.unchecked_into();
+
+                            loading.set(true);
+                            error.set(None);
+                            
+                            let file_promise = handle.get_file();
+                            let file_result = wasm_bindgen_futures::JsFuture::from(file_promise).await;
+
+                            match file_result {
+                                Ok(file_val) => {
+                                    let file: web_sys::File = file_val.unchecked_into();
+                                    let content_promise = file.text();
+                                    let content_result = wasm_bindgen_futures::JsFuture::from(content_promise).await;
+
+                                    match content_result {
+                                        Ok(content_val) => {
+                                            let file_content = content_val.as_string().unwrap_or_default();
+                                            
+                                            // Parse the keymap file via server API
+                                            let parse_result = gloo_net::http::Request::post("/api/parse-keymap")
+                                                .json(&crate::keymap::KeymapRequest { content: file_content })
+                                                .unwrap()
+                                                .send()
+                                                .await;
+
+                                            match parse_result {
+                                                Ok(resp) => {
+                                                    if resp.ok() {
+                                                        match resp.json::<crate::keymap::KeymapData>().await {
+                                                            Ok(new_keymap_data) => {
+                                                                if let Some(current_data) = &*keymap_data {
+                                                                    let current_proto_layers = (*proto_layers).clone();
+                                                                    
+                                                                    // Mark as having unsaved local changes
+                                                                    has_unsaved_changes.set(true);
+                                                                    
+                                                                    // Update local keymap data
+                                                                    keymap_data.set(Some(new_keymap_data.clone()));
+                                                                    
+                                                                    // Sync proto_layers if layer structure changed
+                                                                    if new_keymap_data.layers.len() != current_data.layers.len() ||
+                                                                       new_keymap_data.layers.iter().zip(current_data.layers.iter()).any(|(a, b)| a.name != b.name) {
+                                                                        let mut new_proto_layers = Vec::new();
+                                                                        for (idx, layer) in new_keymap_data.layers.iter().enumerate() {
+                                                                            let proto_layer = current_proto_layers.iter()
+                                                                                .find(|pl| pl.name == layer.name)
+                                                                                .cloned()
+                                                                                .unwrap_or_else(|| {
+                                                                                    convert::ProtoLayer {
+                                                                                        id: (current_proto_layers.len() + idx) as u32,
+                                                                                        name: layer.name.clone(),
+                                                                                        bindings: layer.bindings.iter().map(|_b| {
+                                                                                            convert::ProtoBinding {
+                                                                                                behavior_id: 0,
+                                                                                                param1: 0,
+                                                                                                param2: 0,
+                                                                                            }
+                                                                                        }).collect(),
+                                                                                    }
+                                                                                });
+                                                                            new_proto_layers.push(proto_layer);
+                                                                        }
+                                                                        proto_layers.set(new_proto_layers);
+                                                                    }
+                                                                } else {
+                                                                    // No existing data, just set the new data
+                                                                    has_unsaved_changes.set(true);
+                                                                    keymap_data.set(Some(new_keymap_data));
+                                                                }
+                                                                loading.set(false);
+                                                            }
+                                                            Err(e) => {
+                                                                loading.set(false);
+                                                                error.set(Some(format!(
+                                                                    "Failed to parse keymap: {}",
+                                                                    e
+                                                                )));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        loading.set(false);
+                                                        let error_text = resp
+                                                            .text()
+                                                            .await
+                                                            .unwrap_or_else(|_| "Unknown error".to_string());
+                                                        error.set(Some(format!("Server error: {}", error_text)));
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    loading.set(false);
+                                                    error.set(Some(format!("Network error: {}", e)));
                                                 }
                                             }
                                         }
@@ -950,6 +1047,9 @@ pub fn ZmkStudioHome() -> Html {
                                         </button>
                                         <button onclick={on_download_keymap} class="px-4 py-1.5 bg-blue-600 text-white font-medium text-xs uppercase rounded shadow hover:bg-blue-700 transition">
                                             {"Download Keymap"}
+                                        </button>
+                                        <button onclick={on_load_keymap} class="px-4 py-1.5 bg-cyan-600 text-white font-medium text-xs uppercase rounded shadow hover:bg-cyan-700 transition">
+                                            {"Load from Keymap"}
                                         </button>
                                         <button onclick={on_patch_keymap} class="px-4 py-1.5 bg-purple-600 text-white font-medium text-xs uppercase rounded shadow hover:bg-purple-700 transition">
                                             {"Patch Keymap"}
