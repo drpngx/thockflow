@@ -2709,21 +2709,6 @@ fn KanataRenderer(props: &RendererProps) -> Html {
             menu_state.set(layer_menu::LayerMenuState::default());
         }) as Rc<dyn Fn(usize)>
     };
-    
-    // Start quick assign mode - starts at first non-phantom key
-    let start_quick_assign = {
-        let menu_state = menu_state.clone();
-        let first_non_phantom = non_phantom_keys.first().copied();
-        Rc::new(move || {
-            menu_state.set(layer_menu::LayerMenuState {
-                menu_open_index: None,
-                focus_index: 0,
-                quick_assign_index: first_non_phantom,
-            });
-        }) as Rc<dyn Fn()>
-    };
-    
-
 
     {
         let container_ref = container_ref.clone();
@@ -2749,6 +2734,19 @@ fn KanataRenderer(props: &RendererProps) -> Html {
     let non_phantom_keys: Vec<usize> = (0..num_keys)
         .filter(|i| !phantom_indices.contains(i))
         .collect();
+    
+    // Start quick assign mode - starts at first non-phantom key
+    let start_quick_assign = {
+        let menu_state = menu_state.clone();
+        let first_non_phantom = non_phantom_keys.first().copied();
+        Rc::new(move || {
+            menu_state.set(layer_menu::LayerMenuState {
+                menu_open_index: None,
+                focus_index: 0,
+                quick_assign_index: first_non_phantom,
+            });
+        }) as Rc<dyn Fn()>
+    };
 
     let on_keydown = {
         let jump_mode_active = jump_mode_active.clone();

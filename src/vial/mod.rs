@@ -84,6 +84,9 @@ pub fn VialHome() -> Html {
     let selected_key = use_state(|| None::<(usize, usize)>);
     let container_ref = use_node_ref();
 
+    // Test Matrix tab states
+    let displayed_layer = use_state(|| 0u8);
+
     // Layer menu state
     let layer_menu_index = use_state(|| None::<usize>);
     let menu_focus_index = use_state(|| 0usize);
@@ -98,6 +101,69 @@ pub fn VialHome() -> Html {
                 let _ = element.focus();
             }
             || ()
+        });
+    }
+
+    // -- matrix polling effect (only active on TestMatrix tab) ------------
+    // This effect ONLY runs when active_tab changes to TestMatrix
+    {
+        let device = device.clone();
+        let matrix_state = matrix_state.clone();
+        let matrix_rows = matrix_rows.clone();
+        let matrix_cols = matrix_cols.clone();
+        let active_tab_val = (*active_tab).clone();
+        
+        use_effect_with(active_tab_val, move |tab| {
+            let mut cleanup: Option<Box<dyn FnOnce()>> = None;
+            
+            // Only start polling when on TestMatrix tab and device is connected
+            if *tab == VialTab::TestMatrix && device.is_some() {
+                // Clone device for the closure
+                let dev_opt = (*device).clone();
+                
+                let closure = Closure::wrap(Box::new(move || {
+                    if let Some(ref d) = dev_opt {
+                        let matrix_state = matrix_state.clone();
+                        let rows = *matrix_rows;
+                        let cols = *matrix_cols;
+                        let dev = d.clone();
+
+                        spawn_local(async move {
+                            match webhid::send_message(
+                                &dev,
+                                vial_protocol::VialMessage::get_switch_matrix_state().as_bytes(),
+                            ).await {
+                                Ok(resp) => {
+                                    let new_state = vial_protocol::parse_matrix_state(&resp, rows, cols);
+                                    matrix_state.set(new_state);
+                                }
+                                Err(e) => {
+                                    log::warn!("Matrix poll error: {e}");
+                                }
+                            }
+                        });
+                    }
+                }) as Box<dyn FnMut()>);
+
+                // Set up 50ms interval
+                let window = web_sys::window().unwrap();
+                let interval_id = window.set_interval_with_callback_and_timeout_and_arguments_0(
+                    closure.as_ref().unchecked_ref(),
+                    50,
+                ).unwrap();
+
+                cleanup = Some(Box::new(move || {
+                    window.clear_interval_with_handle(interval_id);
+                    drop(closure);
+                }));
+            }
+
+            // Return cleanup function
+            move || {
+                if let Some(c) = cleanup {
+                    c();
+                }
+            }
         });
     }
 
@@ -387,6 +453,8 @@ pub fn VialHome() -> Html {
         let qmk_settings = qmk_settings.clone();
         let layer_names = layer_names.clone();
         let layer_menu_index = layer_menu_index.clone();
+        let displayed_layer = displayed_layer.clone();
+        let matrix_state = matrix_state.clone();
 
         Callback::from(move |_: MouseEvent| {
             let device = device.clone();
@@ -401,6 +469,8 @@ pub fn VialHome() -> Html {
             let qmk_settings = qmk_settings.clone();
             let layer_names = layer_names.clone();
             let layer_menu_index = layer_menu_index.clone();
+            let displayed_layer = displayed_layer.clone();
+            let matrix_state = matrix_state.clone();
 
             if let Some(dev) = (*device).clone() {
                 spawn_local(async move {
@@ -414,6 +484,8 @@ pub fn VialHome() -> Html {
                     layers.set(Vec::new());
                     layer_count.set(0);
                     active_layer.set(0);
+                    displayed_layer.set(0);
+                    matrix_state.set(Vec::new());
                     qmk_settings.set(Vec::new());
                     layer_names.set(Vec::new());
                     layer_menu_index.set(None);
@@ -1247,7 +1319,16 @@ pub fn VialHome() -> Html {
                                 Rc::new(move |idx| none_to_trans(idx)),
                                 Rc::new(move || start_quick_assign(())),
                             ),
-                            VialTab::TestMatrix => render_matrix_tab(&matrix_state, *matrix_cols),
+                            VialTab::TestMatrix => render_test_matrix_tab(
+                                &matrix_state,
+                                &key_layout,
+                                &layers,
+                                &displayed_layer,
+                                &active_layer,
+                                *matrix_cols,
+                                *vial_protocol_ver,
+                                &*keyboard_name,
+                            ),
                             VialTab::QmkSettings => html! {
                                 <QmkSettingsPanel
                                     settings={(*qmk_settings).clone()}
@@ -1627,32 +1708,230 @@ Keycode: 0x{:04X}", pos.row, pos.col, kc)}
     }
 }
 
-fn render_matrix_tab(matrix_state: &UseStateHandle<Vec<Vec<bool>>>, cols: u8) -> Html {
-    html! {
-        <div>
-            <p class="text-gray-500 mb-4">
-                {"Press keys on your keyboard to test the switch matrix."}
-            </p>
-            if cols > 0 {
-                <div
-                    class="grid gap-1"
-                    style={format!("grid-template-columns: repeat({cols}, 2.5rem)")}
-                >
-                    { for matrix_state.iter().flat_map(|row| {
-                        row.iter().map(|&pressed| {
+/// Determine which layer to display based on pressed keys
+fn resolve_display_layer(
+    matrix_state: &[Vec<bool>],
+    layers: &[Vec<u16>],
+    base_layer: u8,
+    key_layout: &[MatrixPos],
+    matrix_cols: u8,
+    protocol_version: u32,
+) -> u8 {
+    for pos in key_layout.iter() {
+        if pos.row as usize >= matrix_state.len() {
+            continue;
+        }
+        if pos.col as usize >= matrix_state[pos.row as usize].len() {
+            continue;
+        }
+        if matrix_state[pos.row as usize][pos.col as usize] {
+            let keycode_idx = (pos.row as usize) * (matrix_cols as usize) + (pos.col as usize);
+            let base_layer_idx = base_layer as usize;
+            if base_layer_idx >= layers.len() {
+                continue;
+            }
+            if keycode_idx >= layers[base_layer_idx].len() {
+                continue;
+            }
+            let keycode = layers[base_layer_idx][keycode_idx];
+
+            if let Some((func, target_layer)) = vial_protocol::keycodes::layer_info(keycode, protocol_version) {
+                match func {
+                    "TO" | "MO" | "DF" | "TG" | "OSL" | "TT" => return target_layer,
+                    "LT" => return target_layer, // When held
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    base_layer
+}
+
+fn render_test_matrix_tab(
+    matrix_state: &UseStateHandle<Vec<Vec<bool>>>,
+    key_layout: &UseStateHandle<Vec<MatrixPos>>,
+    layers: &UseStateHandle<Vec<Vec<u16>>>,
+    displayed_layer: &UseStateHandle<u8>,
+    active_layer: &UseStateHandle<u8>,
+    matrix_cols: u8,
+    protocol_version: u32,
+    keyboard_name: &str,
+) -> Html {
+    // Resolve which layer to display based on pressed keys
+    let display_layer = resolve_display_layer(
+        matrix_state,
+        layers,
+        **active_layer,
+        key_layout,
+        matrix_cols,
+        protocol_version,
+    );
+
+    // Update displayed_layer state if it changed
+    if display_layer != **displayed_layer {
+        displayed_layer.set(display_layer);
+    }
+
+    let layer_keys = layers.get(display_layer as usize);
+
+    // Show layer indicator if viewing a different layer than base
+    let layer_indicator = if display_layer != **active_layer {
+        html! {
+            <div class="mb-4 px-4 py-2 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 rounded-lg">
+                <span class="text-sm font-medium text-blue-800 dark:text-blue-300">
+                    {format!("Viewing Layer {} (Layer-switching key pressed)", display_layer)}
+                </span>
+            </div>
+        }
+    } else {
+        html! {}
+    };
+
+    let layout_html = if let Some(codes) = layer_keys {
+        if !key_layout.is_empty() {
+            // Calculate layout bounds (same as render_keymap_tab)
+            let mut min_x = f32::MAX;
+            let mut max_x = f32::MIN;
+            let mut min_y = f32::MAX;
+            let mut max_y = f32::MIN;
+            let mut avg_w = 0.0;
+            for pos in key_layout.iter() {
+                avg_w += pos.w;
+                if pos.x < min_x { min_x = pos.x; }
+                if pos.x + pos.w > max_x { max_x = pos.x + pos.w; }
+                if pos.y < min_y { min_y = pos.y; }
+                if pos.y + pos.h > max_y { max_y = pos.y + pos.h; }
+            }
+            if !key_layout.is_empty() {
+                avg_w /= key_layout.len() as f32;
+            }
+
+            let u_size = if avg_w < 5.0 { 1.0 } else if avg_w < 500.0 { 100.0 } else { 1000.0 };
+            let size_scale = 44.0 / u_size;
+            let u_pos = if max_x.abs() > 20000.0 || min_x.abs() > 20000.0 {
+                19050.0
+            } else {
+                u_size
+            };
+            let pos_scale = 44.0 / u_pos;
+
+            let content_width_px = (max_x - min_x) * pos_scale;
+            let offset_x = -(min_x * pos_scale);
+
+            html! {
+                <div class="relative bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 overflow-auto shadow-inner w-full max-w-full"
+                     style="min-height: 350px; height: 55vh;">
+                    <div class="relative mx-auto" style={format!("width: {}px;", content_width_px)}>
+                        { for key_layout.iter().map(|pos| {
+                            let keycode_idx = (pos.row as usize) * (matrix_cols as usize) + (pos.col as usize);
+                            let kc = codes.get(keycode_idx).copied().unwrap_or(0);
+                            let disp = keycode_display(kc, protocol_version, keyboard_name);
+
+                            // Check if this key is pressed
+                            let row = pos.row as usize;
+                            let col = pos.col as usize;
+                            let is_pressed = row < matrix_state.len()
+                                && col < matrix_state[row].len()
+                                && matrix_state[row][col];
+
+                            let x = (pos.x * pos_scale + offset_x) as i32;
+                            let y = (pos.y * pos_scale) as i32;
+                            let w = (pos.w * size_scale).max(20.0) as i32 - 4;
+                            let h = (pos.h * size_scale).max(20.0) as i32 - 4;
+                            let style = format!(
+                                "position: absolute; left: {}px; top: {}px; width: {}px; height: {}px;",
+                                x, y, w, h
+                            );
+
+                            let key_class = if is_pressed {
+                                "flex flex-col items-center justify-center font-bold border rounded-md bg-green-500 dark:bg-green-600 border-green-600 dark:border-green-700 shadow-lg shadow-green-500/50 dark:shadow-green-500/30 transition-all duration-75 select-none relative scale-95"
+                            } else {
+                                "flex flex-col items-center justify-center font-bold border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 transition-all select-none relative"
+                            };
+
                             html! {
-                                <div class={if pressed {
-                                    "w-10 h-10 bg-green-500 rounded border border-green-600"
-                                } else {
-                                    "w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600"
-                                }}></div>
+                                <div
+                                    class={key_class}
+                                    style={style}
+                                    title={format!("Row {}, Col {}
+Keycode: 0x{:04X}", pos.row, pos.col, kc)}
+                                >
+                                    <div class="absolute top-0.5 left-1 text-[7px] leading-tight opacity-50 truncate max-w-[30%]">{disp.upper_left}</div>
+                                    <div class="absolute top-0.5 left-0 right-0 text-[7px] leading-tight opacity-50 truncate max-w-[30%] text-center mx-auto">{disp.upper_middle}</div>
+                                    <div class="absolute top-0.5 right-1 text-[7px] leading-tight opacity-50 truncate max-w-[30%] text-right">{disp.upper_right}</div>
+                                    <div class="text-[9px] leading-tight text-center px-1 break-all">{disp.middle}</div>
+                                </div>
                             }
-                        })
+                        })}
+                    </div>
+                </div>
+            }
+        } else {
+            // Fallback: simple grid with key labels
+            html! {
+                <div class="flex flex-wrap gap-1 my-4">
+                    { for codes.iter().enumerate().map(|(keycode_idx, &kc)| {
+                        let disp = keycode_display(kc, protocol_version, keyboard_name);
+
+                        // Calculate row/col from index
+                        let row = keycode_idx / (matrix_cols as usize);
+                        let col = keycode_idx % (matrix_cols as usize);
+
+                        // Check if this position is pressed
+                        let is_pressed = if row < matrix_state.len() && col < matrix_state[row].len() {
+                            matrix_state[row][col]
+                        } else {
+                            false
+                        };
+
+                        let key_class = if is_pressed {
+                            "w-14 h-14 flex flex-col items-center justify-center border rounded bg-green-500 dark:bg-green-600 border-green-600 dark:border-green-700 shadow-lg transition-all duration-75 select-none relative scale-95"
+                        } else {
+                            "w-14 h-14 flex flex-col items-center justify-center border rounded bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all select-none relative"
+                        };
+
+                        html! {
+                            <div
+                                class={key_class}
+                                title={format!("Row {}, Col {}
+0x{:04X}", row, col, kc)}
+                            >
+                                <div class="absolute top-0.5 left-1 text-[7px] leading-tight opacity-50 truncate max-w-[30%]">{disp.upper_left}</div>
+                                <div class="absolute top-0.5 left-0 right-0 text-[7px] leading-tight opacity-50 truncate max-w-[30%] text-center mx-auto">{disp.upper_middle}</div>
+                                <div class="absolute top-0.5 right-1 text-[7px] leading-tight opacity-50 truncate max-w-[30%] text-right">{disp.upper_right}</div>
+                                <div class="text-[9px] leading-tight text-center px-1 break-all">{disp.middle}</div>
+                            </div>
+                        }
                     })}
                 </div>
-            } else {
-                <p class="text-gray-400">{"Matrix size unknown \u{2014} definition not yet decoded."}</p>
             }
+        }
+    } else {
+        html! {
+            <div class="py-12 text-center text-gray-400 italic">
+                {"Loading matrix data..."}
+            </div>
+        }
+    };
+
+    html! {
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold">{"Test Matrix"}</h2>
+                    <p class="text-sm text-gray-500">
+                        {"Press keys on your keyboard to test the switch matrix and see live layer switching."}
+                    </p>
+                </div>
+                <div class="text-sm text-gray-500">
+                    {format!("Base Layer: {}", **active_layer)}
+                </div>
+            </div>
+
+            {layer_indicator}
+
+            {layout_html}
         </div>
     }
 }
