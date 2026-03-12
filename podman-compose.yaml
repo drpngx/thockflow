@@ -3,6 +3,7 @@ services:
     container_name: thockflow
     image: localhost/thockflow:latest
     restart: unless-stopped
+    read_only: true
     cap_drop:
       - ALL
     environment:
