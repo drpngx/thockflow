@@ -45,6 +45,68 @@ compile_pip_requirements(
     requirements_txt = "requirements_lock.txt",
 )
 
+genrule(
+    name = "gen_contrib_layouts",
+    srcs = ["@keymap_editor_contrib//:keyboard_data"],
+    outs = ["src/keymap/contrib_layouts.rs"],
+    cmd = """
+        # Create a temporary directory for keyboard data
+        KEYBOARD_DIR=$$(mktemp -d)
+        
+        # Copy all JSON files from srcs to the temp directory
+        for src in $(SRCS); do
+            if [[ $$src == *.json ]]; then
+                cp "$$src" "$$KEYBOARD_DIR/"
+            fi
+        done
+        
+        # Run the fetcher with the keyboard data directory
+        $(location //server:fetch_contrib_layouts) "$$KEYBOARD_DIR" "$@"
+        
+        # Cleanup
+        rm -rf "$$KEYBOARD_DIR"
+    """,
+    tools = ["//server:fetch_contrib_layouts"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "gen_builtin_keymaps",
+    srcs = ["@zmk//:app"],
+    outs = ["src/keymap/builtin_keymaps.rs"],
+    cmd = """
+        # Find the boards directory in the ZMK app
+        BOARDS_DIR=""
+        for src in $(SRCS); do
+            if [[ $$src == *"/boards/"* ]]; then
+                BOARDS_DIR=$$(dirname "$$(dirname "$$(dirname "$$src")")")
+                break
+            fi
+        done
+        
+        if [ -z "$$BOARDS_DIR" ]; then
+            # Fallback: try to find boards directory structure
+            for src in $(SRCS); do
+                if [[ $$src == *app/boards* ]]; then
+                    # Extract up to boards/
+                    BOARDS_DIR=$${src%%/boards/*}/boards
+                    break
+                fi
+            done
+        fi
+        
+        if [ -z "$$BOARDS_DIR" ] || [ ! -d "$$BOARDS_DIR" ]; then
+            echo "Error: Could not find boards directory in ZMK app" >&2
+            exit 1
+        fi
+        
+        # Run the fetcher with the boards directory
+        $(location //server:fetch_builtin_keymaps) "$$BOARDS_DIR" "$@"
+    """,
+    tools = ["//server:fetch_builtin_keymaps"],
+    visibility = ["//visibility:public"],
+)
+
 rust_binary(
     name = "app",
     srcs = ["src/bin/app.rs"],
@@ -85,8 +147,15 @@ rust_library(
         include = [
             "src/**/*.rs",
         ],
-        exclude = ["src/bin/**"],
-    ),
+        exclude = [
+            "src/bin/**",
+            "src/keymap/contrib_layouts.rs",
+            "src/keymap/builtin_keymaps.rs",
+        ],
+    ) + [
+        ":gen_contrib_layouts",
+        ":gen_builtin_keymaps",
+    ],
     aliases = aliases(),
     compile_data = [
         "static/quotes.txt",

@@ -205,6 +205,7 @@ pub fn to_keymap_data(
         defvars: vec![],
         phantom_keys: vec![],
         chordsv2: vec![],
+        generated_layout_info: None,
     }
 }
 

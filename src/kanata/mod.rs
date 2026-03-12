@@ -1139,6 +1139,7 @@ mod tests {
             defvars: Vec::new(),
             phantom_keys: Vec::new(),
             chordsv2: Vec::new(),
+            generated_layout_info: None,
         };
         data.aliases.insert("myalias".to_string(), "lsft".to_string());
 
@@ -1186,6 +1187,7 @@ mod tests {
             defvars: Vec::new(),
             phantom_keys: Vec::new(),
             chordsv2: Vec::new(),
+            generated_layout_info: None,
         };
         let (_, suggestions) = get_suggestions("_", &data);
         assert!(suggestions.contains(&"_".to_string()));
@@ -1213,6 +1215,7 @@ mod tests {
             defvars: Vec::new(),
             phantom_keys: Vec::new(),
             chordsv2: Vec::new(),
+            generated_layout_info: None,
         };
 
         // Add test variables

@@ -263,3 +263,19 @@ exports_files(glob(['**']))
     strip_prefix = "zmk-a23aa009d7a07d67fe5609caca7372e16610f238",
     urls = ["https://github.com/zmkfirmware/zmk/archive/a23aa009d7a07d67fe5609caca7372e16610f238.zip"],
 )
+
+# Keyboard layouts from nickcoutsos/keymap-editor-contrib
+http_archive(
+    name = "keymap_editor_contrib",
+    build_file_content = """
+filegroup(
+    name = "keyboard_data",
+    srcs = glob(["keyboard-data/*.json"]),
+    visibility = ["//visibility:public"],
+)
+exports_files(glob(['**']))
+""",
+    sha256 = "ad255600eb62798d56d0c80368713778db7f4e4149f172af1a4504842af7283a",
+    strip_prefix = "keymap-editor-contrib-main",
+    urls = ["https://github.com/nickcoutsos/keymap-editor-contrib/archive/refs/heads/main.tar.gz"],
+)

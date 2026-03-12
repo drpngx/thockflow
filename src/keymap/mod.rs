@@ -34,12 +34,46 @@ extern "C" {
     pub type FileSystemWritableFileStream;
 }
 
+/// Source of the current keymap
+#[derive(Clone, PartialEq)]
+pub enum KeymapSource {
+    /// Loaded from File System Access API - can save in-place
+    FileSystem(FileSystemFileHandle),
+    /// Loaded from built-in layout - save downloads file
+    BuiltIn { name: String, display_name: String },
+}
+
+impl KeymapSource {
+    /// Returns true if this source supports in-place saving
+    pub fn can_save_in_place(&self) -> bool {
+        matches!(self, KeymapSource::FileSystem(_))
+    }
+
+    /// Returns the name for download filename
+    pub fn download_name(&self) -> String {
+        match self {
+            KeymapSource::FileSystem(handle) => handle.name(),
+            KeymapSource::BuiltIn { name, .. } => format!("{}.keymap", name),
+        }
+    }
+}
+
 pub mod behaviors;
 use behaviors::{ParameterType, ZMK_BEHAVIORS};
 
 pub mod layouts;
 
+pub mod contrib_layouts;
+
+pub mod builtin_keymaps;
+
 pub mod keycodes;
+
+pub mod layout_detector;
+pub mod layout_generation;
+
+pub use layout_detector::{detect_layout_type, DetectedKeyboardLayout, LayoutDetectionResult};
+pub use layout_generation::{generate_square_layout, generate_fallback_split_layout, GeneratedLayoutInfo, generate_uniform_grid, generate_split_layout};
 use keycodes::format_keycode;
 
 use serde::{Deserialize, Serialize};
@@ -365,6 +399,9 @@ pub struct KeymapData {
     /// defchordsv2 definitions
     #[serde(default)]
     pub chordsv2: Vec<ChordV2>,
+    /// If layout was auto-generated (not from keymap file)
+    #[serde(default)]
+    pub generated_layout_info: Option<GeneratedLayoutInfo>,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.
@@ -686,20 +723,21 @@ pub fn KeymapHome() -> Html {
     let original_content = use_state(|| String::new());
     let error = use_state(|| None::<String>);
     let loading = use_state(|| false);
-    let file_handle = use_state(|| None::<FileSystemFileHandle>);
+    let keymap_source = use_state(|| None::<KeymapSource>);
+    let show_builtin_selector = use_state(|| false);
 
     let on_open = {
         let keymap_data = keymap_data.clone();
         let original_content = original_content.clone();
         let error = error.clone();
         let loading = loading.clone();
-        let file_handle = file_handle.clone();
+        let keymap_source = keymap_source.clone();
         Callback::from(move |_| {
             let keymap_data = keymap_data.clone();
             let original_content = original_content.clone();
             let error = error.clone();
             let loading = loading.clone();
-            let file_handle = file_handle.clone();
+            let keymap_source = keymap_source.clone();
             spawn_local(async move {
                 let options = js_sys::Object::new();
                 let types = js_sys::Array::new();
@@ -730,7 +768,7 @@ pub fn KeymapHome() -> Html {
                         if handles.length() > 0 {
                             let handle_val = handles.get(0);
                             let handle: FileSystemFileHandle = handle_val.unchecked_into();
-                            file_handle.set(Some(handle.clone().unchecked_into()));
+                            keymap_source.set(Some(KeymapSource::FileSystem(handle.clone().unchecked_into())));
 
                             loading.set(true);
                             let file_promise = handle.get_file();
@@ -816,19 +854,74 @@ pub fn KeymapHome() -> Html {
         })
     };
 
+    // Callback to load a built-in keymap
+    let on_load_builtin = {
+        let keymap_data = keymap_data.clone();
+        let original_content = original_content.clone();
+        let keymap_source = keymap_source.clone();
+        let error = error.clone();
+        let loading = loading.clone();
+        let show_builtin_selector = show_builtin_selector.clone();
+        Callback::from(move |(name, display_name, content): (String, String, String)| {
+            let keymap_data = keymap_data.clone();
+            let original_content = original_content.clone();
+            let keymap_source = keymap_source.clone();
+            let error = error.clone();
+            let loading = loading.clone();
+            let show_builtin_selector = show_builtin_selector.clone();
+            
+            loading.set(true);
+            spawn_local(async move {
+                let parse_result = Request::post("/api/parse-keymap")
+                    .json(&KeymapRequest { content: content.clone() })
+                    .unwrap()
+                    .send()
+                    .await;
+
+                loading.set(false);
+                match parse_result {
+                    Ok(resp) => {
+                        if resp.ok() {
+                            match resp.json::<KeymapData>().await {
+                                Ok(data) => {
+                                    original_content.set(content);
+                                    keymap_data.set(Some(data));
+                                    keymap_source.set(Some(KeymapSource::BuiltIn { name, display_name }));
+                                    show_builtin_selector.set(false);
+                                    error.set(None);
+                                }
+                                Err(e) => {
+                                    error.set(Some(format!("JSON Parse error: {}", e)));
+                                }
+                            }
+                        } else {
+                            error.set(Some(format!(
+                                "Server error: {}",
+                                resp.text().await.unwrap_or_default()
+                            )));
+                        }
+                    }
+                    Err(e) => {
+                        error.set(Some(format!("Network error: {}", e)));
+                    }
+                }
+            });
+        })
+    };
+
     let on_save = {
         let keymap_data = keymap_data.clone();
         let original_content = original_content.clone();
         let error = error.clone();
         let loading = loading.clone();
-        let file_handle = file_handle.clone();
+        let keymap_source = keymap_source.clone();
         Callback::from(move |_| {
             if let Some(data) = &*keymap_data {
                 let original_content_str = (*original_content).clone();
                 let data = data.clone();
                 let error = error.clone();
                 let loading = loading.clone();
-                let file_handle_val = (*file_handle).clone();
+                let source = (*keymap_source).clone();
 
                 loading.set(true);
                 spawn_local(async move {
@@ -846,64 +939,70 @@ pub fn KeymapHome() -> Html {
                             if resp.ok() {
                                 match resp.json::<SaveKeymapResponse>().await {
                                     Ok(res) => {
-                                        // Check if we have a direct file handle
-                                        if let Some(handle) = file_handle_val {
-                                            let writable_promise = handle.create_writable();
-                                            let writable_result =
-                                                wasm_bindgen_futures::JsFuture::from(
-                                                    writable_promise,
-                                                )
-                                                .await;
+                                        match source {
+                                            // For FileSystem source: try to save in-place
+                                            Some(KeymapSource::FileSystem(handle)) => {
+                                                let writable_promise = handle.create_writable();
+                                                let writable_result =
+                                                    wasm_bindgen_futures::JsFuture::from(
+                                                        writable_promise,
+                                                    )
+                                                    .await;
 
-                                            match writable_result {
-                                                Ok(writable_val) => {
-                                                    let writable: FileSystemWritableFileStream =
-                                                        writable_val.unchecked_into();
-                                                    let write_promise = writable
-                                                        .write(&JsValue::from_str(&res.content));
-                                                    let _ = wasm_bindgen_futures::JsFuture::from(
-                                                        write_promise,
-                                                    )
-                                                    .await;
-                                                    let close_promise = writable.close();
-                                                    let _ = wasm_bindgen_futures::JsFuture::from(
-                                                        close_promise,
-                                                    )
-                                                    .await;
-                                                    loading.set(false);
-                                                    error.set(None);
-                                                }
-                                                Err(e) => {
-                                                    loading.set(false);
-                                                    error.set(Some(format!(
-                                                        "Failed to create writable: {:?}",
-                                                        e
-                                                    )));
+                                                match writable_result {
+                                                    Ok(writable_val) => {
+                                                        let writable: FileSystemWritableFileStream =
+                                                            writable_val.unchecked_into();
+                                                        let write_promise = writable
+                                                            .write(&JsValue::from_str(&res.content));
+                                                        let _ = wasm_bindgen_futures::JsFuture::from(
+                                                            write_promise,
+                                                        )
+                                                        .await;
+                                                        let close_promise = writable.close();
+                                                        let _ = wasm_bindgen_futures::JsFuture::from(
+                                                            close_promise,
+                                                        )
+                                                        .await;
+                                                        loading.set(false);
+                                                        error.set(None);
+                                                    }
+                                                    Err(e) => {
+                                                        loading.set(false);
+                                                        error.set(Some(format!(
+                                                            "Failed to create writable: {:?}",
+                                                            e
+                                                        )));
+                                                    }
                                                 }
                                             }
-                                        } else {
-                                            // Fallback to traditional download if handle is missing
-                                            loading.set(false);
-                                            let blob = web_sys::Blob::new_with_str_sequence(
-                                                &js_sys::Array::of1(&JsValue::from_str(
-                                                    &res.content,
-                                                )),
-                                            )
-                                            .unwrap();
-                                            let url =
-                                                web_sys::Url::create_object_url_with_blob(&blob)
-                                                    .unwrap();
-                                            let window = web_sys::window().unwrap();
-                                            let document = window.document().unwrap();
-                                            let link = document
-                                                .create_element("a")
-                                                .unwrap()
-                                                .dyn_into::<web_sys::HtmlAnchorElement>()
+                                            // For BuiltIn source or no source: always download
+                                            source => {
+                                                loading.set(false);
+                                                let blob = web_sys::Blob::new_with_str_sequence(
+                                                    &js_sys::Array::of1(&JsValue::from_str(
+                                                        &res.content,
+                                                    )),
+                                                )
                                                 .unwrap();
-                                            link.set_href(&url);
-                                            link.set_download("edited.keymap");
-                                            link.click();
-                                            web_sys::Url::revoke_object_url(&url).unwrap();
+                                                let url =
+                                                    web_sys::Url::create_object_url_with_blob(&blob)
+                                                        .unwrap();
+                                                let window = web_sys::window().unwrap();
+                                                let document = window.document().unwrap();
+                                                let link = document
+                                                    .create_element("a")
+                                                    .unwrap()
+                                                    .dyn_into::<web_sys::HtmlAnchorElement>()
+                                                    .unwrap();
+                                                link.set_href(&url);
+                                                // Use appropriate filename based on source
+                                                let filename = source.map(|s| s.download_name())
+                                                    .unwrap_or_else(|| "edited.keymap".to_string());
+                                                link.set_download(&filename);
+                                                link.click();
+                                                web_sys::Url::revoke_object_url(&url).unwrap();
+                                            }
                                         }
                                     }
                                     Err(e) => {
@@ -939,7 +1038,7 @@ pub fn KeymapHome() -> Html {
         let has_data = keymap_data.is_some();
         let keymap_data_val = (*keymap_data).clone();
         use_effect_with(
-            (has_data, keymap_data_val, (*file_handle).clone()),
+            (has_data, keymap_data_val, (*keymap_source).clone()),
             move |(has_data, _, _)| {
                 let on_open = on_open.clone();
                 let on_save = on_save.clone();
@@ -981,7 +1080,7 @@ pub fn KeymapHome() -> Html {
 
     let on_download_svg = {
         let keymap_data = keymap_data.clone();
-        let file_handle = file_handle.clone();
+        let keymap_source = keymap_source.clone();
         Callback::from(move |_| {
             if let Some(data) = &*keymap_data {
                 let svg_content = generate_svg(data, false, crate::is_mac(), false);
@@ -999,8 +1098,8 @@ pub fn KeymapHome() -> Html {
                     .unwrap();
                 link.set_href(&url);
 
-                let filename = if let Some(handle) = &*file_handle {
-                    let mut name = handle.name();
+                let filename = if let Some(source) = &*keymap_source {
+                    let mut name = source.download_name();
                     if name.ends_with(".keymap") {
                         name = name.replace(".keymap", ".svg");
                     } else {
@@ -1018,6 +1117,14 @@ pub fn KeymapHome() -> Html {
         })
     };
 
+    // Callback to toggle built-in selector
+    let toggle_builtin_selector = {
+        let show_builtin_selector = show_builtin_selector.clone();
+        Callback::from(move |_| {
+            show_builtin_selector.set(!*show_builtin_selector);
+        })
+    };
+
     html! {
         <div class="w-full flex flex-col items-center p-4">
             <h2 class="text-4xl font-display mb-8">{"ZMK Keymap Editor"}</h2>
@@ -1031,6 +1138,14 @@ pub fn KeymapHome() -> Html {
                         </button>
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{"Type "} <kbd class="px-1.5 py-0.5 font-sans font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">{"j"}</kbd> {" to start jump mode"}</p>
+                </div>
+                <div>
+                    <div class="flex flex-col space-y-2">
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white">{"Built-in keymaps"}</label>
+                        <button onclick={toggle_builtin_selector.clone()} class="px-6 py-2.5 bg-indigo-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-indigo-700 hover:shadow-lg focus:bg-indigo-700 focus:shadow-lg focus:outline-none focus:ring-0 active:bg-indigo-800 active:shadow-lg transition duration-150 ease-in-out">
+                            {"Load Built-in"}
+                        </button>
+                    </div>
                 </div>
                 { if keymap_data.is_some() {
                     html! {
@@ -1046,6 +1161,40 @@ pub fn KeymapHome() -> Html {
                 } else { html! {} }}
             </div>
 
+            // Built-in keymap selector
+            { if *show_builtin_selector {
+                html! {
+                    <div class="w-full max-w-4xl mb-8 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{"Select a Built-in Keymap"}</h3>
+                            <button onclick={toggle_builtin_selector.clone()} class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                {"✕"}
+                            </button>
+                        </div>
+                        <div class="max-h-96 overflow-y-auto">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                { builtin_keymaps::BUILTIN_KEYMAPS.iter().map(|keymap| {
+                                    let on_load = on_load_builtin.clone();
+                                    let name = keymap.name.to_string();
+                                    let display_name = keymap.display_name.to_string();
+                                    let content = keymap.content.to_string();
+                                    html! {
+                                        <button 
+                                            onclick={Callback::from(move |_| on_load.emit((name.clone(), display_name.clone(), content.clone())))}
+                                            class="text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
+                                            title={keymap.board_path.to_string()}
+                                        >
+                                            <div class="font-medium">{keymap.display_name}</div>
+                                            <div class="text-xs text-gray-500">{format!("{}", keymap.board_path)}</div>
+                                        </button>
+                                    }
+                                }).collect::<Html>() }
+                            </div>
+                        </div>
+                    </div>
+                }
+            } else { html! {} }}
+
             { if *loading {
                 html! { <div class="text-blue-500 mb-4 animate-pulse">{"Processing..."}</div> }
             } else { html! {} }}
@@ -1058,7 +1207,7 @@ pub fn KeymapHome() -> Html {
                 let on_update_data_clone = on_update_data.clone();
                 html! { <KeymapRenderer data={data.clone()} on_update={on_update_data_clone} /> }
             } else {
-                if !*loading { html! { <div class="text-gray-500 italic">{"Please open a keymap file to start editing."}</div> } } else { html! {} }
+                if !*loading { html! { <div class="text-gray-500 italic">{"Please open a keymap file or select a built-in layout to start editing."}</div> } } else { html! {} }
             }}
         </div>
     }

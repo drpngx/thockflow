@@ -35,6 +35,9 @@ bazel run -c opt //server:keymap_svg -- ~/glove80/zmk-config/config/glove80.keym
 ## ZMK Studio initial bytes
 You may request the client to what it read from the keyboard in a json using [`dump_init=1`](http://127.0.0.1:8081/zmk-studio?dump_init=1).
 
+## Drawing layouts
+This pretty nice: https://nickcoutsos.github.io/keymap-layout-tools/
+
 ## More quotes prompt
 I want to generate long quotes for a typing practice. They don't have to be actual quotes. They must be about 150 words long. Please output a text file that has one such quote on each line. Please generate 20 quotes. Put each quote on a line, and no blank lines in between. I repeat, no blank lines in between the quotes. Strictly use ASCII characters, for instance with single quotes are: ', and hyphens are just a dash. Don't output any preamble or formatting, just the quotes, without blank lines between the quotes. You must make sure not to insert a blank line between the quotes. No blank line, please.
 
@@ -52,7 +55,6 @@ Tidy:
 - implement C-o and C-s for all tabs
 
 - test write paths
-
 
 Mod-tap optimizer:
 - see failure conditions from [howto](https://precondition.github.io/home-row-mods)

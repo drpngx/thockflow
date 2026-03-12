@@ -44,6 +44,34 @@ rust_binary(
 )
 
 rust_binary(
+    name = "fetch_contrib_layouts",
+    srcs = ["src/bin/fetch_contrib_layouts.rs"],
+    crate_features = ["runfiles"],
+    data = ["@keymap_editor_contrib//:keyboard_data"],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        "@rules_rust//tools/runfiles",
+    ],
+)
+
+rust_binary(
+    name = "fetch_builtin_keymaps",
+    srcs = ["src/bin/fetch_builtin_keymaps.rs"],
+    crate_features = ["runfiles"],
+    data = ["@zmk//:app"],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        "@rules_rust//tools/runfiles",
+    ],
+)
+
+rust_binary(
     name = "server",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),

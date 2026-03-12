@@ -232,12 +232,63 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
                     ..Default::default()
                 })
                 .collect();
+        } else {
+            // Try ±3 tolerance matching
+            let tolerance = 3;
+            let candidates: Vec<_> = ZMK_LAYOUTS
+                .iter()
+                .filter(|l| l.keys.len().abs_diff(key_count) <= tolerance)
+                .collect();
+            
+            if !candidates.is_empty() {
+                let best = candidates.iter()
+                    .min_by_key(|l| l.keys.len().abs_diff(key_count))
+                    .unwrap();
+                eprintln!(
+                    "No exact match, using closest: {} ({} keys, target: {}) from {}",
+                    best.name, best.keys.len(), key_count, best.source_file
+                );
+                physical_layout = best
+                    .keys
+                    .iter()
+                    .map(|k| PhysicalKey {
+                        width: k.width,
+                        height: k.height,
+                        x: k.x,
+                        y: k.y,
+                        rotation: k.rotation,
+                        rx: k.rx,
+                        ry: k.ry,
+                        ..Default::default()
+                    })
+                    .collect();
+            }
         }
+    }
+
+    // If still no layout, auto-generate a split layout (two squares, one for each hand)
+    if physical_layout.is_empty() && !layers.is_empty() {
+        let key_count = layers[0].bindings.len();
+        eprintln!(
+            "No matching layout found, auto-generating split layout for {} keys",
+            key_count
+        );
+        
+        // Detect layout type from first layer bindings
+        let detection_result = thockflow::keymap::detect_layout_type(&layers[0].bindings);
+        eprintln!("Detected layout: {} (confidence: {:.2})", 
+            detection_result.layout_type.display_name(),
+            detection_result.confidence
+        );
+        
+        // Generate a split layout (two squares, one for each hand)
+        let (generated_keys, _info) = thockflow::keymap::generate_fallback_split_layout(key_count, detection_result.layout_type);
+        physical_layout = generated_keys;
     }
 
     if physical_layout.is_empty() {
         return Err(anyhow::anyhow!(
-            "Missing physical layout and no match found for {} keys",
+            "Missing physical layout and could not generate layout for {} keys",
             layers.get(0).map_or(0, |l| l.bindings.len())
         ));
     }

@@ -9,12 +9,13 @@ use axum::http::{header, HeaderMap, HeaderValue, Request, Response, StatusCode};
 use axum::response::{Html, IntoResponse};
 use axum::routing::{get_service, post, MethodRouter};
 use axum::Extension;
+use axum::extract::Path;
 use axum::{routing::get, Json, Router};
 use futures::future::BoxFuture;
 use futures::ready;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use thockflow::keymap::{parse_raw_bindings, Defvar, KeymapData, KeyOrigin, Layer, LayerType, PhantomKey, PhysicalKey, ProcessUnmappedKeys, VarType};
+use thockflow::keymap::{parse_raw_bindings, Defvar, KeymapData, KeyOrigin, Layer, LayerType, PhantomKey, PhysicalKey, ProcessUnmappedKeys, VarType, layout_detector::detect_layout_type, layout_generation::generate_fallback_split_layout};
 use thockflow::ServerAppProps;
 use tree_sitter_devicetree;
 use tree_sitter_scheme;
@@ -25,6 +26,50 @@ use yew_router::Routable;
 
 use thockflow::keymap::behaviors::ZMK_BEHAVIORS;
 use thockflow::keymap::layouts::ZMK_LAYOUTS;
+
+// New API types for layout selection
+
+#[derive(Serialize)]
+struct LayoutCandidate {
+    id: String,
+    name: String,
+    source: String,  // "zmk" or "contrib"
+    key_count: usize,
+    /// Base64-encoded mini SVG preview (optional)
+    preview_svg: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GenerateLayoutRequest {
+    bindings: Vec<String>,
+    target_key_count: usize,
+}
+
+#[derive(Serialize)]
+struct GenerateLayoutResponse {
+    keys: Vec<PhysicalKey>,
+    layout_type: String,
+    confidence: f32,
+}
+
+#[derive(Serialize)]
+struct LayoutCandidatesResponse {
+    candidates: Vec<LayoutCandidate>,
+    key_count: usize,
+}
+
+// Note: This type is kept for future API extension that returns layout candidates
+// when no physical layout is found, allowing the frontend to prompt user selection.
+#[allow(dead_code)]
+#[derive(Serialize)]
+struct ParseKeymapExtendedResponse {
+    #[serde(flatten)]
+    data: Option<KeymapData>,
+    success: bool,
+    needs_layout_selection: bool,
+    candidates: Vec<LayoutCandidate>,
+    error: Option<String>,
+}
 
 lazy_static::lazy_static!(
     // Use the source HTML as a template
@@ -156,6 +201,68 @@ async fn patch_keymap_api(Json(req): Json<PatchKeymapRequest>) -> impl IntoRespo
             (StatusCode::BAD_REQUEST, e.to_string()).into_response()
         }
     }
+}
+
+/// Get layout candidates for a given key count with ±3 tolerance
+async fn layout_candidates_api(Path(key_count): Path<usize>) -> impl IntoResponse {
+    info!("Fetching layout candidates for key count: {}", key_count);
+    
+    let candidates = find_layout_candidates(key_count);
+    
+    let response = LayoutCandidatesResponse {
+        candidates,
+        key_count,
+    };
+    
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+/// Generate a square layout based on bindings and target key count
+async fn generate_layout_api(Json(req): Json<GenerateLayoutRequest>) -> impl IntoResponse {
+    info!(
+        "Generating layout for {} bindings, target {} keys",
+        req.bindings.len(),
+        req.target_key_count
+    );
+    
+    // Detect layout type from bindings
+    let detection_result = detect_layout_type(&req.bindings);
+    
+    // Generate a split layout (two squares, one for each hand)
+    let (keys, _info) = generate_fallback_split_layout(req.target_key_count, detection_result.layout_type);
+    
+    let response = GenerateLayoutResponse {
+        keys,
+        layout_type: detection_result.layout_type.display_name().to_string(),
+        confidence: detection_result.confidence,
+    };
+    
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+/// Find layout candidates within ±3 keys tolerance
+fn find_layout_candidates(target_key_count: usize) -> Vec<LayoutCandidate> {
+    let tolerance = 3;
+    let mut candidates = Vec::new();
+    
+    // Search ZMK_LAYOUTS
+    for layout in ZMK_LAYOUTS.iter() {
+        let key_count = layout.keys.len();
+        if key_count.abs_diff(target_key_count) <= tolerance {
+            candidates.push(LayoutCandidate {
+                id: layout.name.to_string(),
+                name: layout.display_name.unwrap_or(layout.name).to_string(),
+                source: "zmk".to_string(),
+                key_count,
+                preview_svg: None, // Could generate on demand
+            });
+        }
+    }
+    
+    // Sort by closeness to target key count
+    candidates.sort_by_key(|c| c.key_count.abs_diff(target_key_count));
+    
+    candidates
 }
 
 fn generate_keymap_dts(original: &str, data: &KeymapData) -> Result<String> {
@@ -692,11 +799,75 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                     name: String::new(),
                 })
                 .collect();
+        } else {
+            // Try to find candidates within ±3 tolerance
+            let candidates = find_layout_candidates(key_count);
+            if !candidates.is_empty() {
+                info!(
+                    "No exact match found, but found {} candidates within ±3 keys tolerance",
+                    candidates.len()
+                );
+                // Use the best candidate (first one, which is closest in key count)
+                let best_candidate = &candidates[0];
+                let matched_layout = ZMK_LAYOUTS
+                    .iter()
+                    .find(|l| l.name == best_candidate.id)
+                    .expect("Candidate layout should exist in ZMK_LAYOUTS");
+                
+                info!(
+                    "Using best candidate: {} ({} keys) from {}",
+                    matched_layout.name,
+                    matched_layout.keys.len(),
+                    matched_layout.source_file
+                );
+                physical_layout = matched_layout
+                    .keys
+                    .iter()
+                    .map(|k| PhysicalKey {
+                        width: k.width,
+                        height: k.height,
+                        x: k.x,
+                        y: k.y,
+                        rotation: k.rotation,
+                        rx: k.rx,
+                        ry: k.ry,
+                        origin: KeyOrigin::Standard,
+                        name: String::new(),
+                    })
+                    .collect();
+            }
         }
     }
 
+    // If still no physical layout, try to auto-generate a split layout
+    let generated_layout_info = if physical_layout.is_empty() && !layers.is_empty() {
+        let key_count = layers[0].bindings.len();
+        info!(
+            "No matching layout found, auto-generating split layout for {} keys",
+            key_count
+        );
+        
+        // Detect layout type from first layer bindings
+        let detection_result = detect_layout_type(&layers[0].bindings);
+        
+        // Generate a split layout (two squares, one for each hand)
+        let (generated_keys, info) = generate_fallback_split_layout(key_count, detection_result.layout_type);
+        physical_layout = generated_keys;
+        
+        info!(
+            "Generated split {} layout with {} keys (confidence: {:.2})",
+            info.layout_type.display_name(),
+            physical_layout.len(),
+            detection_result.confidence
+        );
+        
+        Some(info)
+    } else {
+        None
+    };
+
     if physical_layout.is_empty() {
-        return Err(anyhow::anyhow!("Missing physical layout (zmk,physical-layout compatible node) and no match found in database for {} keys", layers.get(0).map_or(0, |l| l.bindings.len())));
+        return Err(anyhow::anyhow!("Missing physical layout (zmk,physical-layout compatible node) and could not generate layout for {} keys", layers.get(0).map_or(0, |l| l.bindings.len())));
     }
     if layers.is_empty() {
         return Err(anyhow::anyhow!(
@@ -715,6 +886,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         defvars: Vec::new(),
         phantom_keys: Vec::new(),
         chordsv2: Vec::new(),
+        generated_layout_info,
     })
 }
 
@@ -896,6 +1068,7 @@ mod tests {
         
         phantom_keys: vec![],
             chordsv2: vec![],
+            generated_layout_info: None,
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -967,6 +1140,7 @@ mod tests {
         
         phantom_keys: vec![],
             chordsv2: vec![],
+            generated_layout_info: None,
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1039,6 +1213,7 @@ mod tests {
         
         phantom_keys: vec![],
             chordsv2: vec![],
+            generated_layout_info: None,
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1148,6 +1323,7 @@ mod tests {
         
         phantom_keys: vec![],
             chordsv2: vec![],
+            generated_layout_info: None,
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -2646,6 +2822,7 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
         defvars,
         phantom_keys,
         chordsv2: Vec::new(),
+        generated_layout_info: None,
     })
 }
 
@@ -3152,6 +3329,8 @@ fn app() -> Router {
             .route("/api/patch-keymap", post(patch_keymap_api))
             .route("/api/parse-kanata", post(parse_kanata_api))
             .route("/api/save-kanata", post(save_kanata_api))
+            .route("/api/layout-candidates/:key_count", get(layout_candidates_api))
+            .route("/api/generate-layout", post(generate_layout_api))
             .route(*APP_JS_PATH, app_wasm_serve.clone())
             .route(*APP_WASM_PATH, app_wasm_serve)
             // Serve built assets from Vite dist first
