@@ -895,6 +895,7 @@ mod tests {
             defvars: Vec::new(),
         
         phantom_keys: vec![],
+            chordsv2: vec![],
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -965,6 +966,7 @@ mod tests {
             defvars: Vec::new(),
         
         phantom_keys: vec![],
+            chordsv2: vec![],
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1036,6 +1038,7 @@ mod tests {
             defvars: Vec::new(),
         
         phantom_keys: vec![],
+            chordsv2: vec![],
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();
@@ -1144,6 +1147,7 @@ mod tests {
             defvars: Vec::new(),
         
         phantom_keys: vec![],
+            chordsv2: vec![],
     };
 
         let result = generate_keymap_dts(content, &data).unwrap();

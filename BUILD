@@ -26,6 +26,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "opt",
+    values = {
+        "compilation_mode": "opt",
+    },
+)
+
 bool_flag(
     name = "show_drafts",
     build_setting_default = False,

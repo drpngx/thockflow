@@ -177,7 +177,7 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
                 }
             }
         }
-        "&out" | "&ext_power" | "&rgb_ug" | "&bl" | "&mkp" | "&msc" | "&mmv" => {
+        "&out" | "&ext_power" | "&rgb_ug" | "&bl" | "&mkp" | "&mmv" => {
             let cmd_raw = params.get(0).unwrap_or(&"");
             let prefix = match behavior_raw {
                 "&out" => "OUT_",
@@ -191,6 +191,14 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
                 top_left: behavior.into(),
                 top_right: "".into(),
                 center: cmd.into(),
+            }
+        }
+        "&msc" => {
+            let cmd_raw = params.get(0).unwrap_or(&"");
+            BindingParts {
+                top_left: behavior.into(),
+                top_right: "".into(),
+                center: keycodes::format_keycode(cmd_raw),
             }
         }
         _ => {

@@ -73,10 +73,15 @@ lazy_static! {
         m.insert("MOVE_DOWN", "🖱️↓");
         m.insert("MOVE_LEFT", "🖱️←");
         m.insert("MOVE_RIGHT", "🖱️→");
-        m.insert("SCROLL_UP", "🖱️↑");
-        m.insert("SCROLL_DOWN", "🖱️↓");
-        m.insert("SCROLL_LEFT", "🖱️←");
-        m.insert("SCROLL_RIGHT", "🖱️→");
+        m.insert("SCROLL_UP", "🖱️📜↑");
+        m.insert("SCROLL_DOWN", "🖱️📜↓");
+        m.insert("SCROLL_LEFT", "🖱️📜←");
+        m.insert("SCROLL_RIGHT", "🖱️📜→");
+        // ZMK mouse scroll aliases
+        m.insert("SCRL_UP", "🖱️📜↑");
+        m.insert("SCRL_DOWN", "🖱️📜↓");
+        m.insert("SCRL_LEFT", "🖱️📜←");
+        m.insert("SCRL_RIGHT", "🖱️📜→");
 
         // Bluetooth
         m.insert("BT_CLR", "BT Clear");

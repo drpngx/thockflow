@@ -51,14 +51,28 @@ rust_binary(
         "//:static/hshs52.keymap",
         "//:static/kanata-surf.kbd",
     ],
-    data = [
-        "//:app_wasm",
-        "//:static_files",
-    ],
+    data = select({
+        "//:opt": [
+            "//:app_wasm_opt",
+            "//:app_wasm_opt_br",
+            "//:static_files",
+        ],
+        "//conditions:default": [
+            "//:app_wasm",
+            "//:static_files",
+        ],
+    }),
     edition = "2021",
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
     ),
+    rustc_env = select({
+        "//:opt": {
+            "APP_WASM_PATH": "/app_wasm_bg_opt.wasm",
+            "AXUM_PRECOMPRESSED_WASM": "1",
+        },
+        "//conditions:default": {},
+    }),
     rustc_flags = select({
         "//:debug": [
             "-Copt-level=0",

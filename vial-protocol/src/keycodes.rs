@@ -356,7 +356,7 @@ pub fn keycode_label(keycode: u16, protocol_version: u32, keyboard_name: &str) -
             0x1c => "Y".into(),
             0x1d => "Z".into(),
             0x1e => "1 !".into(),
-            0x1f => "QMK_LM_MASK".into(),
+            0x1f => "2 @".into(),
             0x20 => "3 #".into(),
             0x21 => "4 $".into(),
             0x22 => "5 %".into(),
