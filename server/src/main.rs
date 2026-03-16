@@ -595,12 +595,20 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         .map(|cap| cap[1].to_string())
         .collect();
 
+    // MoErgo detection
+    let mut is_moergo = content.contains("&magic");
+    if !is_moergo && content.contains("&rgb_ug") {
+        // Fallback detection: if it has 80 keys and uses RGB, it's likely a MoErgo Glove80
+        // We'll refine this after initial parse if needed
+    }
+
     // Recursive traversal to find nodes
     fn traverse(
         node: tree_sitter::Node,
         source: &[u8],
         physical_layout: &mut Vec<PhysicalKey>,
         layers: &mut Vec<Layer>,
+        is_moergo: bool,
     ) {
         if node.kind() == "node" {
             let node_name = node
@@ -705,7 +713,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
                                     for val_node in inner_child.children(&mut prop_cursor) {
                                         if val_node.kind() != "identifier" {
                                             let raw_val = val_node.utf8_text(source).unwrap_or("");
-                                            bindings.extend(parse_raw_bindings(raw_val));
+                                            bindings.extend(parse_raw_bindings(raw_val, is_moergo));
                                         }
                                     }
                                 }
@@ -732,7 +740,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
 
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            traverse(child, source, physical_layout, layers);
+            traverse(child, source, physical_layout, layers, is_moergo);
         }
     }
 
@@ -741,7 +749,12 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         content.as_bytes(),
         &mut physical_layout,
         &mut layers,
+        is_moergo,
     );
+
+    if !is_moergo && !layers.is_empty() && layers[0].bindings.len() == 80 && content.contains("&rgb_ug") {
+        is_moergo = true;
+    }
 
     if !layers.is_empty() {
         let first_layer_len = layers[0].bindings.len();
@@ -887,6 +900,7 @@ fn parse_keymap_with_tree_sitter(content: &str) -> Result<KeymapData> {
         phantom_keys: Vec::new(),
         chordsv2: Vec::new(),
         generated_layout_info,
+        is_moergo,
     })
 }
 
@@ -922,6 +936,61 @@ mod tests {
             result.physical_layout.len(),
             result.layers.len()
         );
+    }
+
+    #[test]
+    fn test_parse_moergo_glove80() {
+        let content = include_str!("../../static/moergo-glove80.keymap");
+        let result = parse_keymap_with_tree_sitter(content).expect("Should parse successfully");
+
+        assert_eq!(result.physical_layout.len(), 80);
+        assert!(result.is_moergo, "Should be detected as MoErgo");
+        assert_eq!(result.layers.len(), 4);
+
+        // Check &magic parsing
+        let first_layer = &result.layers[0];
+        assert_eq!(first_layer.bindings.len(), 80);
+        assert!(first_layer.bindings.contains(&"&magic MAGIC 0".to_string()));
+
+        // Check &rgb_ug RGB_TOG in magic_layer
+        let magic_layer = &result.layers[2];
+        assert!(magic_layer.bindings.contains(&"&rgb_ug RGB_TOG".to_string()));
+
+        // Validate all bindings are valid (have correct number of parameters) and known
+        for (l_idx, layer) in result.layers.iter().enumerate() {
+            for (b_idx, binding) in layer.bindings.iter().enumerate() {
+                let tokens: Vec<&str> = binding.split_whitespace().collect();
+                if tokens.is_empty() { continue; }
+                let behavior = tokens[0].strip_prefix('&').unwrap_or(tokens[0]);
+                
+                // Behavior must be known
+                let is_known = thockflow::keymap::behaviors::ZMK_BEHAVIORS.iter().any(|b| b.label == Some(behavior) || b.name == behavior)
+                    || (result.is_moergo && (behavior == "magic" || behavior == "layer_td" || behavior.starts_with("bt_") || behavior == "rgb_ug_status_macro"));
+                assert!(is_known, "Unknown behavior '{}' at layer {}, index {}", behavior, l_idx, b_idx);
+
+                let params = &tokens[1..];
+                let expected = thockflow::keymap::raw_param_count(behavior, params.get(0).map(|s| *s), result.is_moergo);
+                assert_eq!(params.len(), expected, 
+                    "Invalid param count for binding '{}' at layer {}, index {}. Expected {}, got {}", 
+                    binding, l_idx, b_idx, expected, params.len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_moergo_roundtrip() {
+        let content = include_str!("../../static/moergo-glove80.keymap");
+        let data = parse_keymap_with_tree_sitter(content).expect("Should parse");
+        
+        let result = generate_keymap_dts(content, &data).expect("Should generate");
+        
+        // The generated bindings should contain &magic with its params
+        assert!(result.contains("&magic MAGIC 0"), "Should preserve &magic bindings");
+        
+        // Re-parse and verify
+        let reparsed = parse_keymap_with_tree_sitter(&result).expect("Should re-parse");
+        assert!(reparsed.is_moergo);
+        assert!(reparsed.layers[0].bindings.contains(&"&magic MAGIC 0".to_string()));
     }
 
     #[tokio::test]
@@ -1037,9 +1106,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -1048,9 +1117,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
             ],
             layers: vec![Layer {
                 name: "new_layer_0".to_string(),
@@ -1059,17 +1128,8 @@ mod tests {
                 source_layer: None,
                 key_bindings: HashMap::new(),
             }],
-            includes: vec![],
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-        
-        phantom_keys: vec![],
-            chordsv2: vec![],
-            generated_layout_info: None,
-    };
+            ..Default::default()
+        };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         assert!(result.contains("new_layer_0"));
@@ -1100,9 +1160,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -1111,9 +1171,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
             ],
             layers: vec![
                 Layer {
@@ -1131,17 +1191,8 @@ mod tests {
                     key_bindings: HashMap::new(),
                 },
             ],
-            includes: vec![],
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-        
-        phantom_keys: vec![],
-            chordsv2: vec![],
-            generated_layout_info: None,
-    };
+            ..Default::default()
+        };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         // Layer 0: "&kp LONG_BINDING" (16) + " " + "&kp B"
@@ -1173,9 +1224,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -1184,9 +1235,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
             ],
             layers: vec![
                 Layer {
@@ -1204,17 +1255,8 @@ mod tests {
                     key_bindings: HashMap::new(),
                 },
             ],
-            includes: vec![],
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-        
-        phantom_keys: vec![],
-            chordsv2: vec![],
-            generated_layout_info: None,
-    };
+            ..Default::default()
+        };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         println!("Result:\n{}", result);
@@ -1292,9 +1334,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
                 PhysicalKey {
                     x: 200,
                     y: 0,
@@ -1303,9 +1345,9 @@ mod tests {
                     rotation: 0,
                     rx: 0,
                     ry: 0,
-                origin: KeyOrigin::Standard,
-                name: String::new(),
-            },
+                    origin: KeyOrigin::Standard,
+                    name: String::new(),
+                },
             ],
             layers: vec![Layer {
                 name: "layer_0".to_string(),
@@ -1315,16 +1357,8 @@ mod tests {
                 key_bindings: HashMap::new(),
             }],
             includes: vec!["custom.h".to_string()],
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-        
-        phantom_keys: vec![],
-            chordsv2: vec![],
-            generated_layout_info: None,
-    };
+            ..Default::default()
+        };
 
         let result = generate_keymap_dts(content, &data).unwrap();
         println!("Result:\n{}", result);
@@ -2814,15 +2848,13 @@ fn parse_kanata_with_tree_sitter(content: &str, is_mac: bool, is_laptop: bool) -
     Ok(KeymapData {
         physical_layout,
         layers,
-        includes: Vec::new(),
         aliases,
         defsrc: key_names,
         unmapped_names,
         process_unmapped_keys,
         defvars,
         phantom_keys,
-        chordsv2: Vec::new(),
-        generated_layout_info: None,
+        ..Default::default()
     })
 }
 

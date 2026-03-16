@@ -16,8 +16,10 @@ env HTTP_LISTEN_ADDR=0.0.0.0:8081 RUST_BACKTRACE=1 RUST_LOG=info bazel run //ser
 envgpg -e THOCKFLOW bazel run -c opt //server:serve
 ```
 
-To pull the latest cloudflared:
-```
+`cloudflared` is version-pinned in `MODULE.bazel` for reproducibility. To update to a newer version, find the latest digest on Docker Hub and update it there.
+
+To fetch the pinned version:
+```bash
 bazel fetch @cloudflared//...
 ```
 

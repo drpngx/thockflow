@@ -1123,7 +1123,6 @@ mod tests {
     #[test]
     fn test_completion_congruence() {
         let mut data = KeymapData {
-            physical_layout: Vec::new(),
             layers: vec![Layer { 
                 name: "base".to_string(), 
                 bindings: Vec::new(),
@@ -1131,15 +1130,7 @@ mod tests {
                 source_layer: None,
                 key_bindings: HashMap::new(),
             }],
-            includes: Vec::new(),
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-            phantom_keys: Vec::new(),
-            chordsv2: Vec::new(),
-            generated_layout_info: None,
+            ..Default::default()
         };
         data.aliases.insert("myalias".to_string(), "lsft".to_string());
 
@@ -1176,19 +1167,7 @@ mod tests {
 
     #[test]
     fn test_transparent_suggestion() {
-        let data = KeymapData {
-            physical_layout: Vec::new(),
-            layers: Vec::new(),
-            includes: Vec::new(),
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-            phantom_keys: Vec::new(),
-            chordsv2: Vec::new(),
-            generated_layout_info: None,
-        };
+        let data = KeymapData::default();
         let (_, suggestions) = get_suggestions("_", &data);
         assert!(suggestions.contains(&"_".to_string()));
     }
@@ -1199,7 +1178,6 @@ mod tests {
 
     fn create_test_data_with_defvars() -> KeymapData {
         let mut data = KeymapData {
-            physical_layout: Vec::new(),
             layers: vec![Layer { 
                 name: "base".to_string(), 
                 bindings: Vec::new(),
@@ -1207,15 +1185,7 @@ mod tests {
                 source_layer: None,
                 key_bindings: HashMap::new(),
             }],
-            includes: Vec::new(),
-            aliases: HashMap::new(),
-            defsrc: Vec::new(),
-            unmapped_names: Vec::new(),
-            process_unmapped_keys: ProcessUnmappedKeys::No,
-            defvars: Vec::new(),
-            phantom_keys: Vec::new(),
-            chordsv2: Vec::new(),
-            generated_layout_info: None,
+            ..Default::default()
         };
 
         // Add test variables

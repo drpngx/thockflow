@@ -77,6 +77,7 @@ rust_binary(
     aliases = aliases(),
     compile_data = [
         "//:static/hshs52.keymap",
+        "//:static/moergo-glove80.keymap",
         "//:static/kanata-surf.kbd",
     ],
     data = select({
@@ -118,6 +119,7 @@ rust_test(
     crate = ":server",
     compile_data = [
         "//:static/hshs52.keymap",
+        "//:static/moergo-glove80.keymap",
         "//:static/kanata-surf.kbd",
     ],
     proc_macro_deps = all_crate_deps(

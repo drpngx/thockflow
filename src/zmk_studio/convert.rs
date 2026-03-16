@@ -197,15 +197,7 @@ pub fn to_keymap_data(
     KeymapData {
         layers,
         physical_layout: physical_keys,
-        aliases: std::collections::HashMap::new(),
-        defsrc: vec![],
-        includes: vec![],
-        unmapped_names: vec![],
-        process_unmapped_keys: ProcessUnmappedKeys::No,
-        defvars: vec![],
-        phantom_keys: vec![],
-        chordsv2: vec![],
-        generated_layout_info: None,
+        ..Default::default()
     }
 }
 

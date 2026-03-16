@@ -53,7 +53,7 @@ oci.pull(
     name = "cloudflared",
     image = "docker.io/cloudflare/cloudflared",
     platforms = ["linux/amd64"],
-    tag = "latest",
+    digest = "sha256:64f4e9d6a867f71d89ae3318460bb3c604923b4af62b1bc9e2f74ee7486e3052",
 )
 use_repo(oci, "cloudflared", "cloudflared_linux_amd64")
 

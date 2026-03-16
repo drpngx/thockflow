@@ -47,11 +47,15 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         .map(|cap| cap[1].to_string())
         .collect();
 
+    // MoErgo detection
+    let mut is_moergo = content.contains("&magic");
+
     fn traverse(
         node: tree_sitter::Node,
         source: &[u8],
         physical_layout: &mut Vec<PhysicalKey>,
         layers: &mut Vec<Layer>,
+        is_moergo: bool,
     ) {
         if node.kind() == "node" {
             let node_name = node
@@ -148,7 +152,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
                                     for val_node in inner_child.children(&mut prop_cursor) {
                                         if val_node.kind() != "identifier" {
                                             let raw_val = val_node.utf8_text(source).unwrap_or("");
-                                            bindings.extend(parse_raw_bindings(raw_val));
+                                            bindings.extend(parse_raw_bindings(raw_val, is_moergo));
                                         }
                                     }
                                 }
@@ -170,7 +174,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
 
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            traverse(child, source, physical_layout, layers);
+            traverse(child, source, physical_layout, layers, is_moergo);
         }
     }
 
@@ -179,7 +183,12 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         content.as_bytes(),
         &mut physical_layout,
         &mut layers,
+        is_moergo,
     );
+
+    if !is_moergo && !layers.is_empty() && layers[0].bindings.len() == 80 && content.contains("&rgb_ug") {
+        is_moergo = true;
+    }
 
     if !layers.is_empty() {
         let first_layer_len = layers[0].bindings.len();
@@ -300,10 +309,7 @@ fn parse_keymap(content: &str) -> Result<KeymapData> {
         physical_layout,
         layers,
         includes,
-        aliases: std::collections::HashMap::new(),
-        defsrc: Vec::new(),
-        unmapped_names: Vec::new(),
-        process_unmapped_keys: thockflow::keymap::ProcessUnmappedKeys::No,
+        is_moergo,
         ..Default::default()
     })
 }

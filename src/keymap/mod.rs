@@ -78,8 +78,8 @@ use keycodes::format_keycode;
 
 use serde::{Deserialize, Serialize};
 
-pub fn format_binding(binding: &str) -> String {
-    let parts = get_binding_parts(binding);
+pub fn format_binding(binding: &str, is_moergo: bool) -> String {
+    let parts = get_binding_parts(binding, is_moergo);
     if parts.top_left.is_empty() && parts.top_right.is_empty() {
         parts.center
     } else if !parts.top_left.is_empty() && parts.top_right.is_empty() {
@@ -95,7 +95,7 @@ pub struct BindingParts {
     pub center: String,
 }
 
-pub fn get_binding_parts(binding: &str) -> BindingParts {
+pub fn get_binding_parts(binding: &str, is_moergo: bool) -> BindingParts {
     let parts: Vec<&str> = binding.split_whitespace().collect();
     if parts.is_empty() {
         return BindingParts {
@@ -108,6 +108,28 @@ pub fn get_binding_parts(binding: &str) -> BindingParts {
     let behavior_raw = parts[0];
     let behavior = behavior_raw.strip_prefix('&').unwrap_or(behavior_raw);
     let params = &parts[1..];
+
+    if is_moergo && (behavior == "magic" || behavior == "layer_td" || behavior.starts_with("bt_") || behavior == "rgb_ug_status_macro") {
+        if behavior == "magic" {
+            return BindingParts {
+                top_left: "magic".into(),
+                top_right: params.get(0).cloned().unwrap_or("").to_string(),
+                center: "rgb_status".into(),
+            };
+        }
+        let center = if behavior == "layer_td" {
+            "LAYER".into()
+        } else if behavior.starts_with("bt_") {
+            format!("BT {}", behavior.strip_prefix("bt_").unwrap_or(""))
+        } else {
+            behavior.to_string()
+        };
+        return BindingParts {
+            top_left: behavior.into(),
+            top_right: "".into(),
+            center,
+        };
+    }
 
     match behavior_raw {
         "&kp" => {
@@ -402,19 +424,35 @@ pub struct KeymapData {
     /// If layout was auto-generated (not from keymap file)
     #[serde(default)]
     pub generated_layout_info: Option<GeneratedLayoutInfo>,
+    /// Whether this is a MoErgo keymap
+    #[serde(default)]
+    pub is_moergo: bool,
 }
 
 /// Returns how many raw (un-preprocessed) parameter tokens a behavior consumes.
 /// ZMK C macros like RGB_TOG expand to 2 cell values from 1 token, so
 /// `binding_cells` from the DTS doesn't match the raw token count.
-pub fn raw_param_count(behavior_name: &str, first_param: Option<&str>) -> usize {
+pub fn raw_param_count(behavior_name: &str, first_param: Option<&str>, is_moergo: bool) -> usize {
     let behavior_name = behavior_name.strip_prefix('&').unwrap_or(behavior_name);
+
+    if is_moergo && (behavior_name == "magic" || behavior_name == "layer_td" || behavior_name.starts_with("bt_") || behavior_name == "rgb_ug_status_macro") {
+        if behavior_name == "magic" {
+            return 2;
+        }
+        return 0;
+    }
+
+    let is_next_behavior = first_param.map(|s| s.starts_with('&')).unwrap_or(false);
+
     if let Some(meta) = behaviors::ZMK_BEHAVIORS
         .iter()
         .find(|b| b.label == Some(behavior_name) || b.name == behavior_name)
     {
         if meta.binding_cells == 2 {
             if let Some(c_inc) = meta.c_include {
+                if first_param.is_none() || is_next_behavior {
+                    return 0;
+                }
                 // Behaviors with C header macros: most constants pack 2 cells into 1 token.
                 // Exceptions are constants that expand to just a command (needing a user-supplied value).
                 match c_inc {
@@ -430,10 +468,20 @@ pub fn raw_param_count(behavior_name: &str, first_param: Option<&str>) -> usize 
                     _ => 1,
                 }
             } else {
-                meta.binding_cells as usize
+                if first_param.is_none() || is_next_behavior {
+                    0
+                } else {
+                    meta.binding_cells as usize
+                }
+            }
+        } else if meta.binding_cells == 1 {
+            if first_param.is_none() || is_next_behavior {
+                0
+            } else {
+                1
             }
         } else {
-            meta.binding_cells as usize
+            0
         }
     } else {
         0 // Unknown behavior, assume no params
@@ -442,7 +490,7 @@ pub fn raw_param_count(behavior_name: &str, first_param: Option<&str>) -> usize 
 
 /// Parse raw DTS binding tokens into individual binding strings.
 /// Handles the fact that ZMK C macros pack multiple cell values into single tokens.
-pub fn parse_raw_bindings(raw: &str) -> Vec<String> {
+pub fn parse_raw_bindings(raw: &str, is_moergo: bool) -> Vec<String> {
     let tokens: Vec<&str> = raw.split_whitespace().collect();
     let mut bindings = Vec::new();
     let mut i = 0;
@@ -450,22 +498,20 @@ pub fn parse_raw_bindings(raw: &str) -> Vec<String> {
         let token = tokens[i].trim_matches(|c| c == '<' || c == '>' || c == ';' || c == ' ');
         if token.starts_with('&') {
             let behavior_name = &token[1..];
-            let behavior = behaviors::ZMK_BEHAVIORS
-                .iter()
-                .find(|b| b.label == Some(behavior_name) || b.name == behavior_name);
+            let first_param = tokens.get(i + 1).map(|&s| s.trim_matches(|c| c == '>' || c == ';'));
+            let binding_cells = raw_param_count(behavior_name, first_param, is_moergo);
+
             let mut binding = token.to_string();
-            if let Some(b) = behavior {
-                for _ in 0..b.binding_cells {
-                    if i + 1 < tokens.len() {
-                        let next = tokens[i + 1].trim_matches(|c| c == '>' || c == ';');
-                        // Stop consuming params if we hit another behavior reference
-                        if next.starts_with('&') {
-                            break;
-                        }
-                        i += 1;
-                        binding.push(' ');
-                        binding.push_str(next);
+            for _ in 0..binding_cells {
+                if i + 1 < tokens.len() {
+                    let next = tokens[i + 1].trim_matches(|c| c == '>' || c == ';');
+                    // Stop consuming params if we hit another behavior reference
+                    if next.starts_with('&') {
+                        break;
                     }
+                    i += 1;
+                    binding.push(' ');
+                    binding.push_str(next);
                 }
             }
             bindings.push(binding);
@@ -587,7 +633,7 @@ pub fn generate_svg(data: &KeymapData, is_kanata: bool, is_mac: bool, is_laptop:
             let parts = if is_kanata {
                 crate::kanata::get_kanata_binding_parts_internal(&binding, &data.aliases, is_mac, is_laptop)
             } else {
-                get_binding_parts(&binding)
+                get_binding_parts(&binding, data.is_moergo)
             };
 
             let x = pk.x as f32 * pos_scale + offset_x;
@@ -1729,7 +1775,7 @@ pub fn KeymapRenderer(props: &RendererProps) -> Html {
                 <div class="relative mx-auto" style={format!("width: {}px;", content_width_px)}>
                 { for props.data.physical_layout.iter().enumerate().map(|(i, pk)| {
                     let binding = layer.bindings.get(i).cloned().unwrap_or_else(|| "".to_string());
-                    let parts = get_binding_parts(&binding);
+                    let parts = get_binding_parts(&binding, props.data.is_moergo);
                     let x = (pk.x as f32 * pos_scale + offset_x) as i32; let y = (pk.y as f32 * pos_scale) as i32;
                     let w = (pk.width as f32 * size_scale).max(20.0) as i32 - 4; let h = (pk.height as f32 * size_scale).max(20.0) as i32 - 4;
                     let rotation_deg = pk.rotation as f32 / 100.0;
@@ -2008,7 +2054,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
         behavior_name == "sk" || (behavior_name == "mt" && param_idx == 0)
     };
     let get_expected_param_count = |behavior_label: &str, params: &[String]| -> usize {
-        let count = raw_param_count(behavior_label, params.get(0).map(|s| s.as_str()));
+        let count = raw_param_count(behavior_label, params.get(0).map(|s| s.as_str()), props.data.is_moergo);
         if count > 0 {
             count
         } else {
@@ -2490,7 +2536,7 @@ fn KeyBindingPopup(props: &PopupProps) -> Html {
         current_binding_full.push(' ');
         current_binding_full.push_str(p);
     }
-    let preview_parts = get_binding_parts(&current_binding_full);
+    let preview_parts = get_binding_parts(&current_binding_full, props.data.is_moergo);
     let selected_pk = &props.data.physical_layout[props.selected_key.key_index];
     let preview_style = format!(
         "transform: rotate({}deg);",
