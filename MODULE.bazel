@@ -49,11 +49,12 @@ oci.pull(
 )
 use_repo(oci, "distroless_base_nonroot", "distroless_base_nonroot_linux_amd64")
 
+# Latest: https://hub.docker.com/r/cloudflare/cloudflared
 oci.pull(
     name = "cloudflared",
     image = "docker.io/cloudflare/cloudflared",
     platforms = ["linux/amd64"],
-    digest = "sha256:64f4e9d6a867f71d89ae3318460bb3c604923b4af62b1bc9e2f74ee7486e3052",
+    digest = "sha256:12ff5c6992a9863db4da270746af7c244bcaee49353039af8104268a18d6c4f0",
 )
 use_repo(oci, "cloudflared", "cloudflared_linux_amd64")
 
