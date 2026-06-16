@@ -18,9 +18,9 @@ stylist = { version = "0.13", features = [
 ], default-features = false }
 yew = { version = "0.21", features = ["hydration"] }
 yew-router = { version = "0.18" }
-time = { version = "0.3.47", features = ["macros", "formatting"] }
+time = { version = "0.3.49", features = ["macros", "formatting"] }
 lazy_static = "1.5.0"
-web-sys = { version = "0.3.95", features = [
+web-sys = { version = "0.3.102", features = [
     "Element", 
     "DomRect", 
     "HtmlElement", 
