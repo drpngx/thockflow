@@ -76,7 +76,21 @@ def main():
         print("Usage: envgpg -e CF_TUNNEL_THOCKFLOW bazel run //:serve")
         sys.exit(1)
 
-    # 7. Start the Stack
+    # 7. Tear down any leftovers from a previous run so `up` is idempotent.
+    # A hard kill or a container wedged in "Stopping" leaves containers behind
+    # and `up` then fails with "container name is already in use". `down` alone
+    # can't always clear a stuck container, so force-remove by name as well.
+    # Remove in dependency order: dependents (cloudflared) before the container
+    # they require (thockflow).
+    print("\nClearing any previous thockflow containers...")
+    subprocess.run(["podman-compose", "-f", compose_file, "down"])
+    for name in ("cloudflared-thockflow", "thockflow"):
+        subprocess.run(
+            ["podman", "rm", "-f", "-t", "1", name],
+            stderr=subprocess.DEVNULL,
+        )
+
+    # 8. Start the Stack
     print("\nStarting isolated Kata VMs via Podman Compose...")
     # Pass along any extra arguments provided to `bazel run //:serve -- [args]`
     compose_args = ["podman-compose", "-f", compose_file, "up"] + sys.argv[1:]
