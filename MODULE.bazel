@@ -1,7 +1,6 @@
 module(
     name = "thockflow",
     version = "0.0.0",
-    compatibility_level = 1,
 )
 
 bazel_dep(name = "rules_python", version = "1.9.0")
@@ -55,7 +54,7 @@ oci.pull(
     name = "cloudflared",
     image = "docker.io/cloudflare/cloudflared",
     platforms = ["linux/amd64"],
-    digest = "sha256:12ff5c6992a9863db4da270746af7c244bcaee49353039af8104268a18d6c4f0",
+    digest = "sha256:18626b1baac4450214535cd5bc40ef44c0635244d585ebf707749c22b6f3408f",
 )
 use_repo(oci, "cloudflared", "cloudflared_linux_amd64")
 
@@ -66,8 +65,8 @@ archive_override(
     strip_prefix = "hermetic_cc_toolchain-d76afacf58283e4994700be3937173707fcc1761",
 )
 
-bazel_dep(name = "rules_rust", version = "0.68.1")
-bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_rust", version = "0.69.0")
+bazel_dep(name = "platforms", version = "1.1.0")
 
 RUST_EDITION = "2024"
 
@@ -125,7 +124,7 @@ use_repo(
     "rust_host_tools_nightly",
 )
 
-bazel_dep(name = "rules_rust_wasm_bindgen", version = "0.68.1")
+bazel_dep(name = "rules_rust_wasm_bindgen", version = "0.69.0")
 
 # use manual wasm-bindgen toolchain to fix windows build failure
 bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
@@ -155,7 +154,7 @@ bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aspect_rules_lint", version = "2.1.0")
 bazel_dep(name = "aspect_rules_jest", version = "0.24.3")
-bazel_dep(name = "aspect_rules_js", version = "2.7.0")
+bazel_dep(name = "aspect_rules_js", version = "2.9.2")
 bazel_dep(name = "aspect_rules_swc", version = "2.6.1")
 bazel_dep(name = "aspect_rules_ts", version = "3.8.4")
 bazel_dep(name = "aspect_rules_rollup", version = "2.0.1")
@@ -187,7 +186,7 @@ rules_ts_ext.deps()
 use_repo(rules_ts_ext, "npm_typescript")
 
 #### wasm compression
-bazel_dep(name = "brotli", version = "1.2.0")
+bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
 
 #### wasm-opt
 bazel_dep(name = "emsdk", version = "5.0.1")
@@ -216,7 +215,7 @@ register_toolchains(
 
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "protobuf", version = "35.1", repo_name = "com_google_protobuf")
-bazel_dep(name = "rules_rust_prost", version = "0.68.1")
+bazel_dep(name = "rules_rust_prost", version = "0.69.0")
 
 prost_bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
 prost_bindeps.spec(
