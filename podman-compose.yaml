@@ -21,7 +21,9 @@ services:
       - thockflow_external
       - thockflow_internal
     labels:
-      - "io.containers.autoupdate=registry"
+      # Image is built locally, not pulled: "registry" made podman auto-update fail
+      # with "pinging container registry localhost: connection refused".
+      - "io.containers.autoupdate=local"
     depends_on:
       - thockflow
 
