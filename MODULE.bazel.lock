@@ -1136,7 +1136,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "gsQojxtBSp2mKQsK3MECOqwOzOlW1X6jAVk7kGyj9z8=",
-        "usagesDigest": "DmZ+83zCR1hX5xVB3Lm6L/NYSCZOZ9W4OJO8++XobOE=",
+        "usagesDigest": "lhIVWnJl3C2OOEjuPBEDKbq5hsKxvM3C82d6RrthxZo=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_bazel_lib+,bazel_tools bazel_tools",
           "REPO_MAPPING:bazel_features+,bazel_tools bazel_tools",
@@ -1224,7 +1224,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "cloudflare/cloudflared",
-              "identifier": "sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38",
+              "identifier": "sha256:51c9cefcb4569df44e1ad403ab1d3d8065aa8e84339bcfc6aee75502e1140339",
               "platform": "linux/amd64",
               "target_name": "cloudflared_linux_amd64",
               "bazel_tags": []
@@ -1238,7 +1238,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "cloudflare/cloudflared",
-              "identifier": "sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38",
+              "identifier": "sha256:51c9cefcb4569df44e1ad403ab1d3d8065aa8e84339bcfc6aee75502e1140339",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@cloudflared_linux_amd64"
               },
