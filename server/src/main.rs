@@ -3391,8 +3391,21 @@ async fn main() -> Result<()> {
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     } else {
         let addr = std::env::var("HTTP_LISTEN_ADDR").unwrap_or("127.0.0.1:8080".into());
-        info!("starting server on {}", addr);
-        axum::Server::bind(&addr.parse()?)
+        // Accept a literal SocketAddr ("0.0.0.0:8080") or a host:port to resolve
+        // ("thockflow:8080"). Resolving our own container name binds exactly the
+        // container's interface: aardvark DNS answers with the current address,
+        // so the bind stays scoped without pinning a static IP.
+        let socket_addr = match addr.parse() {
+            Ok(sa) => sa,
+            Err(_) => {
+                use std::net::ToSocketAddrs;
+                addr.to_socket_addrs()?
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("could not resolve {}", addr))?
+            }
+        };
+        info!("starting server on {}", socket_addr);
+        axum::Server::bind(&socket_addr)
             .serve(app.into_make_service())
             .await?;
     }

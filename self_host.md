@@ -202,6 +202,25 @@ podman-compose -f podman-compose.yaml down
 
 ## Troubleshooting
 
+### `IPAM error: requested ip address 10.89.1.5 is already allocated to container ID …`
+
+Seen 2026-09-13, after a WSL user-manager crash. podman 4.9 / netavark 1.4 keep IP
+leases in `/run/user/1000/containers/networks/ipam.db` and never release them when a
+container is force-removed or dies mid-start — verified by force-removing a healthy
+container and watching its lease survive. The compose then pinned `thockflow` to a
+static IP, so every later `up` collided with a dead container's lease.
+
+Fixed by removing the pin: the server binds `HTTP_LISTEN_ADDR=thockflow:8080` — its
+own name, resolved via aardvark DNS to the container's current dynamic address, so the
+listen socket stays scoped to that interface. cloudflared reaches it by the same name,
+leaked leases no longer matter, and unclean crashes self-heal on the next `up`.
+Don't reintroduce `ipv4_address` without accepting this failure mode back.
+
+If it does reappear (a pinned IP somewhere else), the lease db is on tmpfs and a
+`wsl --shutdown` from Windows wipes it clean. Also: force-removing containers leaks
+*more* leases — tear down gracefully (`podman-compose -f podman-compose.yaml down`)
+when you can.
+
 ### "KVM not available"
 - Ensure `nestedVirtualization=true` is in `.wslconfig` and you've restarted WSL
 - Run `lsmod | grep kvm` — if empty, run `sudo modprobe kvm_intel` (or `kvm_amd`)

@@ -18,6 +18,8 @@ envgpg -e THOCKFLOW bazel run -c opt //server:serve
 
 `cloudflared` is version-pinned in `MODULE.bazel` for reproducibility. To update to a newer version, find the latest digest on Docker Hub and update it there.
 
+If `//server:serve` fails with `IPAM error: requested ip address … already allocated to container ID …`, podman leaked a lease for a pinned static IP — the pin was removed from `podman-compose.yaml` for exactly this reason. See [Troubleshooting](self_host.md#troubleshooting) in `self_host.md`; a `wsl --shutdown` resets the lease db.
+
 To fetch the pinned version:
 ```bash
 bazel fetch @cloudflared//...

@@ -7,10 +7,15 @@ services:
     cap_drop:
       - ALL
     environment:
-      - HTTP_LISTEN_ADDR=10.89.1.5:8080
+      # Bind by container name, not a pinned container IP: podman 4.9 leaks the
+      # IPAM lease when a container dies mid-start, and a pinned address then
+      # collides with the dead lease on every restart until /run clears. The
+      # server resolves "thockflow" via aardvark DNS to its own current address,
+      # so the bind stays scoped to this interface. Only cloudflared can reach it
+      # -- the network is internal-only.
+      - HTTP_LISTEN_ADDR=thockflow:8080
     networks:
-      thockflow_internal:
-        ipv4_address: 10.89.1.5
+      - thockflow_internal
 
   cloudflared:
     container_name: cloudflared-thockflow
