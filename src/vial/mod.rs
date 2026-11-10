@@ -1,7 +1,7 @@
-//! Vial keyboard layout manager — WebHID-based live configuration.
+//! Keyboard layout manager — WebHID-based live configuration for Vial and
+//! SVIL (Svalboard) keyboards. Both tabs share this UI; protocol differences
+//! live in [`backend`].
 
-use lzma_rs::xz_decompress;
-use std::io::Cursor;
 use std::rc::Rc;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
@@ -9,14 +9,21 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
+pub mod backend;
 pub mod popup;
 pub mod settings;
+pub mod sval_settings;
+pub mod svil_link;
 pub mod webhid;
 use popup::VialKeyBindingPopup;
 
+pub use backend::Protocol;
+use backend::{Link, SvilState};
 use settings::QmkSettingsPanel;
+use sval_settings::SvalSettingsPanel;
 use vial_protocol::keycodes::keycode_display;
-use vial_protocol::qmk_settings as qs;
+use vial_protocol::svil::file::SvilData;
+use vial_protocol::vil::VilData;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +34,7 @@ enum VialTab {
     Keymap,
     TestMatrix,
     QmkSettings,
+    SvalSettings,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -45,23 +53,96 @@ pub struct QmkSettingValue {
 }
 
 #[derive(Clone, PartialEq, Default)]
-struct MatrixPos {
-    row: u8,
-    col: u8,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
+pub struct MatrixPos {
+    pub row: u8,
+    pub col: u8,
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
 
 // ---------------------------------------------------------------------------
-// VialHome — top-level page component
+// Page components
 // ---------------------------------------------------------------------------
 
 #[function_component]
 pub fn VialHome() -> Html {
+    html! { <KeyboardHome protocol={Protocol::Vial} /> }
+}
+
+#[function_component]
+pub fn SvilHome() -> Html {
+    html! { <KeyboardHome protocol={Protocol::Svil} /> }
+}
+
+/// Offer `text` as a file download.
+fn download_text(filename: &str, text: &str) -> Result<(), String> {
+    let blob = web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(&JsValue::from_str(text)))
+        .map_err(|e| format!("Failed to create blob: {e:?}"))?;
+    let url = web_sys::Url::create_object_url_with_blob(&blob).map_err(|e| format!("Failed to create URL: {e:?}"))?;
+    let document = web_sys::window().and_then(|w| w.document()).ok_or("No document")?;
+    let link = document
+        .create_element("a")
+        .map_err(|e| format!("{e:?}"))?
+        .dyn_into::<web_sys::HtmlAnchorElement>()
+        .map_err(|_| "Not an anchor")?;
+    link.set_href(&url);
+    link.set_download(filename);
+    link.click();
+    let _ = web_sys::Url::revoke_object_url(&url);
+    Ok(())
+}
+
+/// Let the user pick a file and read it as text.
+async fn pick_text_file(accept: &str) -> Result<String, String> {
+    use futures::channel::oneshot;
+    let document = web_sys::window().and_then(|w| w.document()).ok_or("No document")?;
+    let input = document
+        .create_element("input")
+        .map_err(|e| format!("{e:?}"))?
+        .dyn_into::<web_sys::HtmlInputElement>()
+        .map_err(|_| "Not an input")?;
+    input.set_type("file");
+    input.set_accept(accept);
+    let (tx, rx) = oneshot::channel::<Option<web_sys::File>>();
+    let tx = std::cell::RefCell::new(Some(tx));
+    let input_for_cb = input.clone();
+    let on_change = Closure::<dyn FnMut()>::new(move || {
+        let file = input_for_cb.files().and_then(|f| f.get(0));
+        if let Some(tx) = tx.borrow_mut().take() {
+            let _ = tx.send(file);
+        }
+    });
+    input.set_onchange(Some(on_change.as_ref().unchecked_ref()));
+    input.click();
+    let file = rx.await.map_err(|_| "No file selected")?.ok_or("No file selected")?;
+    drop(on_change);
+    let text = wasm_bindgen_futures::JsFuture::from(file.text()).await.map_err(|e| format!("Failed to read file: {e:?}"))?;
+    text.as_string().ok_or_else(|| "File is not text".to_string())
+}
+
+fn file_stem(kb_name: &str, fallback: &str) -> String {
+    if kb_name.is_empty() {
+        fallback.to_string()
+    } else {
+        kb_name.to_lowercase().replace(' ', "_")
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct KeyboardHomeProps {
+    pub protocol: Protocol,
+}
+
+#[function_component]
+pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
+    let protocol = props.protocol;
+    let is_svil = protocol == Protocol::Svil;
     let connected = use_state(|| false);
-    let device = use_state(|| Option::<webhid::HidDevice>::None);
+    let device = use_state(|| Option::<Link>::None);
+    let svil_state = use_state(|| Option::<SvilState>::None);
+    let kb_uid = use_state(|| 0u64);
     let keyboard_name = use_state(String::new);
     let vendor_id = use_state(|| 0u16);
     let product_id = use_state(|| 0u16);
@@ -73,7 +154,9 @@ pub fn VialHome() -> Html {
     let matrix_rows = use_state(|| 0u8);
     let matrix_cols = use_state(|| 0u8);
     let error = use_state(|| Option::<String>::None);
+    let notice = use_state(|| Option::<String>::None);
     let loading = use_state(|| false);
+    let busy = use_state(|| false);
     let matrix_state = use_state(Vec::<Vec<bool>>::new);
     let qmk_settings = use_state(Vec::<QmkSettingValue>::new);
     let definition_info = use_state(|| Option::<String>::None);
@@ -92,6 +175,10 @@ pub fn VialHome() -> Html {
     let menu_focus_index = use_state(|| 0usize);
     let quick_assign_index = use_state(|| None::<usize>);
     let layer_names = use_state(|| Vec::<String>::new());
+
+    // Custom keycode labels are global to the keycode tables: drop them when
+    // this page goes away.
+    use_effect_with((), |_| || vial_protocol::keycodes::set_custom_keycodes(Vec::new()));
 
     {
         let container_ref = container_ref.clone();
@@ -121,26 +208,27 @@ pub fn VialHome() -> Html {
                 // Clone device for the closure
                 let dev_opt = (*device).clone();
                 
+                // Skip a tick while the previous poll is still in flight, so a
+                // slow keyboard doesn't build up a queue of requests.
+                let in_flight = Rc::new(std::cell::Cell::new(false));
                 let closure = Closure::wrap(Box::new(move || {
                     if let Some(ref d) = dev_opt {
+                        if in_flight.get() {
+                            return;
+                        }
+                        in_flight.set(true);
+                        let in_flight = in_flight.clone();
                         let matrix_state = matrix_state.clone();
                         let rows = *matrix_rows;
                         let cols = *matrix_cols;
-                        let dev = d.clone();
+                        let link = d.clone();
 
                         spawn_local(async move {
-                            match webhid::send_message(
-                                &dev,
-                                vial_protocol::VialMessage::get_switch_matrix_state().as_bytes(),
-                            ).await {
-                                Ok(resp) => {
-                                    let new_state = vial_protocol::parse_matrix_state(&resp, rows, cols);
-                                    matrix_state.set(new_state);
-                                }
-                                Err(e) => {
-                                    log::warn!("Matrix poll error: {e}");
-                                }
+                            match link.poll_matrix(rows, cols).await {
+                                Ok(new_state) => matrix_state.set(new_state),
+                                Err(e) => log::warn!("Matrix poll error: {e}"),
                             }
+                            in_flight.set(false);
                         });
                     }
                 }) as Box<dyn FnMut()>);
@@ -168,15 +256,15 @@ pub fn VialHome() -> Html {
     }
 
     // -- connect ------------------------------------------------------------
-    let on_connect = {
+    // Puts a freshly loaded keyboard into the UI state.
+    let apply_loaded = {
         let connected = connected.clone();
         let device = device.clone();
+        let svil_state = svil_state.clone();
         let keyboard_name = keyboard_name.clone();
         let vendor_id = vendor_id.clone();
         let product_id = product_id.clone();
         let microcontroller = microcontroller.clone();
-        let error = error.clone();
-        let loading = loading.clone();
         let layer_count = layer_count.clone();
         let definition_info = definition_info.clone();
         let qmk_settings = qmk_settings.clone();
@@ -186,254 +274,49 @@ pub fn VialHome() -> Html {
         let key_layout = key_layout.clone();
         let layers = layers.clone();
         let layer_names = layer_names.clone();
+        let notice = notice.clone();
+        let active_layer = active_layer.clone();
+        let active_tab = active_tab.clone();
+        let kb_uid = kb_uid.clone();
+        Rc::new(move |link: Link, kb: backend::LoadedKeyboard| {
+            kb_uid.set(kb.uid);
+            keyboard_name.set(kb.name);
+            vendor_id.set(kb.vendor_id);
+            product_id.set(kb.product_id);
+            microcontroller.set(kb.microcontroller);
+            vial_protocol_ver.set(kb.protocol_version);
+            matrix_rows.set(kb.rows);
+            matrix_cols.set(kb.cols);
+            layer_count.set(kb.layer_count);
+            layers.set(kb.layers);
+            layer_names.set(kb.layer_names);
+            key_layout.set(kb.key_layout);
+            qmk_settings.set(kb.qmk_settings);
+            definition_info.set(kb.definition_info);
+            notice.set(kb.notice);
+            svil_state.set(kb.svil);
+            active_layer.set(0);
+            active_tab.set(VialTab::Keymap);
+            device.set(Some(link));
+            connected.set(true);
+        })
+    };
 
+    let on_connect = {
+        let error = error.clone();
+        let loading = loading.clone();
+        let apply_loaded = apply_loaded.clone();
         Callback::from(move |_: MouseEvent| {
-            let connected = connected.clone();
-            let device = device.clone();
-            let keyboard_name = keyboard_name.clone();
-            let vendor_id = vendor_id.clone();
-            let product_id = product_id.clone();
-            let microcontroller = microcontroller.clone();
             let error = error.clone();
             let loading = loading.clone();
-            let layer_count = layer_count.clone();
-            let definition_info = definition_info.clone();
-            let qmk_settings = qmk_settings.clone();
-            let vial_protocol_ver = vial_protocol_ver.clone();
-            let matrix_rows = matrix_rows.clone();
-            let matrix_cols = matrix_cols.clone();
-            let key_layout = key_layout.clone();
-            let layers = layers.clone();
-            let layer_names = layer_names.clone();
-
+            let apply_loaded = apply_loaded.clone();
             spawn_local(async move {
                 loading.set(true);
                 error.set(None);
-
-                let dev = match webhid::request_device().await {
-                    Ok(d) => d,
-                    Err(e) => {
-                        error.set(Some(e));
-                        loading.set(false);
-                        return;
-                    }
-                };
-
-                keyboard_name.set(dev.product_name());
-                vendor_id.set(dev.vendor_id());
-                product_id.set(dev.product_id());
-
-                // 1. Keyboard ID: [vial_proto LE32][uid LE64]
-                let mut vial_ver = 0u32;
-                if let Ok(resp) = webhid::send_message(
-                    &dev,
-                    vial_protocol::VialMessage::get_keyboard_id().as_bytes(),
-                )
-                .await
-                {
-                    let (ver, uid) = vial_protocol::parse_keyboard_id(&resp);
-                    vial_ver = ver;
-                    vial_protocol_ver.set(ver);
-                    log::info!("Vial protocol v{ver}, UID {uid:016X}");
+                match backend::connect(protocol).await {
+                    Ok((link, kb)) => apply_loaded(link, kb),
+                    Err(e) => error.set(Some(e)),
                 }
-
-                // 2. Definition size, then definition blocks
-                let mut m_rows = 0u8;
-                let mut m_cols = 0u8;
-                if let Ok(size_resp) =
-                    webhid::send_message(&dev, vial_protocol::VialMessage::get_size().as_bytes())
-                        .await
-                {
-                    let total_size = vial_protocol::parse_definition_size(&size_resp);
-                    log::info!("Definition payload: {total_size} bytes");
-                    let mut payload = Vec::with_capacity(total_size as usize);
-                    let mut remaining = total_size as i64;
-                    let mut block = 0u32;
-                    while remaining > 0 {
-                        match webhid::send_message(
-                            &dev,
-                            vial_protocol::VialMessage::get_definition(block).as_bytes(),
-                        )
-                        .await
-                        {
-                            Ok(resp) => {
-                                let chunk_len = if remaining < vial_protocol::MSG_LEN as i64 {
-                                    remaining as usize
-                                } else {
-                                    vial_protocol::MSG_LEN
-                                };
-                                let chunk = &resp[..chunk_len];
-
-                                payload.extend_from_slice(chunk);
-                                remaining -= chunk.len() as i64;
-                                block += 1;
-                            }
-                            Err(e) => {
-                                log::warn!("definition fetch error at block {block}: {e}");
-                                break;
-                            }
-                        }
-                    }
-
-                    // Decompress XZ
-                    let mut decompressed = Vec::new();
-                    let mut reader = Cursor::new(&payload);
-                    match xz_decompress(&mut reader, &mut decompressed) {
-                        Ok(_) => {
-                            if let Ok(json) =
-                                serde_json::from_slice::<serde_json::Value>(&decompressed)
-                            {
-                                if let Some(name) = json.get("keyboard_name").and_then(|v| v.as_str()) {
-                                    keyboard_name.set(name.to_string());
-                                }
-                                if let Some(mcu) = json.get("processor").and_then(|v| v.as_str()) {
-                                    microcontroller.set(mcu.to_string());
-                                } else if let Some(mcu) = json.get("mcu").and_then(|v| v.as_str()) {
-                                    microcontroller.set(mcu.to_string());
-                                }
-
-                                if let Some(matrix) = json.get("matrix") {
-                                    m_rows =
-                                        matrix.get("rows").and_then(|v| v.as_u64()).unwrap_or(0)
-                                            as u8;
-                                    m_cols =
-                                        matrix.get("cols").and_then(|v| v.as_u64()).unwrap_or(0)
-                                            as u8;
-                                    matrix_rows.set(m_rows);
-                                    matrix_cols.set(m_cols);
-                                }
-
-                                // Parse layout
-                                let mut positions = Vec::new();
-                                if let Some(layouts) =
-                                    json.get("layouts").and_then(|l| l.get("keymap"))
-                                {
-                                    if let Some(rows) = layouts.as_array() {
-                                        let mut cur_y = 0.0f32;
-                                        for row_val in rows {
-                                            if let Some(keys) = row_val.as_array() {
-                                                let mut cur_x = 0.0f32;
-                                                let mut cur_w = 1.0f32;
-                                                let mut cur_h = 1.0f32;
-                                                for k in keys {
-                                                    if let Some(obj) = k.as_object() {
-                                                        if let Some(x) =
-                                                            obj.get("x").and_then(|v| v.as_f64())
-                                                        {
-                                                            cur_x += x as f32;
-                                                        }
-                                                        if let Some(y) =
-                                                            obj.get("y").and_then(|v| v.as_f64())
-                                                        {
-                                                            cur_y += y as f32;
-                                                        }
-                                                        if let Some(w) =
-                                                            obj.get("w").and_then(|v| v.as_f64())
-                                                        {
-                                                            cur_w = w as f32;
-                                                        }
-                                                        if let Some(h) =
-                                                            obj.get("h").and_then(|v| v.as_f64())
-                                                        {
-                                                            cur_h = h as f32;
-                                                        }
-                                                    } else if let Some(label) = k.as_str() {
-                                                        // Format: "row,col" or "label\n\nrow,col"
-                                                        let parts: Vec<&str> =
-                                                            label.split('\n').collect();
-                                                        let coord = parts.last().unwrap_or(&"");
-                                                        let coords: Vec<&str> =
-                                                            coord.split(',').collect();
-                                                        if coords.len() == 2 {
-                                                            let r: u8 =
-                                                                coords[0].parse().unwrap_or(255);
-                                                            let c: u8 =
-                                                                coords[1].parse().unwrap_or(255);
-                                                            if r != 255 && c != 255 {
-                                                                positions.push(MatrixPos {
-                                                                    row: r,
-                                                                    col: c,
-                                                                    x: cur_x,
-                                                                    y: cur_y,
-                                                                    w: cur_w,
-                                                                    h: cur_h,
-                                                                });
-                                                            }
-                                                        }
-                                                        cur_x += cur_w;
-                                                        cur_w = 1.0;
-                                                        cur_h = 1.0;
-                                                    }
-                                                }
-                                            }
-                                            cur_y += 1.0;
-                                        }
-                                    }
-                                }
-                                key_layout.set(positions);
-                                definition_info.set(Some(format!(
-                                    "{} bytes LZMA payload, {} decompressed. Matrix: {}x{}",
-                                    payload.len(),
-                                    decompressed.len(),
-                                    m_rows,
-                                    m_cols
-                                )));
-                            }
-                        }
-                        Err(e) => {
-                            error.set(Some(format!("XZ decompression failed: {e}")));
-                        }
-                    }
-                }
-
-                // 3. Layer count
-                let mut l_count = 0u8;
-                if let Ok(resp) = webhid::send_message(
-                    &dev,
-                    vial_protocol::VialMessage::get_layer_count().as_bytes(),
-                )
-                .await
-                {
-                    l_count = vial_protocol::parse_layer_count(&resp);
-                    layer_count.set(l_count);
-                    log::info!("layers: {l_count}");
-                }
-
-                // 4. Fetch Keymap layer-by-layer
-                if l_count > 0 && m_rows > 0 && m_cols > 0 {
-                    let mut all_layers = Vec::new();
-                    for l in 0..l_count {
-                        let mut layer_codes = Vec::new();
-                        for r in 0..m_rows {
-                            for c in 0..m_cols {
-                                if let Ok(resp) = webhid::send_message(
-                                    &dev,
-                                    vial_protocol::VialMessage::get_keycode(l, r, c).as_bytes(),
-                                )
-                                .await
-                                {
-                                    layer_codes.push(vial_protocol::parse_keycode(&resp));
-                                } else {
-                                    layer_codes.push(0);
-                                }
-                            }
-                        }
-                        all_layers.push(layer_codes);
-                        layers.set(all_layers.clone());
-                    }
-                    // Initialize layer names
-                    let names: Vec<String> = (0..l_count).map(|i| format!("L{}", i)).collect();
-                    layer_names.set(names);
-                }
-
-                // 5. QMK settings (only if vial protocol >= 4)
-                if vial_ver >= vial_protocol::VIAL_PROTOCOL_QMK_SETTINGS {
-                    let settings = load_qmk_settings(&dev).await;
-                    qmk_settings.set(settings);
-                }
-
-                device.set(Some(dev));
-                connected.set(true);
                 loading.set(false);
             });
         })
@@ -443,6 +326,7 @@ pub fn VialHome() -> Html {
     let on_disconnect = {
         let connected = connected.clone();
         let device = device.clone();
+        let svil_state = svil_state.clone();
         let keyboard_name = keyboard_name.clone();
         let vendor_id = vendor_id.clone();
         let product_id = product_id.clone();
@@ -455,10 +339,13 @@ pub fn VialHome() -> Html {
         let layer_menu_index = layer_menu_index.clone();
         let displayed_layer = displayed_layer.clone();
         let matrix_state = matrix_state.clone();
+        let notice = notice.clone();
+        let active_tab = active_tab.clone();
 
         Callback::from(move |_: MouseEvent| {
             let device = device.clone();
             let connected = connected.clone();
+            let svil_state = svil_state.clone();
             let keyboard_name = keyboard_name.clone();
             let vendor_id = vendor_id.clone();
             let product_id = product_id.clone();
@@ -471,11 +358,15 @@ pub fn VialHome() -> Html {
             let layer_menu_index = layer_menu_index.clone();
             let displayed_layer = displayed_layer.clone();
             let matrix_state = matrix_state.clone();
+            let notice = notice.clone();
+            let active_tab = active_tab.clone();
 
-            if let Some(dev) = (*device).clone() {
+            if let Some(link) = (*device).clone() {
                 spawn_local(async move {
-                    let _ = webhid::close_device(&dev).await;
+                    link.close().await;
+                    vial_protocol::keycodes::set_custom_keycodes(Vec::new());
                     device.set(None);
+                    svil_state.set(None);
                     connected.set(false);
                     keyboard_name.set(String::new());
                     vendor_id.set(0);
@@ -489,6 +380,8 @@ pub fn VialHome() -> Html {
                     qmk_settings.set(Vec::new());
                     layer_names.set(Vec::new());
                     layer_menu_index.set(None);
+                    notice.set(None);
+                    active_tab.set(VialTab::Keymap);
                 });
             }
         })
@@ -576,6 +469,7 @@ pub fn VialHome() -> Html {
     let rename_layer = {
         let layer_names = layer_names.clone();
         let layer_menu_index = layer_menu_index.clone();
+        let error = error.clone();
         move |idx: usize| {
             let window = web_sys::window().unwrap();
             let current_name = &layer_names[idx];
@@ -583,7 +477,13 @@ pub fn VialHome() -> Html {
                 window.prompt_with_message_and_default("Rename layer:", current_name)
             {
                 let trimmed = new_name.trim();
-                if !trimmed.is_empty() && trimmed.len() <= 32 {
+                // SVIL boards store names in 16 UTF-8 bytes.
+                let valid = if is_svil {
+                    vial_protocol::svil::validate_label(trimmed).map_err(|e| error.set(Some(e))).is_ok()
+                } else {
+                    trimmed.len() <= 32
+                };
+                if !trimmed.is_empty() && valid {
                     let mut names = (*layer_names).clone();
                     names[idx] = trimmed.to_string();
                     layer_names.set(names);
@@ -922,129 +822,367 @@ pub fn VialHome() -> Html {
     let on_save = {
         let layers = layers.clone();
         let device = device.clone();
+        let matrix_rows = matrix_rows.clone();
         let matrix_cols = matrix_cols.clone();
+        let layer_count = layer_count.clone();
+        let layer_names = layer_names.clone();
+        let svil_state = svil_state.clone();
+        let error = error.clone();
+        let notice = notice.clone();
+        let busy = busy.clone();
         Callback::from(move |_: MouseEvent| {
-            let dev = device.clone();
-            let lays = layers.clone();
-            let cols = *matrix_cols;
+            let Some(link) = (*device).clone() else { return };
+            let lays = (*layers).clone();
+            let names = (*layer_names).clone();
+            let (rows, cols, count) = (*matrix_rows, *matrix_cols, *layer_count);
+            let svil_state = svil_state.clone();
+            let error = error.clone();
+            let notice = notice.clone();
+            let busy = busy.clone();
             spawn_local(async move {
-                if let Some(d) = &*dev {
-                    for (l_idx, layer) in lays.iter().enumerate() {
-                        for (k_idx, &kc) in layer.iter().enumerate() {
-                            let r = (k_idx / cols as usize) as u8;
-                            let c = (k_idx % cols as usize) as u8;
-                            let msg =
-                                vial_protocol::VialMessage::set_keycode(l_idx as u8, r, c, kc);
-                            let _ = webhid::send_message(d, msg.as_bytes()).await;
+                busy.set(true);
+                let mut result = link.write_keymap(&lays, rows, cols, count).await;
+                if result.is_ok() {
+                    if let Some(st) = (*svil_state).clone() {
+                        match link.write_layer_names(&names, &st.board_layer_names).await {
+                            Ok(board) => svil_state.set(Some(SvilState { board_layer_names: board, ..st })),
+                            Err(e) => result = Err(e),
                         }
                     }
                 }
+                match result {
+                    Ok(()) => {
+                        let extra = if lays.len() > count as usize {
+                            format!(" Only the first {count} layers fit on the keyboard.")
+                        } else {
+                            String::new()
+                        };
+                        notice.set(Some(format!("Keymap saved to the keyboard.{extra}")));
+                    }
+                    Err(e) => error.set(Some(format!("Failed to save to the keyboard: {e}"))),
+                }
+                busy.set(false);
             });
         })
     };
 
-    // -- Save keymap as .vil file with dual parsing validation ----------------
+    // -- Save as .vil (Vial keyboards): a full vial-gui layout file -----------
     let on_save_vil = {
+        let device = device.clone();
         let layers = layers.clone();
         let layer_names = layer_names.clone();
         let keyboard_name = keyboard_name.clone();
         let matrix_rows = matrix_rows.clone();
         let matrix_cols = matrix_cols.clone();
+        let layer_count = layer_count.clone();
+        let key_layout = key_layout.clone();
+        let qmk_settings = qmk_settings.clone();
+        let vial_protocol_ver = vial_protocol_ver.clone();
+        let kb_uid = kb_uid.clone();
         let error = error.clone();
+        let busy = busy.clone();
         Callback::from(move |_: MouseEvent| {
-            let lays = layers.clone();
-            let names = layer_names.clone();
-            let kb_name = (*keyboard_name).clone();
-            let rows = *matrix_rows;
-            let cols = *matrix_cols;
+            let Some(link) = (*device).clone() else { return };
+            let kb = backend::LoadedKeyboard {
+                name: (*keyboard_name).clone(),
+                uid: *kb_uid,
+                protocol_version: *vial_protocol_ver,
+                rows: *matrix_rows,
+                cols: *matrix_cols,
+                layer_count: *layer_count,
+                layers: layers.iter().take(*layer_count as usize).cloned().collect(),
+                layer_names: (*layer_names).clone(),
+                key_layout: (*key_layout).clone(),
+                qmk_settings: (*qmk_settings).clone(),
+                ..Default::default()
+            };
             let error = error.clone();
-            
+            let busy = busy.clone();
             spawn_local(async move {
-                // Build the VIL JSON structure
-                let layers_json: Vec<serde_json::Value> = lays
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, layer)| {
-                        let name = names.get(idx).cloned().unwrap_or_else(|| format!("Layer{}", idx));
-                        serde_json::json!({
-                            "name": name,
-                            "keycodes": layer.iter().map(|kc| format!("0x{:04X}", kc)).collect::<Vec<_>>()
-                        })
-                    })
-                    .collect();
-                
-                let vil_data = serde_json::json!({
-                    "version": 1,
-                    "keyboard": kb_name,
-                    "matrix": {
-                        "rows": rows,
-                        "cols": cols
-                    },
-                    "layers": layers_json
-                });
-                
-                // Serialize to string
-                let json_str = match serde_json::to_string_pretty(&vil_data) {
-                    Ok(s) => s,
+                busy.set(true);
+                match link.read_vil_backup(&kb).await {
+                    Ok(data) => {
+                        let text = data.to_json();
+                        // Check the file reads back as written before offering it.
+                        match VilData::from_json(&text) {
+                            Ok(back) if back == data => {
+                                let filename = format!("{}.vil", file_stem(&kb.name, "keyboard"));
+                                match download_text(&filename, &text) {
+                                    Ok(()) => error.set(None),
+                                    Err(e) => error.set(Some(e)),
+                                }
+                            }
+                            Ok(_) => error.set(Some("Validation failed: the .vil file doesn't read back as written.".into())),
+                            Err(e) => error.set(Some(format!("Validation failed: {e}"))),
+                        }
+                    }
+                    Err(e) => error.set(Some(format!("Failed to read the keyboard: {e}"))),
+                }
+                busy.set(false);
+            });
+        })
+    };
+
+    // -- Save as .svil (SVIL keyboards) ---------------------------------------
+    let on_save_svil = {
+        let device = device.clone();
+        let svil_state = svil_state.clone();
+        let keyboard_name = keyboard_name.clone();
+        let layers = layers.clone();
+        let layer_names = layer_names.clone();
+        let qmk_settings = qmk_settings.clone();
+        let matrix_rows = matrix_rows.clone();
+        let matrix_cols = matrix_cols.clone();
+        let layer_count = layer_count.clone();
+        let error = error.clone();
+        let busy = busy.clone();
+        Callback::from(move |_: MouseEvent| {
+            let Some(link) = (*device).clone() else { return };
+            let Some(st) = (*svil_state).clone() else { return };
+            let kb = backend::LoadedKeyboard {
+                name: (*keyboard_name).clone(),
+                rows: *matrix_rows,
+                cols: *matrix_cols,
+                layer_count: *layer_count,
+                // The file describes the keyboard: no more layers than it has.
+                layers: layers.iter().take(*layer_count as usize).cloned().collect(),
+                layer_names: (*layer_names).clone(),
+                qmk_settings: (*qmk_settings).clone(),
+                svil: Some(st.clone()),
+                ..Default::default()
+            };
+            let error = error.clone();
+            let busy = busy.clone();
+            spawn_local(async move {
+                busy.set(true);
+                match link.read_svil_backup(&kb).await {
+                    Ok(data) => {
+                        let text = data.to_json(&st.keycode_names());
+                        // Check the file reads back as written before offering it.
+                        match SvilData::from_json(&text, &st.keycode_names()) {
+                            Ok(back) if back == data => {
+                                let filename = format!("{}.svil", file_stem(&kb.name, "keyboard"));
+                                match download_text(&filename, &text) {
+                                    Ok(()) => error.set(None),
+                                    Err(e) => error.set(Some(e)),
+                                }
+                            }
+                            Ok(_) => error.set(Some("Validation failed: the .svil file doesn't read back as written.".into())),
+                            Err(e) => error.set(Some(format!("Validation failed: {e}"))),
+                        }
+                    }
+                    Err(e) => error.set(Some(format!("Failed to read the keyboard: {e}"))),
+                }
+                busy.set(false);
+            });
+        })
+    };
+
+    // -- Open a .svil file into the editor (SVIL keyboards) -------------------
+    let on_open_svil = {
+        let device = device.clone();
+        let svil_state = svil_state.clone();
+        let layers = layers.clone();
+        let layer_names = layer_names.clone();
+        let qmk_settings = qmk_settings.clone();
+        let matrix_rows = matrix_rows.clone();
+        let matrix_cols = matrix_cols.clone();
+        let layer_count = layer_count.clone();
+        let error = error.clone();
+        let notice = notice.clone();
+        let busy = busy.clone();
+        Callback::from(move |_: MouseEvent| {
+            let Some(link) = (*device).clone() else { return };
+            let Some(st) = (*svil_state).clone() else { return };
+            let current_layers = (*layers).clone();
+            let current_names = (*layer_names).clone();
+            let current_settings = (*qmk_settings).clone();
+            let (rows, cols, count) = (*matrix_rows as usize, *matrix_cols as usize, *layer_count as usize);
+            let svil_state = svil_state.clone();
+            let layers = layers.clone();
+            let layer_names = layer_names.clone();
+            let qmk_settings = qmk_settings.clone();
+            let error = error.clone();
+            let notice = notice.clone();
+            let busy = busy.clone();
+            spawn_local(async move {
+                let text = match pick_text_file(".svil,.vil,.viable,.json").await {
+                    Ok(t) => t,
                     Err(e) => {
-                        error.set(Some(format!("Failed to serialize keymap: {}", e)));
+                        log::info!("No file opened: {e}");
                         return;
                     }
                 };
-                
-                // DUAL PARSING: Parse it back to verify it works
-                match serde_json::from_str::<serde_json::Value>(&json_str) {
-                    Ok(parsed) => {
-                        // Verify the parsed data has the expected structure
-                        if !parsed.get("layers").is_some() {
-                            error.set(Some("Validation failed: missing layers in generated file".to_string()));
-                            return;
+                // A Vial .vil (e.g. saved from the Vial tab before flashing Svalboard QMK)
+                // is migrated: Svalboard's USERnn keycodes become its SV_ keycodes.
+                let mut migration_note = String::new();
+                let parsed = if vial_protocol::vil::is_vil(&text) {
+                    VilData::from_json(&text).map(|vil| {
+                        let (data, report) = vil.to_svil(&st.keycode_names());
+                        if report.unassigned_custom_keycodes > 0 {
+                            migration_note.push_str(&format!(
+                                " {} key(s) used custom keycodes Svalboard's Vial firmware left unassigned; they are now empty.",
+                                report.unassigned_custom_keycodes
+                            ));
                         }
-                        
-                        // Create and download the file
-                        let blob = match web_sys::Blob::new_with_str_sequence(&js_sys::Array::of1(
-                            &JsValue::from_str(&json_str),
-                        )) {
-                            Ok(b) => b,
-                            Err(e) => {
-                                error.set(Some(format!("Failed to create blob: {:?}", e)));
-                                return;
-                            }
-                        };
-                        
-                        let url = match web_sys::Url::create_object_url_with_blob(&blob) {
-                            Ok(u) => u,
-                            Err(e) => {
-                                error.set(Some(format!("Failed to create URL: {:?}", e)));
-                                return;
-                            }
-                        };
-                        
-                        let window = web_sys::window().unwrap();
-                        let document = window.document().unwrap();
-                        let link = document
-                            .create_element("a")
-                            .unwrap()
-                            .dyn_into::<web_sys::HtmlAnchorElement>()
-                            .unwrap();
-                        
-                        let filename = if kb_name.is_empty() {
-                            "keymap.vil".to_string()
-                        } else {
-                            format!("{}_keymap.vil", kb_name.to_lowercase().replace(' ', "_"))
-                        };
-                        
-                        link.set_href(&url);
-                        link.set_download(&filename);
-                        link.click();
-                        
-                        let _ = web_sys::Url::revoke_object_url(&url);
-                        error.set(None); // Clear any previous errors
-                    }
+                        if report.foreign_custom_keycodes > 0 {
+                            migration_note.push_str(&format!(
+                                " {} key(s) use another keyboard's custom keycodes (USERnn); they won't do anything here.",
+                                report.foreign_custom_keycodes
+                            ));
+                        }
+                        data
+                    })
+                } else {
+                    SvilData::from_json(&text, &st.keycode_names())
+                };
+                let data = match parsed {
+                    Ok(d) => d,
                     Err(e) => {
-                        error.set(Some(format!("Dual parsing validation failed: {}", e)));
+                        error.set(Some(format!("Couldn't open the file: {e}")));
+                        return;
+                    }
+                };
+                if data.uid != st.info.uid {
+                    let ok = web_sys::window()
+                        .and_then(|w| w.confirm_with_message("This layout was saved from a different keyboard. Open it anyway?").ok())
+                        .unwrap_or(false);
+                    if !ok {
+                        return;
                     }
                 }
+
+                // Keymap and layer names go into the editor ("Save Keymap to Device" writes them).
+                let file_rows = data.layout[0].len();
+                let file_cols = data.layout[0][0].len();
+                let mut new_layers = current_layers.clone();
+                new_layers.resize(count.max(new_layers.len()), vec![0; rows * cols]);
+                for (l, layer) in data.layout.iter().enumerate().take(count) {
+                    for r in 0..rows.min(file_rows) {
+                        for c in 0..cols.min(file_cols) {
+                            if let Some(k) = new_layers[l].get_mut(r * cols + c) {
+                                *k = layer[r][c];
+                            }
+                        }
+                    }
+                }
+                let new_names: Vec<String> = (0..new_layers.len())
+                    .map(|i| {
+                        data.layer_names
+                            .get(&i)
+                            .cloned()
+                            .unwrap_or_else(|| if i < count { backend::default_layer_name(i) } else { current_names.get(i).cloned().unwrap_or_default() })
+                    })
+                    .collect();
+                layers.set(new_layers);
+                layer_names.set(new_names);
+
+                // Settings are applied to the keyboard right away, after asking.
+                let settings_changes: Vec<(u16, Vec<u8>)> = current_settings
+                    .iter()
+                    .filter_map(|s| {
+                        let v = *data.settings.get(&s.qsid)?;
+                        let bytes = vial_protocol::svil::menus::int_to_bytes(v, s.value.len());
+                        (bytes != s.value).then_some((s.qsid, bytes))
+                    })
+                    .collect();
+                let value_changes: Vec<_> = data
+                    .custom_values
+                    .iter()
+                    .filter_map(|cv| {
+                        let current = st.menu_values.iter().find(|m| m.key == cv.key)?;
+                        let mut bytes = cv.data.clone();
+                        bytes.resize(current.data.len(), 0);
+                        (bytes != current.data).then(|| (current.clone(), bytes))
+                    })
+                    .collect();
+                let mut msg = format!(
+                    "Opened the layout ({} layers). Review it, then use \"Save Keymap to Device\".",
+                    data.layout.len().min(count)
+                );
+                if !settings_changes.is_empty() || !value_changes.is_empty() {
+                    let ok = web_sys::window()
+                        .and_then(|w| {
+                            w.confirm_with_message(&format!(
+                                "The file also has {} QMK setting(s) and {} keyboard setting(s) that differ from the keyboard. Apply them to the keyboard now?",
+                                settings_changes.len(),
+                                value_changes.len()
+                            ))
+                            .ok()
+                        })
+                        .unwrap_or(false);
+                    if ok {
+                        busy.set(true);
+                        let mut settings = current_settings.clone();
+                        let mut st = st.clone();
+                        let mut failures = Vec::new();
+                        for (qsid, bytes) in settings_changes {
+                            match link.set_qmk_setting(qsid, &bytes).await {
+                                Ok(()) => {
+                                    if let Some(s) = settings.iter_mut().find(|s| s.qsid == qsid) {
+                                        s.value = bytes;
+                                    }
+                                }
+                                Err(e) => failures.push(format!("QMK setting {qsid}: {e}")),
+                            }
+                        }
+                        for (entry, bytes) in value_changes {
+                            match link.set_custom_value(entry.channel, entry.value_id, &bytes).await {
+                                Ok(()) => {
+                                    if let Some(m) = st.menu_values.iter_mut().find(|m| m.key == entry.key) {
+                                        m.data = bytes;
+                                    }
+                                }
+                                Err(e) => failures.push(format!("{}: {e}", entry.key)),
+                            }
+                        }
+                        qmk_settings.set(settings);
+                        svil_state.set(Some(st));
+                        busy.set(false);
+                        if !failures.is_empty() {
+                            error.set(Some(format!("Some settings weren't applied: {}", failures.join("; "))));
+                        }
+                        msg.push_str(" Settings applied.");
+                    }
+                }
+                let has_tables = !data.macros.iter().all(|m: &Vec<vial_protocol::svil::macros::MacroAction>| m.is_empty())
+                    || !data.tap_dances.is_empty()
+                    || !data.combos.is_empty()
+                    || !data.key_overrides.is_empty()
+                    || !data.alt_repeat_keys.is_empty()
+                    || !data.leaders.is_empty()
+                    || data.one_shot.is_some();
+                if has_tables {
+                    let ok = web_sys::window()
+                        .and_then(|w| {
+                            w.confirm_with_message(
+                                "The file also has macros, tap dances, combos or key overrides. Write them to the keyboard now? \
+                                 (Entries that differ from the keyboard are replaced.)",
+                            )
+                            .ok()
+                        })
+                        .unwrap_or(false);
+                    if ok {
+                        busy.set(true);
+                        match link.write_svil_tables(&data, &st).await {
+                            Ok(r) => {
+                                msg.push_str(&format!(
+                                    " Wrote {} table entr{}{}.",
+                                    r.written,
+                                    if r.written == 1 { "y" } else { "ies" },
+                                    if r.macros_written { " and the macros" } else { "" }
+                                ));
+                                if r.dropped > 0 {
+                                    msg.push_str(&format!(" {} entr(ies) didn't fit on the keyboard.", r.dropped));
+                                }
+                            }
+                            Err(e) => error.set(Some(format!("Failed to write macros and tables: {e}"))),
+                        }
+                        busy.set(false);
+                    }
+                }
+                msg.push_str(&migration_note);
+                notice.set(Some(msg));
             });
         })
     };
@@ -1127,9 +1265,8 @@ pub fn VialHome() -> Html {
             let error = error.clone();
             let qmk_settings = qmk_settings.clone();
             spawn_local(async move {
-                if let Some(dev) = (*device).as_ref() {
-                    let msg = vial_protocol::VialMessage::qmk_settings_set(qsid, &value);
-                    match webhid::send_message(dev, msg.as_bytes()).await {
+                if let Some(link) = (*device).as_ref() {
+                    match link.set_qmk_setting(qsid, &value).await {
                         Ok(_) => {
                             let mut s = (*qmk_settings).clone();
                             if let Some(entry) = s.iter_mut().find(|e| e.qsid == qsid) {
@@ -1151,11 +1288,42 @@ pub fn VialHome() -> Html {
             let device = device.clone();
             let error = error.clone();
             spawn_local(async move {
-                if let Some(dev) = (*device).as_ref() {
-                    let msg = vial_protocol::VialMessage::qmk_settings_reset();
-                    if let Err(e) = webhid::send_message(dev, msg.as_bytes()).await {
+                if let Some(link) = (*device).as_ref() {
+                    if let Err(e) = link.reset_qmk_settings().await {
                         error.set(Some(format!("Failed to reset: {e}")));
                     }
+                }
+            });
+        })
+    };
+
+    // -- Keyboard (VIA3 menu) settings, SVIL only ---------------------------
+    let on_sval_setting_change = {
+        let device = device.clone();
+        let error = error.clone();
+        let svil_state = svil_state.clone();
+        Callback::from(move |(r, data): (vial_protocol::svil::menus::ValueRef, Vec<u8>)| {
+            let device = device.clone();
+            let error = error.clone();
+            let svil_state = svil_state.clone();
+            spawn_local(async move {
+                let Some(link) = (*device).clone() else { return };
+                match link.set_custom_value(r.channel, r.value_id, &data).await {
+                    Ok(()) => {
+                        if let Some(mut st) = (*svil_state).clone() {
+                            match st.menu_values.iter_mut().find(|e| e.key == r.key) {
+                                Some(e) => e.data = data,
+                                None => st.menu_values.push(vial_protocol::svil::menus::CustomValueEntry {
+                                    key: r.key.clone(),
+                                    channel: r.channel,
+                                    value_id: r.value_id,
+                                    data,
+                                }),
+                            }
+                            svil_state.set(Some(st));
+                        }
+                    }
+                    Err(e) => error.set(Some(format!("Failed to set {}: {e}", r.key))),
                 }
             });
         })
@@ -1222,12 +1390,25 @@ pub fn VialHome() -> Html {
                             <div class="w-3 h-3 bg-green-500 rounded-full"></div>
                             <span class="font-medium">{&*keyboard_name}</span>
                             <span class="text-sm text-gray-500">{format!("{} layers", *layer_count)}</span>
-                            <button onclick={on_save.clone()} class="ml-auto bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-4 rounded shadow text-sm">
+                            if *busy {
+                                <span class="text-sm text-gray-500 italic">{"Working..."}</span>
+                            }
+                            <button onclick={on_save.clone()} disabled={*busy} class="ml-auto bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold py-1.5 px-4 rounded shadow text-sm"
+                                title={if is_svil { "Write the keymap and layer names to the keyboard" } else { "Write the keymap to the keyboard" }}>
                                 {"Save Keymap to Device"}
                             </button>
-                            <button onclick={on_save_vil.clone()} class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Save keymap as .vil file">
-                                {"Save as .vil"}
-                            </button>
+                            if is_svil {
+                                <button onclick={on_save_svil.clone()} disabled={*busy} class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Save a full .svil backup (keymap, layer names, settings, macros, tap dances, combos, ...)">
+                                    {"Save as .svil"}
+                                </button>
+                                <button onclick={on_open_svil.clone()} disabled={*busy} class="bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Open a .svil layout, or migrate a Vial .vil saved from the Vial tab">
+                                    {"Open .svil / .vil"}
+                                </button>
+                            } else {
+                                <button onclick={on_save_vil.clone()} disabled={*busy} class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Save a vial-gui .vil layout (keymap, macros, tap dances, combos, key overrides, QMK settings). Open it in the SVIL tab to migrate to Svalboard QMK.">
+                                    {"Save as .vil"}
+                                </button>
+                            }
                             <button onclick={on_download_svg.clone()} class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 px-4 rounded shadow text-sm" title="Download keymap as SVG">
                                 {"Download SVG"}
                             </button>
@@ -1263,12 +1444,28 @@ pub fn VialHome() -> Html {
                         </div>
                     }
 
+                    // Notice
+                    if let Some(msg) = &*notice {
+                        <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded">
+                            {msg}
+                            <button
+                                class="ml-2 underline"
+                                onclick={let notice = notice.clone(); Callback::from(move |_: MouseEvent| notice.set(None))}
+                            >
+                                {"dismiss"}
+                            </button>
+                        </div>
+                    }
+
                     if *connected {
                         // Tab bar
                         <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                             <button class={tab_class(&VialTab::Keymap)} onclick={set_tab(VialTab::Keymap)}>{"Keymap"}</button>
                             <button class={tab_class(&VialTab::TestMatrix)} onclick={set_tab(VialTab::TestMatrix)}>{"Test Matrix"}</button>
                             <button class={tab_class(&VialTab::QmkSettings)} onclick={set_tab(VialTab::QmkSettings)}>{"QMK Settings"}</button>
+                            if svil_state.as_ref().is_some_and(|st| st.menus.is_some()) {
+                                <button class={tab_class(&VialTab::SvalSettings)} onclick={set_tab(VialTab::SvalSettings)}>{"Sval Settings"}</button>
+                            }
                         </div>
 
 
@@ -1337,11 +1534,26 @@ pub fn VialHome() -> Html {
                                     loading={*loading}
                                 />
                             },
+                            VialTab::SvalSettings => match (*svil_state).as_ref() {
+                                Some(st) => html! {
+                                    <SvalSettingsPanel
+                                        menus={st.menus.clone().unwrap_or_default()}
+                                        values={st.menu_values.clone()}
+                                        names={st.keycode_names()}
+                                        on_change={on_sval_setting_change}
+                                    />
+                                },
+                                None => html! {},
+                            },
                         }}
                     } else {
                         <div class="text-center py-20 text-gray-500">
-                            <p class="text-2xl mb-4">{"Vial Keyboard Manager"}</p>
-                            <p>{"Connect a Vial-compatible keyboard via USB to get started."}</p>
+                            <p class="text-2xl mb-4">{if is_svil { "SVIL Keyboard Manager" } else { "Vial Keyboard Manager" }}</p>
+                            <p>{if is_svil {
+                                "Connect a Svalboard (or other SVIL keyboard running Svalboard QMK) via USB to get started."
+                            } else {
+                                "Connect a Vial-compatible keyboard via USB to get started."
+                            }}</p>
                             <p class="text-sm mt-2">{"Requires a Chromium-based browser (Chrome, Edge) with WebHID support."}</p>
                         </div>
                     }
@@ -1349,73 +1561,6 @@ pub fn VialHome() -> Html {
             </div>
         </div>
     }
-}
-
-// ---------------------------------------------------------------------------
-// QMK settings loader — queries supported qsids then reads their values
-// ---------------------------------------------------------------------------
-
-async fn load_qmk_settings(dev: &webhid::HidDevice) -> Vec<QmkSettingValue> {
-    // Step 1: discover all supported qsids via cursor-based pagination
-    let mut supported: Vec<u16> = Vec::new();
-    let mut cursor: u16 = 0;
-    loop {
-        let msg = vial_protocol::VialMessage::qmk_settings_query(cursor);
-        let resp = match webhid::send_message(dev, msg.as_bytes()).await {
-            Ok(r) => r,
-            Err(_) => break,
-        };
-        let qsids = vial_protocol::parse_qmk_settings_query(&resp);
-        if qsids.is_empty() {
-            break;
-        }
-        let mut max_qsid = cursor;
-        for &qsid in &qsids {
-            if !supported.contains(&qsid) {
-                supported.push(qsid);
-            }
-            max_qsid = max_qsid.max(qsid);
-        }
-        // Advance cursor past the largest qsid we saw
-        if max_qsid == cursor {
-            break; // no progress
-        }
-        cursor = max_qsid;
-    }
-
-    log::info!(
-        "QMK settings: {} supported qsids: {:?}",
-        supported.len(),
-        supported
-    );
-
-    // Step 2: for each supported qsid that we know about, read its value
-    let mut values = Vec::new();
-    // Deduplicate: only read each qsid once
-    let mut read_qsids = Vec::new();
-    for &qsid in &supported {
-        if read_qsids.contains(&qsid) {
-            continue;
-        }
-        // Only read if we have a definition for it
-        if !qs::is_qsid_supported(qsid) {
-            continue;
-        }
-        let width = qs::width_for_qsid(qsid) as usize;
-        let msg = vial_protocol::VialMessage::qmk_settings_get(qsid);
-        match webhid::send_message(dev, msg.as_bytes()).await {
-            Ok(resp) => {
-                let (_status, val) = vial_protocol::parse_qmk_settings_get(&resp, width);
-                values.push(QmkSettingValue { qsid, value: val });
-            }
-            Err(e) => {
-                log::warn!("Failed to read qsid {qsid}: {e}");
-            }
-        }
-        read_qsids.push(qsid);
-    }
-
-    values
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,9 @@
 
 pub mod keycodes;
 pub mod qmk_settings;
+pub mod svil;
+#[cfg(feature = "std")]
+pub mod vil;
 
 use serde::{Deserialize, Serialize};
 

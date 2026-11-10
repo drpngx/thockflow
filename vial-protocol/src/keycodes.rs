@@ -237,6 +237,10 @@ pub fn keycode_label(keycode: u16, protocol_version: u32, keyboard_name: &str) -
         return "transparent (▽)".into();
     }
 
+    if let Some(label) = custom_keycode_label(keycode) {
+        return label;
+    }
+
     if keyboard_name.to_lowercase().contains("lightly") {
         let user_start = if protocol_version >= 6 { 0x7e00 } else { 0x5f80 };
         if keycode >= user_start && keycode < user_start + 64 {
@@ -2936,9 +2940,42 @@ pub fn keycode_label(keycode: u16, protocol_version: u32, keyboard_name: &str) -
     }
 }
 
+/// A keyboard-specific keycode registered for display: `(code, label, name)`.
+pub type CustomKeycodeLabel = (u16, String, String);
+
+thread_local! {
+    static CUSTOM_KEYCODES: std::cell::RefCell<Vec<CustomKeycodeLabel>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Register the connected keyboard's own keycodes (from its definition's
+/// `customKeycodes`), so they are labeled and parsed by name. Replaces any
+/// previous registration; pass an empty list to clear it.
+pub fn set_custom_keycodes(entries: Vec<CustomKeycodeLabel>) {
+    CUSTOM_KEYCODES.with(|c| *c.borrow_mut() = entries);
+}
+
+fn custom_keycode_label(keycode: u16) -> Option<String> {
+    CUSTOM_KEYCODES.with(|c| c.borrow().iter().find(|(k, _, _)| *k == keycode).map(|(_, l, _)| l.clone()))
+}
+
+fn custom_keycode_from_string(s: &str) -> Option<u16> {
+    CUSTOM_KEYCODES.with(|c| c.borrow().iter().find(|(_, l, n)| l == s || n == s).map(|(k, _, _)| *k))
+}
+
 pub fn keycode_from_string(s: &str, protocol_version: u32, keyboard_name: &str) -> Option<u16> {
     if s == "NONE" { return Some(0x0000); }
     if s == "transparent (▽)" || s == "transparent" { return Some(0x0001); }
+    if let Some(kc) = custom_keycode_from_string(s) { return Some(kc); }
+    let parsed = keycode_from_label(s, protocol_version, keyboard_name);
+    if parsed.is_some() || protocol_version < 6 {
+        return parsed;
+    }
+    // QMK names (KC_A, LSFT_T(KC_A), 0x7e40...), numbered as current QMK.
+    crate::svil::keycode_names::KeycodeNames::default().parse(s)
+}
+
+fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Option<u16> {
 
     // Try exact match in labels
     for kc in 0..0xFFFF {

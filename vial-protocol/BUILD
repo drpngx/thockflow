@@ -9,6 +9,10 @@ rust_library(
     name = "vial-protocol",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),
+    crate_features = [
+        "default",
+        "std",
+    ],
     edition = "2021",
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -21,6 +25,10 @@ rust_library(
 rust_test(
     name = "vial-protocol_test",
     crate = ":vial-protocol",
+    crate_features = [
+        "default",
+        "std",
+    ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
     ),
