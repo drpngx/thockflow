@@ -35,6 +35,8 @@ pub struct SvilData {
     pub menus: Option<Value>,
     pub fragments: Option<Value>,
     pub composition: Option<Value>,
+    pub keylayout: Option<Value>,
+    pub fragment_selections: Option<Value>,
 }
 
 /// Build the `[layer][row][col]` layout from flat per-layer keymaps.
@@ -179,6 +181,12 @@ impl SvilData {
         }
         if let Some(c) = &self.composition {
             root.insert("composition".into(), c.clone());
+        }
+        if let Some(kl) = &self.keylayout {
+            root.insert("keylayout".into(), kl.clone());
+        }
+        if let Some(fs) = &self.fragment_selections {
+            root.insert("fragment_selections".into(), fs.clone());
         }
         if let Some(m) = &self.menus {
             root.insert("menus".into(), m.clone());
@@ -382,6 +390,8 @@ impl SvilData {
         data.menus = obj.get("menus").cloned();
         data.fragments = obj.get("fragments").cloned();
         data.composition = obj.get("composition").cloned();
+        data.keylayout = obj.get("keylayout").cloned();
+        data.fragment_selections = obj.get("fragment_selections").cloned();
         Ok(data)
     }
 }
@@ -411,6 +421,8 @@ mod tests {
             menus: None,
             fragments: None,
             composition: None,
+            keylayout: None,
+            fragment_selections: None,
         }
     }
 

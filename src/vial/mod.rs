@@ -1,5 +1,5 @@
 //! Keyboard layout manager — WebHID-based live configuration for Vial and
-//! SVIL (Svalboard) keyboards. Both tabs share this UI; protocol differences
+//! SVIL (Svalboard communication protocol for firmware 4.x and above). Both tabs share this UI; protocol differences
 //! live in [`backend`].
 
 use std::rc::Rc;
@@ -934,6 +934,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
         let matrix_rows = matrix_rows.clone();
         let matrix_cols = matrix_cols.clone();
         let layer_count = layer_count.clone();
+        let key_layout = key_layout.clone();
         let error = error.clone();
         let busy = busy.clone();
         Callback::from(move |_: MouseEvent| {
@@ -947,6 +948,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                 // The file describes the keyboard: no more layers than it has.
                 layers: layers.iter().take(*layer_count as usize).cloned().collect(),
                 layer_names: (*layer_names).clone(),
+                key_layout: (*key_layout).clone(),
                 qmk_settings: (*qmk_settings).clone(),
                 svil: Some(st.clone()),
                 ..Default::default()
@@ -984,6 +986,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
         let svil_state = svil_state.clone();
         let layers = layers.clone();
         let layer_names = layer_names.clone();
+        let key_layout = key_layout.clone();
         let qmk_settings = qmk_settings.clone();
         let matrix_rows = matrix_rows.clone();
         let matrix_cols = matrix_cols.clone();
@@ -1001,6 +1004,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
             let svil_state = svil_state.clone();
             let layers = layers.clone();
             let layer_names = layer_names.clone();
+            let key_layout = key_layout.clone();
             let qmk_settings = qmk_settings.clone();
             let error = error.clone();
             let notice = notice.clone();
@@ -1050,6 +1054,18 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                     if !ok {
                         return;
                     }
+                }
+
+                // Update physical layout if the file provides one or if it is Svalboard
+                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&text) {
+                    let kl = backend::parse_key_layout(&json_val);
+                    if !kl.is_empty() {
+                        key_layout.set(kl);
+                    } else if data.uid == vial_protocol::vil::SVALBOARD_VIAL_UID {
+                        key_layout.set(backend::svalboard_key_layout());
+                    }
+                } else if data.uid == vial_protocol::vil::SVALBOARD_VIAL_UID {
+                    key_layout.set(backend::svalboard_key_layout());
                 }
 
                 // Keymap and layer names go into the editor ("Save Keymap to Device" writes them).
@@ -1365,6 +1381,12 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                         <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{"PID"}</div>
                         <div class="text-xs font-mono text-gray-900 dark:text-gray-100">{format!("0x{:04X}", *product_id)}</div>
                     </div>
+                    if is_svil {
+                        <div class="col-span-2 space-y-1">
+                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{"Protocol"}</div>
+                            <div class="text-xs font-medium text-blue-600 dark:text-blue-400">{"SVIL (Svalboard Firmware 4.x+)"}</div>
+                        </div>
+                    }
                 </div>
                 <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{"Matrix & Payload"}</div>
@@ -1389,6 +1411,11 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                         if *connected {
                             <div class="w-3 h-3 bg-green-500 rounded-full"></div>
                             <span class="font-medium">{&*keyboard_name}</span>
+                            if is_svil {
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" title="SVIL protocol (Svalboard firmware 4.x+)">
+                                    {"SVIL (FW 4.x+)"}
+                                </span>
+                            }
                             <span class="text-sm text-gray-500">{format!("{} layers", *layer_count)}</span>
                             if *busy {
                                 <span class="text-sm text-gray-500 italic">{"Working..."}</span>
@@ -1420,7 +1447,14 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                             </button>
                         } else {
                             <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
-                            <span class="text-gray-500">{"No device connected"}</span>
+                            <div class="flex flex-col">
+                                <span class="text-gray-500 font-medium">{"No device connected"}</span>
+                                if is_svil {
+                                    <span class="text-xs text-blue-600 dark:text-blue-400">
+                                        {"SVIL is the Svalboard communication protocol for firmware 4.x and above"}
+                                    </span>
+                                }
+                            </div>
                             <button
                                 class="ml-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                                 onclick={on_connect}
@@ -1548,13 +1582,26 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                         }}
                     } else {
                         <div class="text-center py-20 text-gray-500">
-                            <p class="text-2xl mb-4">{if is_svil { "SVIL Keyboard Manager" } else { "Vial Keyboard Manager" }}</p>
-                            <p>{if is_svil {
-                                "Connect a Svalboard (or other SVIL keyboard running Svalboard QMK) via USB to get started."
+                            <p class="text-2xl mb-2">{if is_svil { "SVIL Keyboard Manager" } else { "Vial Keyboard Manager" }}</p>
+                            if is_svil {
+                                <p class="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-3">
+                                    {"SVIL is the Svalboard communication protocol for firmware 4.x and above."}
+                                </p>
+                                <p>{"Connect a Svalboard running firmware 4.x+ via USB to get started."}</p>
+                                <p class="text-xs text-gray-400 mt-2">
+                                    {"Keyboards on Svalboard firmware 3.x or earlier use the Vial protocol — please use the "}
+                                    <span class="font-medium text-blue-500">{"Vial tab"}</span>
+                                    {", or update your keyboard to firmware 4.x+."}
+                                </p>
                             } else {
-                                "Connect a Vial-compatible keyboard via USB to get started."
-                            }}</p>
-                            <p class="text-sm mt-2">{"Requires a Chromium-based browser (Chrome, Edge) with WebHID support."}</p>
+                                <p>{"Connect a Vial-compatible keyboard via USB to get started."}</p>
+                                <p class="text-xs text-gray-400 mt-2">
+                                    {"Svalboard keyboards running firmware 4.x+ use the SVIL protocol — switch to the "}
+                                    <span class="font-medium text-blue-500">{"SVIL tab"}</span>
+                                    {"."}
+                                </p>
+                            }
+                            <p class="text-sm mt-4">{"Requires a Chromium-based browser (Chrome, Edge) with WebHID support."}</p>
                         </div>
                     }
                 </div>
@@ -1617,24 +1664,32 @@ fn render_keymap_tab(
                 avg_w /= key_layout.len() as f32;
             }
 
+            let total_w = (max_x - min_x).max(1.0);
+            let base_key_size = if total_w > 20.0 {
+                (920.0 / total_w).clamp(24.0, 44.0)
+            } else {
+                44.0
+            };
             let u_size = if avg_w < 5.0 { 1.0 } else if avg_w < 500.0 { 100.0 } else { 1000.0 };
-            let size_scale = 44.0 / u_size;
+            let size_scale = base_key_size / u_size;
             let u_pos = if max_x.abs() > 20000.0 || min_x.abs() > 20000.0 {
                 19050.0
             } else {
                 u_size
             };
-            let pos_scale = 44.0 / u_pos;
+            let pos_scale = base_key_size / u_pos;
 
             let content_width_px = (max_x - min_x) * pos_scale;
+            let content_height_px = (max_y - min_y) * pos_scale + 20.0;
             let offset_x = -(min_x * pos_scale);
+            let offset_y = -(min_y * pos_scale);
 
             let quick_assign_target = **quick_assign_index;
 
             html! {
-                <div class="relative bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 overflow-auto shadow-inner w-full max-w-full"
+                <div class="relative bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 sm:p-6 overflow-auto shadow-inner w-full max-w-full"
                      style="min-height: 350px; height: 55vh;">
-                    <div class="relative mx-auto" style={format!("width: {}px;", content_width_px)}>
+                    <div class="relative mx-auto" style={format!("width: {}px; height: {}px;", content_width_px, content_height_px)}>
                         { for key_layout.iter().enumerate().map(|(layout_idx, pos)| {
                             let keycode_idx = (pos.row as usize) * (matrix_cols as usize) + (pos.col as usize);
                             let kc = codes.get(keycode_idx).copied().unwrap_or(0);
@@ -1643,7 +1698,7 @@ fn render_keymap_tab(
                             let show_hint = jump_mode_active && hint.map(|h| h.starts_with(jump_input)).unwrap_or(false);
                             let onclick = { let cb = on_key_click.clone(); Callback::from(move |_: MouseEvent| cb.emit(keycode_idx)) };
                             let x = (pos.x * pos_scale + offset_x) as i32;
-                            let y = (pos.y * pos_scale) as i32;
+                            let y = (pos.y * pos_scale + offset_y) as i32;
                             let w = (pos.w * size_scale).max(20.0) as i32 - 4;
                             let h = (pos.h * size_scale).max(20.0) as i32 - 4;
                             let style = format!(
@@ -1952,22 +2007,30 @@ fn render_test_matrix_tab(
                 avg_w /= key_layout.len() as f32;
             }
 
+            let total_w = (max_x - min_x).max(1.0);
+            let base_key_size = if total_w > 20.0 {
+                (920.0 / total_w).clamp(24.0, 44.0)
+            } else {
+                44.0
+            };
             let u_size = if avg_w < 5.0 { 1.0 } else if avg_w < 500.0 { 100.0 } else { 1000.0 };
-            let size_scale = 44.0 / u_size;
+            let size_scale = base_key_size / u_size;
             let u_pos = if max_x.abs() > 20000.0 || min_x.abs() > 20000.0 {
                 19050.0
             } else {
                 u_size
             };
-            let pos_scale = 44.0 / u_pos;
+            let pos_scale = base_key_size / u_pos;
 
             let content_width_px = (max_x - min_x) * pos_scale;
+            let content_height_px = (max_y - min_y) * pos_scale + 20.0;
             let offset_x = -(min_x * pos_scale);
+            let offset_y = -(min_y * pos_scale);
 
             html! {
-                <div class="relative bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 overflow-auto shadow-inner w-full max-w-full"
+                <div class="relative bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 sm:p-6 overflow-auto shadow-inner w-full max-w-full"
                      style="min-height: 350px; height: 55vh;">
-                    <div class="relative mx-auto" style={format!("width: {}px;", content_width_px)}>
+                    <div class="relative mx-auto" style={format!("width: {}px; height: {}px;", content_width_px, content_height_px)}>
                         { for key_layout.iter().map(|pos| {
                             let keycode_idx = (pos.row as usize) * (matrix_cols as usize) + (pos.col as usize);
                             let kc = codes.get(keycode_idx).copied().unwrap_or(0);
@@ -1981,7 +2044,7 @@ fn render_test_matrix_tab(
                                 && matrix_state[row][col];
 
                             let x = (pos.x * pos_scale + offset_x) as i32;
-                            let y = (pos.y * pos_scale) as i32;
+                            let y = (pos.y * pos_scale + offset_y) as i32;
                             let w = (pos.w * size_scale).max(20.0) as i32 - 4;
                             let h = (pos.h * size_scale).max(20.0) as i32 - 4;
                             let style = format!(

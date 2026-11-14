@@ -108,7 +108,8 @@ impl SvilLink {
                     BootstrapReply::ZeroId => break, // new nonce, ask again
                     BootstrapReply::Unhandled | BootstrapReply::Echoed => {
                         return Err("This keyboard doesn't speak SVIL (it looks like Vial or VIA firmware). \
-                                    Use the Vial tab, or update it to Svalboard QMK firmware."
+                                    SVIL is the Svalboard communication protocol for firmware 4.x and above. \
+                                    For Svalboard firmware 3.x or earlier, use the Vial tab; to use SVIL, update your keyboard to Svalboard firmware 4.x+."
                             .into());
                     }
                     BootstrapReply::Error(code) => return Err(format!("Keyboard refused a client ID (error {code}).")),

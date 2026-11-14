@@ -1,5 +1,5 @@
 //! Keyboard backends for the shared keyboard manager UI: plain Vial, and SVIL
-//! (Svalboard's wrapped protocol). The UI talks to a [`Link`]; the VIA commands
+//! (Svalboard communication protocol for firmware 4.x and above). The UI talks to a [`Link`]; the VIA commands
 //! both protocols share go through [`ViaTransport`].
 
 use std::collections::{BTreeMap, HashMap};
@@ -171,8 +171,155 @@ pub fn default_layer_name(i: usize) -> String {
     format!("L{i}")
 }
 
-/// Parse `layouts.keymap` (KLE rows of `"row,col"` labels) into key positions.
+/// Default key positions for Svalboard (10 rows, 6 cols, 52 physical keys).
+pub fn svalboard_key_layout() -> Vec<MatrixPos> {
+    vec![
+        MatrixPos { row: 0, col: 0, x: 10.80, y: 6.50, w: 1.50, h: 1.00 },
+        MatrixPos { row: 0, col: 1, x: 10.80, y: 5.50, w: 1.50, h: 1.00 },
+        MatrixPos { row: 0, col: 2, x: 9.80, y: 6.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 0, col: 3, x: 8.30, y: 5.50, w: 1.50, h: 1.00 },
+        MatrixPos { row: 0, col: 4, x: 7.80, y: 6.50, w: 2.00, h: 1.00 },
+        MatrixPos { row: 0, col: 5, x: 9.80, y: 5.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 1, col: 0, x: 9.50, y: 3.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 1, col: 1, x: 10.50, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 1, col: 2, x: 9.50, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 1, col: 3, x: 9.50, y: 1.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 1, col: 4, x: 8.50, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 2, col: 0, x: 7.00, y: 2.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 2, col: 1, x: 8.00, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 2, col: 2, x: 7.00, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 2, col: 3, x: 7.00, y: 0.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 2, col: 4, x: 6.00, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 3, col: 0, x: 3.50, y: 2.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 3, col: 1, x: 4.50, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 3, col: 2, x: 3.50, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 3, col: 3, x: 3.50, y: 0.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 3, col: 4, x: 2.50, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 4, col: 0, x: 1.00, y: 3.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 4, col: 1, x: 2.00, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 4, col: 2, x: 1.00, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 4, col: 3, x: 1.00, y: 1.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 4, col: 4, x: 0.00, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 5, col: 0, x: 12.70, y: 6.50, w: 1.50, h: 1.00 },
+        MatrixPos { row: 5, col: 1, x: 12.70, y: 5.50, w: 1.50, h: 1.00 },
+        MatrixPos { row: 5, col: 2, x: 14.20, y: 6.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 5, col: 3, x: 15.20, y: 5.50, w: 1.50, h: 1.00 },
+        MatrixPos { row: 5, col: 4, x: 15.20, y: 6.50, w: 2.00, h: 1.00 },
+        MatrixPos { row: 5, col: 5, x: 14.20, y: 5.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 6, col: 0, x: 14.50, y: 3.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 6, col: 1, x: 15.50, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 6, col: 2, x: 14.50, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 6, col: 3, x: 14.50, y: 1.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 6, col: 4, x: 13.50, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 7, col: 0, x: 17.00, y: 2.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 7, col: 1, x: 18.00, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 7, col: 2, x: 17.00, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 7, col: 3, x: 17.00, y: 0.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 7, col: 4, x: 16.00, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 8, col: 0, x: 20.50, y: 2.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 8, col: 1, x: 21.50, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 8, col: 2, x: 20.50, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 8, col: 3, x: 20.50, y: 0.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 8, col: 4, x: 19.50, y: 1.00, w: 1.00, h: 1.00 },
+        MatrixPos { row: 9, col: 0, x: 23.00, y: 3.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 9, col: 1, x: 24.00, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 9, col: 2, x: 23.00, y: 2.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 9, col: 3, x: 23.00, y: 1.50, w: 1.00, h: 1.00 },
+        MatrixPos { row: 9, col: 4, x: 22.00, y: 2.50, w: 1.00, h: 1.00 },
+    ]
+}
+
+/// Parse key layout from definition or layout JSON:
+/// 1. `keylayout` object with `row`, `col`, `x`, `y`, `w`, `h`
+/// 2. `composition` and `fragments` placement
+/// 3. `layouts.keymap` KLE rows
 pub fn parse_key_layout(json: &Value) -> Vec<MatrixPos> {
+    // 1. Direct `keylayout` map (SVIL format)
+    if let Some(kl) = json.get("keylayout").and_then(|v| v.as_object()) {
+        let mut kl_positions = Vec::new();
+        for v in kl.values() {
+            let row = v.get("row").and_then(|x| x.as_u64()).unwrap_or(255) as u8;
+            let col = v.get("col").and_then(|x| x.as_u64()).unwrap_or(255) as u8;
+            let x = v.get("x").and_then(|x| x.as_f64()).unwrap_or(0.0) as f32;
+            let y = v.get("y").and_then(|x| x.as_f64()).unwrap_or(0.0) as f32;
+            let w = v.get("w").and_then(|x| x.as_f64()).unwrap_or(1.0) as f32;
+            let h = v.get("h").and_then(|x| x.as_f64()).unwrap_or(1.0) as f32;
+            if row != 255 && col != 255 {
+                kl_positions.push(MatrixPos { row, col, x, y, w, h });
+            }
+        }
+        if !kl_positions.is_empty() {
+            kl_positions.sort_by_key(|p| (p.row, p.col));
+            return kl_positions;
+        }
+    }
+
+    // 2. Composition and fragments
+    if let (Some(instances), Some(fragments)) = (
+        json.get("composition").and_then(|c| c.get("instances")).and_then(|i| i.as_array()),
+        json.get("fragments").and_then(|f| f.as_object()),
+    ) {
+        let mut comp_positions = Vec::new();
+        for inst in instances {
+            let Some(options) = inst.get("fragment_options").and_then(|o| o.as_array()) else { continue };
+            let Some(first_opt) = options.first() else { continue };
+            let frag_name = first_opt.get("fragment").and_then(|f| f.as_str()).unwrap_or("");
+            let base_x = first_opt.get("placement").and_then(|p| p.get("x")).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+            let base_y = first_opt.get("placement").and_then(|p| p.get("y")).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+            let matrix_map = first_opt.get("matrix_map").and_then(|m| m.as_array());
+            let Some(frag) = fragments.get(frag_name) else { continue };
+            let Some(kle) = frag.get("kle").and_then(|k| k.as_array()) else { continue };
+
+            let mut key_idx = 0;
+            let mut cur_y = 0.0f32;
+            for row_val in kle {
+                if let Some(keys) = row_val.as_array() {
+                    let mut cur_x = 0.0f32;
+                    let mut cur_w = 1.0f32;
+                    let mut cur_h = 1.0f32;
+                    for k in keys {
+                        if let Some(obj) = k.as_object() {
+                            let f = |key: &str| obj.get(key).and_then(|v| v.as_f64()).map(|v| v as f32);
+                            if let Some(x) = f("x") { cur_x += x; }
+                            if let Some(y) = f("y") { cur_y += y; }
+                            if let Some(w) = f("w") { cur_w = w; }
+                            if let Some(h) = f("h") { cur_h = h; }
+                        } else if k.is_string() {
+                            if let Some(mm) = matrix_map {
+                                if let Some(coord) = mm.get(key_idx).and_then(|c| c.as_array()) {
+                                    if coord.len() == 2 {
+                                        let r = coord[0].as_u64().unwrap_or(255) as u8;
+                                        let c = coord[1].as_u64().unwrap_or(255) as u8;
+                                        if r != 255 && c != 255 {
+                                            comp_positions.push(MatrixPos {
+                                                row: r,
+                                                col: c,
+                                                x: base_x + cur_x,
+                                                y: base_y + cur_y,
+                                                w: cur_w,
+                                                h: cur_h,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            cur_x += cur_w;
+                            cur_w = 1.0;
+                            cur_h = 1.0;
+                            key_idx += 1;
+                        }
+                    }
+                }
+                cur_y += 1.0;
+            }
+        }
+        if !comp_positions.is_empty() {
+            comp_positions.sort_by_key(|p| (p.row, p.col));
+            return comp_positions;
+        }
+    }
+
+    // 3. Classic KLE rows under `layouts.keymap`
     let mut positions = Vec::new();
     let Some(rows) = json.get("layouts").and_then(|l| l.get("keymap")).and_then(|k| k.as_array()) else {
         return positions;
@@ -233,6 +380,23 @@ fn apply_definition(json: &Value, kb: &mut LoadedKeyboard) {
         kb.cols = matrix.get("cols").and_then(|v| v.as_u64()).unwrap_or(0) as u8;
     }
     kb.key_layout = parse_key_layout(json);
+
+    // Svalboard geometry fallback when keyboard is identified as Svalboard
+    if kb.key_layout.is_empty()
+        && (kb.uid == vial_protocol::vil::SVALBOARD_VIAL_UID
+            || kb.name.to_lowercase().contains("svalboard"))
+    {
+        kb.key_layout = svalboard_key_layout();
+    }
+
+    if kb.rows == 0 && !kb.key_layout.is_empty() {
+        kb.rows = kb.key_layout.iter().map(|p| p.row).max().unwrap_or(0) + 1;
+        kb.cols = kb.key_layout.iter().map(|p| p.col).max().unwrap_or(0) + 1;
+    }
+
+    if kb.name.is_empty() && kb.uid == vial_protocol::vil::SVALBOARD_VIAL_UID {
+        kb.name = "Svalboard".into();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -704,6 +868,25 @@ impl Link {
             menus: st.menus.clone(),
             fragments: st.fragments.clone(),
             composition: st.composition.clone(),
+            keylayout: if !kb.key_layout.is_empty() {
+                let mut map = serde_json::Map::new();
+                for (idx, pos) in kb.key_layout.iter().enumerate() {
+                    map.insert(
+                        idx.to_string(),
+                        serde_json::json!({
+                            "x": pos.x,
+                            "y": pos.y,
+                            "w": pos.w,
+                            "h": pos.h,
+                            "row": pos.row,
+                            "col": pos.col,
+                        }),
+                    );
+                }
+                Some(serde_json::Value::Object(map))
+            } else {
+                None
+            },
             custom_values: st.menu_values.clone(),
             ..Default::default()
         };

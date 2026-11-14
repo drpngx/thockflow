@@ -1,4 +1,4 @@
-//! SVIL (Svalboard Vial) protocol.
+//! SVIL (Svalboard Vial) protocol: the Svalboard communication protocol for firmware 4.x and above.
 //!
 //! SVIL keeps the VIA command set but carries every report inside a client-ID
 //! wrapper so several apps can share the keyboard, and replaces Vial's `0xFE`

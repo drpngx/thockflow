@@ -119,7 +119,7 @@ fn Navbar() -> Html {
                     </button>
                 </Link<Route>>
                 <Link<Route> classes="p-4 text-3xl  " to={Route::Svil}>
-                    <button >
+                    <button title="SVIL: Svalboard communication protocol for firmware 4.x and above">
                         {"SVIL"}
                     </button>
                 </Link<Route>>
