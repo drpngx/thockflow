@@ -55,6 +55,12 @@ pub fn QmkSettingsPanel(props: &QmkSettingsProps) -> Html {
                 </button>
             </div>
 
+            if props.is_svil {
+                <p class="mb-4 text-xs text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded px-3 py-2">
+                    {"SVIL Auto Mouse, Pointer/Scroll Speed, Touchpad tuning, Power & Scanning, and Layer Colors live in the Svalboard Settings tab."}
+                </p>
+            }
+
             { for tabs.iter().map(|&tab| {
                 render_tab(tab, props.is_svil, &props.settings, &supported_qsids, &props.on_change)
             })}

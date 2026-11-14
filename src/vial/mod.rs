@@ -130,6 +130,23 @@ fn file_stem(kb_name: &str, fallback: &str) -> String {
     }
 }
 
+fn apply_custom_value_entries(
+    menu_values: &mut Vec<vial_protocol::svil::menus::CustomValueEntry>,
+    entries: &[(vial_protocol::svil::menus::ValueRef, Vec<u8>)],
+) {
+    for (r, data) in entries {
+        match menu_values.iter_mut().find(|e| e.key == r.key) {
+            Some(e) => e.data = data.clone(),
+            None => menu_values.push(vial_protocol::svil::menus::CustomValueEntry {
+                key: r.key.clone(),
+                channel: r.channel,
+                value_id: r.value_id,
+                data: data.clone(),
+            }),
+        }
+    }
+}
+
 #[derive(Properties, PartialEq)]
 pub struct KeyboardHomeProps {
     pub protocol: Protocol,
@@ -142,6 +159,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
     let connected = use_state(|| false);
     let device = use_state(|| Option::<Link>::None);
     let svil_state = use_state(|| Option::<SvilState>::None);
+    let svil_state_ref = use_mut_ref(|| Option::<SvilState>::None);
     let kb_uid = use_state(|| 0u64);
     let keyboard_name = use_state(String::new);
     let vendor_id = use_state(|| 0u16);
@@ -261,6 +279,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
         let connected = connected.clone();
         let device = device.clone();
         let svil_state = svil_state.clone();
+        let svil_state_ref = svil_state_ref.clone();
         let keyboard_name = keyboard_name.clone();
         let vendor_id = vendor_id.clone();
         let product_id = product_id.clone();
@@ -294,6 +313,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
             qmk_settings.set(kb.qmk_settings);
             definition_info.set(kb.definition_info);
             notice.set(kb.notice);
+            *svil_state_ref.borrow_mut() = kb.svil.clone();
             svil_state.set(kb.svil);
             active_layer.set(0);
             active_tab.set(VialTab::Keymap);
@@ -327,6 +347,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
         let connected = connected.clone();
         let device = device.clone();
         let svil_state = svil_state.clone();
+        let svil_state_ref = svil_state_ref.clone();
         let keyboard_name = keyboard_name.clone();
         let vendor_id = vendor_id.clone();
         let product_id = product_id.clone();
@@ -346,6 +367,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
             let device = device.clone();
             let connected = connected.clone();
             let svil_state = svil_state.clone();
+            let svil_state_ref = svil_state_ref.clone();
             let keyboard_name = keyboard_name.clone();
             let vendor_id = vendor_id.clone();
             let product_id = product_id.clone();
@@ -366,6 +388,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                     link.close().await;
                     vial_protocol::keycodes::set_custom_keycodes(Vec::new());
                     device.set(None);
+                    *svil_state_ref.borrow_mut() = None;
                     svil_state.set(None);
                     connected.set(false);
                     keyboard_name.set(String::new());
@@ -609,40 +632,51 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
     // -- click outside to close menu ----------------------------------------
     {
         let layer_menu_index = layer_menu_index.clone();
-        use_effect(move || {
-            let lmi = layer_menu_index.clone();
-            let click_listener = Closure::wrap(
-                Box::new(move |_e: MouseEvent| lmi.set(None)) as Box<dyn FnMut(MouseEvent)>
-            );
-            let lmi_esc = layer_menu_index.clone();
-            let key_listener = Closure::wrap(Box::new(move |e: KeyboardEvent| {
-                if e.key() == "Escape" {
-                    lmi_esc.set(None);
-                }
-            }) as Box<dyn FnMut(KeyboardEvent)>);
-            let window = web_sys::window().unwrap();
-            window
-                .add_event_listener_with_callback("click", click_listener.as_ref().unchecked_ref())
-                .unwrap();
-            window
-                .add_event_listener_with_callback("keydown", key_listener.as_ref().unchecked_ref())
-                .unwrap();
-            move || {
+        let open_menu = *layer_menu_index;
+        use_effect_with(open_menu, move |open| {
+            // Only attach global dismiss listeners while a layer dropdown is open;
+            // calling `set(None)` on every window click forces a synchronous Yew
+            // re-render between `<input>` click and change events, resetting toggles.
+            let listeners = if open.is_some() {
+                let lmi = layer_menu_index.clone();
+                let click_listener = Closure::wrap(
+                    Box::new(move |_e: MouseEvent| lmi.set(None)) as Box<dyn FnMut(MouseEvent)>
+                );
+                let lmi_esc = layer_menu_index.clone();
+                let key_listener = Closure::wrap(Box::new(move |e: KeyboardEvent| {
+                    if e.key() == "Escape" {
+                        lmi_esc.set(None);
+                    }
+                }) as Box<dyn FnMut(KeyboardEvent)>);
                 let window = web_sys::window().unwrap();
                 window
-                    .remove_event_listener_with_callback(
-                        "click",
-                        click_listener.as_ref().unchecked_ref(),
-                    )
+                    .add_event_listener_with_callback("click", click_listener.as_ref().unchecked_ref())
                     .unwrap();
                 window
-                    .remove_event_listener_with_callback(
-                        "keydown",
-                        key_listener.as_ref().unchecked_ref(),
-                    )
+                    .add_event_listener_with_callback("keydown", key_listener.as_ref().unchecked_ref())
                     .unwrap();
-                drop(click_listener);
-                drop(key_listener);
+                Some((click_listener, key_listener))
+            } else {
+                None
+            };
+            move || {
+                if let Some((click_listener, key_listener)) = listeners {
+                    let window = web_sys::window().unwrap();
+                    window
+                        .remove_event_listener_with_callback(
+                            "click",
+                            click_listener.as_ref().unchecked_ref(),
+                        )
+                        .unwrap();
+                    window
+                        .remove_event_listener_with_callback(
+                            "keydown",
+                            key_listener.as_ref().unchecked_ref(),
+                        )
+                        .unwrap();
+                    drop(click_listener);
+                    drop(key_listener);
+                }
             }
         });
     }
@@ -827,6 +861,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
         let layer_count = layer_count.clone();
         let layer_names = layer_names.clone();
         let svil_state = svil_state.clone();
+        let svil_state_ref = svil_state_ref.clone();
         let error = error.clone();
         let notice = notice.clone();
         let busy = busy.clone();
@@ -836,6 +871,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
             let names = (*layer_names).clone();
             let (rows, cols, count) = (*matrix_rows, *matrix_cols, *layer_count);
             let svil_state = svil_state.clone();
+            let svil_state_ref = svil_state_ref.clone();
             let error = error.clone();
             let notice = notice.clone();
             let busy = busy.clone();
@@ -845,7 +881,11 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                 if result.is_ok() {
                     if let Some(st) = (*svil_state).clone() {
                         match link.write_layer_names(&names, &st.board_layer_names).await {
-                            Ok(board) => svil_state.set(Some(SvilState { board_layer_names: board, ..st })),
+                            Ok(board) => {
+                                let next = Some(SvilState { board_layer_names: board, ..st });
+                                *svil_state_ref.borrow_mut() = next.clone();
+                                svil_state.set(next);
+                            }
                             Err(e) => result = Err(e),
                         }
                     }
@@ -984,6 +1024,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
     let on_open_svil = {
         let device = device.clone();
         let svil_state = svil_state.clone();
+        let svil_state_ref = svil_state_ref.clone();
         let layers = layers.clone();
         let layer_names = layer_names.clone();
         let key_layout = key_layout.clone();
@@ -1002,6 +1043,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
             let current_settings = (*qmk_settings).clone();
             let (rows, cols, count) = (*matrix_rows as usize, *matrix_cols as usize, *layer_count as usize);
             let svil_state = svil_state.clone();
+            let svil_state_ref = svil_state_ref.clone();
             let layers = layers.clone();
             let layer_names = layer_names.clone();
             let key_layout = key_layout.clone();
@@ -1153,6 +1195,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                             }
                         }
                         qmk_settings.set(settings);
+                        *svil_state_ref.borrow_mut() = Some(st.clone());
                         svil_state.set(Some(st));
                         busy.set(false);
                         if !failures.is_empty() {
@@ -1324,13 +1367,33 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
         let device = device.clone();
         let error = error.clone();
         let svil_state = svil_state.clone();
+        let svil_state_ref = svil_state_ref.clone();
         Callback::from(move |writes: Vec<(vial_protocol::svil::menus::ValueRef, Vec<u8>)>| {
             if writes.is_empty() {
                 return;
             }
+            let prev: Vec<(vial_protocol::svil::menus::ValueRef, Option<Vec<u8>>)> = {
+                let mut guard = svil_state_ref.borrow_mut();
+                let rollback = if let Some(st) = guard.as_mut() {
+                    let prev = writes
+                        .iter()
+                        .map(|(r, _)| {
+                            let old = st.menu_values.iter().find(|e| e.key == r.key).map(|e| e.data.clone());
+                            (r.clone(), old)
+                        })
+                        .collect();
+                    apply_custom_value_entries(&mut st.menu_values, &writes);
+                    prev
+                } else {
+                    Vec::new()
+                };
+                svil_state.set(guard.clone());
+                rollback
+            };
             let device = device.clone();
             let error = error.clone();
             let svil_state = svil_state.clone();
+            let svil_state_ref = svil_state_ref.clone();
             spawn_local(async move {
                 let Some(link) = (*device).clone() else { return };
                 let refresh_pointing_hw = writes.iter().any(|(r, _)| r.key == "id_pad_touchpad_mode");
@@ -1341,25 +1404,49 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                         } else {
                             None
                         };
-                        if let Some(mut st) = (*svil_state).clone() {
-                            for (r, data) in readbacks {
-                                match st.menu_values.iter_mut().find(|e| e.key == r.key) {
-                                    Some(e) => e.data = data,
-                                    None => st.menu_values.push(vial_protocol::svil::menus::CustomValueEntry {
-                                        key: r.key,
-                                        channel: r.channel,
-                                        value_id: r.value_id,
-                                        data,
-                                    }),
+                        let next = {
+                            let mut guard = svil_state_ref.borrow_mut();
+                            if let Some(st) = guard.as_mut() {
+                                apply_custom_value_entries(&mut st.menu_values, &readbacks);
+                                if let Some(hw) = pointing_hw {
+                                    st.pointing_hardware = hw;
                                 }
                             }
-                            if let Some(hw) = pointing_hw {
-                                st.pointing_hardware = hw;
-                            }
-                            svil_state.set(Some(st));
+                            guard.clone()
+                        };
+                        if next.is_some() {
+                            svil_state.set(next);
                         }
                     }
-                    Err(e) => error.set(Some(format!("Failed to update Svalboard setting: {e}"))),
+                    Err(e) => {
+                        log::error!("Failed to update Svalboard setting: {e}");
+                        let next = {
+                            let mut guard = svil_state_ref.borrow_mut();
+                            if let Some(st) = guard.as_mut() {
+                                for ((r, sent), (_, old)) in writes.iter().zip(prev.into_iter()) {
+                                    let still_optimistic = st
+                                        .menu_values
+                                        .iter()
+                                        .find(|entry| entry.key == r.key)
+                                        .is_some_and(|entry| entry.data == *sent);
+                                    if !still_optimistic {
+                                        continue;
+                                    }
+                                    match old {
+                                        Some(data) => {
+                                            if let Some(entry) = st.menu_values.iter_mut().find(|e| e.key == r.key) {
+                                                entry.data = data;
+                                            }
+                                        }
+                                        None => st.menu_values.retain(|e| e.key != r.key),
+                                    }
+                                }
+                            }
+                            guard.clone()
+                        };
+                        svil_state.set(next);
+                        error.set(Some(format!("Failed to update Svalboard setting: {e}")));
+                    }
                 }
             });
         })

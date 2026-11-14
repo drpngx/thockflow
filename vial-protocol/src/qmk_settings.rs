@@ -791,8 +791,15 @@ mod tests {
             assert!(is_qsid_supported(qsid), "missing qsid {qsid}");
             assert!(SVIL_QMK_SETTINGS.iter().any(|d| d.qsid == qsid), "missing qsid {qsid} in SVIL_QMK_SETTINGS");
         }
+        for qsid in [9, 10, 12, 13, 14, 15, 16, 17] {
+            assert!(
+                SVIL_QMK_SETTINGS.iter().any(|d| d.qsid == qsid && d.tab == "Mouse keys"),
+                "missing Mouse keys qsid {qsid} in SVIL_QMK_SETTINGS"
+            );
+        }
         assert!(!SVIL_QMK_SETTINGS.iter().any(|d| d.qsid == 11 || d.qsid >= 500));
         let svil_tabs = tab_names_for(true);
+        assert!(svil_tabs.contains(&"Mouse keys"));
         assert!(svil_tabs.contains(&"Leader Key"));
         assert!(!svil_tabs.contains(&"Sval"));
         assert!(!svil_tabs.contains(&"Sval Colors"));

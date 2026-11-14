@@ -332,9 +332,8 @@ pub fn keycode_label(keycode: u16, protocol_version: u32, keyboard_name: &str) -
 
     if protocol_version >= 6 {
         match keycode {
-0x2 => "MOD_LSFT".into(),
             0x4 => "A".into(),
-            0x5 => "QMK_LM_SHIFT".into(),
+            0x5 => "B".into(),
             0x6 => "C".into(),
             0x7 => "D".into(),
             0x8 => "E".into(),
@@ -1693,8 +1692,7 @@ pub fn keycode_label(keycode: u16, protocol_version: u32, keyboard_name: &str) -
         }
     } else {
         match keycode {
-0x2 => "MOD_LSFT".into(),
-            0x4 => "QMK_LM_SHIFT".into(),
+            0x4 => "A".into(),
             0x5 => "B".into(),
             0x6 => "C".into(),
             0x7 => "D".into(),
@@ -1705,7 +1703,7 @@ pub fn keycode_label(keycode: u16, protocol_version: u32, keyboard_name: &str) -
             0xc => "I".into(),
             0xd => "J".into(),
             0xe => "K".into(),
-            0xf => "QMK_LM_MASK".into(),
+            0xf => "L".into(),
             0x10 => "M".into(),
             0x11 => "N".into(),
             0x12 => "O".into(),
@@ -2967,7 +2965,13 @@ pub fn keycode_from_string(s: &str, protocol_version: u32, keyboard_name: &str) 
     if s == "NONE" { return Some(0x0000); }
     if s == "transparent (▽)" || s == "transparent" { return Some(0x0001); }
     if let Some(kc) = custom_keycode_from_string(s) { return Some(kc); }
-    let parsed = keycode_from_label(s, protocol_version, keyboard_name);
+    let parsed = keycode_from_label(s, protocol_version, keyboard_name).or_else(|| {
+        if s.len() == 1 && s.as_bytes()[0].is_ascii_alphabetic() {
+            keycode_from_label(&s.to_ascii_uppercase(), protocol_version, keyboard_name)
+        } else {
+            None
+        }
+    });
     if parsed.is_some() || protocol_version < 6 {
         return parsed;
     }
@@ -3131,6 +3135,7 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "Auto- shift Report" => Some(0x7c12),
             "Auto- shift Toggle" => Some(0x7c15),
             "Auto- shift Up" => Some(0x7c11),
+            "B" => Some(0x5),
             "BL +" => Some(0x7804),
             "BL - " => Some(0x7803),
             "BL Breath" => Some(0x7806),
@@ -3751,7 +3756,6 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "MO(7)" => Some(0x5227),
             "MO(8)" => Some(0x5228),
             "MO(9)" => Some(0x5229),
-            "MOD_LSFT" => Some(0x2),
             "Mail" => Some(0xb1),
             "Media Next" => Some(0xab),
             "Media Play" => Some(0xae),
@@ -3898,8 +3902,6 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "QK_LAYER_MOD" => Some(0x5000),
             "QK_MOD_TAP" => Some(0x2000),
             "QK_ONE_SHOT_MOD" => Some(0x52a0),
-            "QMK_LM_MASK" => Some(0x1f),
-            "QMK_LM_SHIFT" => Some(0x5),
             "R" => Some(0x15),
             "RA )" => Some(0x7c1d),
             "RAlt" => Some(0xe6),
@@ -4483,6 +4485,7 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "? /" => Some(0x38),
             "@" => Some(0x21f),
             "@ 2" => Some(0x1f),
+            "A" => Some(0x4),
             "ALL_T (kc)" => Some(0x6f00),
             "Again" => Some(0x79),
             "Audio OFF" => Some(0x5c1e),
@@ -4635,6 +4638,7 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "Insert" => Some(0x49),
             "J" => Some(0xd),
             "K" => Some(0xe),
+            "L" => Some(0xf),
             "LA (" => Some(0x5cf5),
             "LAG (kc)" => Some(0xc00),
             "LAG_T (kc)" => Some(0x6c00),
@@ -5049,7 +5053,6 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "MO(7)" => Some(0x5107),
             "MO(8)" => Some(0x5108),
             "MO(9)" => Some(0x5109),
-            "MOD_LSFT" => Some(0x2),
             "Mail" => Some(0xb1),
             "Media Next" => Some(0xab),
             "Media Play" => Some(0xae),
@@ -5164,8 +5167,6 @@ fn keycode_from_label(s: &str, protocol_version: u32, keyboard_name: &str) -> Op
             "QK_LAYER_MOD" => Some(0x5900),
             "QK_ONE_SHOT_MOD" => Some(0x5500),
             "QK_TO" => Some(0x5000),
-            "QMK_LM_MASK" => Some(0xf),
-            "QMK_LM_SHIFT" => Some(0x4),
             "R" => Some(0x15),
             "RA )" => Some(0x5cf6),
             "RAlt" => Some(0xe6),
@@ -5698,4 +5699,36 @@ pub const VIAL_SUGGESTIONS: &[&str] = &[
     "🔇", "🔉", "🔊", "⏭", "⏮", "⏹", "⏯", "⏏", "🔍", "🏠", "🖱↑", "🖱↓", "🖱←", "🖱→", "🖱1", "🖱2", "🖱3", "🖱4", "🖱5",
     "LCtrl", "LShift", "LAlt", "LGui", "RCtrl", "RShift", "RAlt", "RGui"
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ascii_letters_roundtrip_v5_and_v6() {
+        for proto in [5, 6] {
+            for (offset, letter) in ('A'..='Z').enumerate() {
+                let kc = KC_A + offset as u16;
+                let expected = letter.to_string();
+                assert_eq!(keycode_label(kc, proto, ""), expected, "proto {proto} code 0x{kc:04x}");
+                assert_eq!(keycode_from_string(&expected, proto, ""), Some(kc), "proto {proto} {expected}");
+                let lower = expected.to_ascii_lowercase();
+                assert_eq!(keycode_from_string(&lower, proto, ""), Some(kc), "proto {proto} {lower}");
+            }
+            assert_eq!(keycode_label(KC_LSHIFT, proto, ""), "LShift");
+            assert_eq!(keycode_from_string("LShift", proto, ""), Some(KC_LSHIFT));
+            assert_eq!(keycode_label(0x0002, proto, ""), "0x0002");
+        }
+    }
+
+    #[test]
+    fn vial_suggestions_all_parse_in_v6() {
+        for &s in VIAL_SUGGESTIONS {
+            assert!(
+                keycode_from_string(s, 6, "").is_some(),
+                "VIAL_SUGGESTIONS entry {s:?} failed to parse for protocol v6"
+            );
+        }
+    }
+}
 

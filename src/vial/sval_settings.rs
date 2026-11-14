@@ -203,6 +203,65 @@ pub fn filter_dpi_options<'a>(
         .collect()
 }
 
+/// Resolve the selected DPI value from capped choices (clamping legacy/out-of-range
+/// indices to the highest choice supported by the current module).
+pub fn effective_dpi_value(filtered: &[(&str, u32)], stored: u32) -> u32 {
+    if filtered.iter().any(|(_, val)| *val == stored) {
+        stored
+    } else {
+        filtered.last().map(|(_, val)| *val).unwrap_or(stored)
+    }
+}
+
+fn automouse_copy(key: &str) -> Option<&'static str> {
+    Some(match key {
+        "id_automouse_enable" => "Switch to the mouse layer when a pointer moves.",
+        "id_left_automouse" => "This hand switches to the mouse layer.",
+        "id_right_automouse" => "This hand switches to the mouse layer.",
+        "id_automouse_no_timeout" => "The mouse layer never returns on its own.",
+        "id_automouse_timeout_ms" | "id_automouse_timeout" => "How long the mouse layer stays once the pointer rests.",
+        "id_automouse_threshold" => "Ignores small bumps; 0 switches on any motion.",
+        "id_automouse_decay" => "How long movement counts before it is forgotten.",
+        _ => return None,
+    })
+}
+
+const AUTOMOUSE_KEY_ORDER: [&str; 8] = [
+    "id_automouse_enable",
+    "id_left_automouse",
+    "id_right_automouse",
+    "id_automouse_no_timeout",
+    "id_automouse_timeout_ms",
+    "id_automouse_timeout",
+    "id_automouse_threshold",
+    "id_automouse_decay",
+];
+
+fn is_automouse_menu(item: &Value) -> bool {
+    let lbl = menus::label(item);
+    lbl.eq_ignore_ascii_case("Auto Mouse")
+        || lbl.eq_ignore_ascii_case("AutoMouse")
+        || find_control(item, "id_automouse_enable").is_some()
+        || find_control(item, "id_automouse_timeout_ms").is_some()
+        || find_control(item, "id_automouse_timeout").is_some()
+}
+
+fn find_automouse_section<'a>(menu: &'a Value) -> Option<&'a Value> {
+    find_section_by_label(menu, "Auto Mouse")
+        .or_else(|| find_section_by_label(menu, "AutoMouse"))
+        .or_else(|| menus::children(menu).into_iter().find(|child| is_automouse_menu(child)))
+}
+
+fn automouse_control_state(
+    key: &str,
+    no_timeout: bool,
+) -> (bool, Option<&'static str>) {
+    if key == "id_automouse_timeout_ms" && no_timeout {
+        return (true, Some("Disabled while No Layer Timeout is on."));
+    }
+    (false, None)
+}
+
 fn select_value(e: &Event) -> Option<String> {
     let target = e.target()?;
     js_sys::Reflect::get(&target, &"value".into()).ok()?.as_string()
@@ -322,6 +381,12 @@ pub fn SvalSettingsPanel(props: &SvalSettingsProps) -> Html {
             rendered_sections.push(render_power_and_scanning(item, &values, props));
         } else if lbl.eq_ignore_ascii_case("Layer Colors") {
             rendered_sections.push(render_layer_colors(item, &values, props));
+        } else if is_automouse_menu(item) {
+            rendered_sections.push(html! {
+                <div class="p-5 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                    { render_automouse_section(item, &values, props) }
+                </div>
+            });
         } else {
             rendered_sections.push(html! {
                 <div class="p-5 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -374,7 +439,7 @@ fn render_pointing_menu(menu: &Value, values: &HashMap<String, u32>, props: &Sva
 
     let scroll_settings = find_section_by_label(menu, "Scroll Settings");
     let touchpad_section = find_section_by_label(menu, "Touchpad");
-    let automouse_section = find_section_by_label(menu, "Auto Mouse");
+    let automouse_section = find_automouse_section(menu);
 
     let board_has_touchpad = props
         .pointing_hardware
@@ -388,13 +453,16 @@ fn render_pointing_menu(menu: &Value, values: &HashMap<String, u32>, props: &Sva
         "scroll settings",
         "touchpad",
         "auto mouse",
+        "automouse",
         "advanced",
     ];
     let extra_sections: Vec<&Value> = menus::children(menu)
         .into_iter()
         .filter(|child| {
             let l = menus::label(child).to_lowercase();
-            !handled_labels.contains(&l.as_str()) && menus::is_shown(child, values)
+            !handled_labels.contains(&l.as_str())
+                && automouse_section.is_none_or(|am| !std::ptr::eq(*child, am))
+                && menus::is_shown(child, values)
         })
         .collect();
 
@@ -434,15 +502,7 @@ fn render_pointing_menu(menu: &Value, values: &HashMap<String, u32>, props: &Sva
             }
 
             if let Some(sec) = automouse_section {
-                if menus::is_shown(sec, values) {
-                    <div class="pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                            {menus::label(sec)}
-                        </h4>
-                        { render_note_and_desc(sec) }
-                        { render_items(&menus::children(sec), values, props, 1) }
-                    </div>
-                }
+                { render_automouse_section(sec, values, props) }
             }
 
             if !extra_sections.is_empty() {
@@ -450,6 +510,76 @@ fn render_pointing_menu(menu: &Value, values: &HashMap<String, u32>, props: &Sva
                     { render_items(&extra_sections, values, props, 1) }
                 </div>
             }
+
+            <p class="pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                {"QMK Mouse Keys speeds and delays (KC_MS_* / KC_WH_*) are configured in the QMK Settings tab under Mouse keys."}
+            </p>
+        </div>
+    }
+}
+
+fn render_automouse_section(sec: &Value, values: &HashMap<String, u32>, props: &SvalSettingsProps) -> Html {
+    let mut raw_controls: Vec<(&Value, ValueRef)> = Vec::new();
+    collect_controls(sec, &mut raw_controls);
+
+    let mut by_key: HashMap<String, (&Value, ValueRef)> = HashMap::new();
+    let mut original_order: Vec<String> = Vec::new();
+    for (item, r) in raw_controls {
+        if menus::is_link(item) {
+            continue;
+        }
+        if !by_key.contains_key(&r.key) {
+            original_order.push(r.key.clone());
+            by_key.insert(r.key.clone(), (item, r));
+        }
+    }
+
+    let mut ordered_keys: Vec<String> = Vec::new();
+    for fixed in AUTOMOUSE_KEY_ORDER {
+        if by_key.contains_key(fixed) {
+            ordered_keys.push(fixed.to_string());
+        }
+    }
+    let seen: HashSet<String> = ordered_keys.iter().cloned().collect();
+    for key in original_order {
+        if !seen.contains(&key) {
+            ordered_keys.push(key);
+        }
+    }
+
+    let has_enable = by_key.contains_key("id_automouse_enable");
+    let auto_enabled = values.get("id_automouse_enable").copied().unwrap_or(0) != 0;
+    let no_timeout = values.get("id_automouse_no_timeout").copied().unwrap_or(0) != 0;
+
+    html! {
+        <div class="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
+                {menus::label(sec)}
+            </h4>
+            { render_note_and_desc(sec) }
+            if has_enable && !auto_enabled {
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {"Auto Mouse is off. Turn on Enable Auto Mouse for these settings to take effect."}
+                </p>
+            }
+            <div class="space-y-1">
+                { for ordered_keys.into_iter().filter_map(|key| {
+                    let (item, r) = by_key.get(&key)?.clone();
+                    let (force_disabled, reason_desc) = automouse_control_state(&key, no_timeout);
+                    let desc_override = reason_desc.or_else(|| automouse_copy(&key));
+                    Some(render_control_with_opts(
+                        item,
+                        r,
+                        values,
+                        props,
+                        ControlRenderOpts {
+                            desc_override,
+                            force_disabled,
+                            ..Default::default()
+                        },
+                    ))
+                })}
+            </div>
         </div>
     }
 }
@@ -477,9 +607,9 @@ fn render_hand_card(
     values: &HashMap<String, u32>,
     props: &SvalSettingsProps,
 ) -> Html {
-    let (title, dpi_key, scroll_key, scroll_speed_key) = match side {
-        Side::Left => ("Left Hand", "id_left_dpi", "id_left_scroll", "id_left_scroll_speed"),
-        Side::Right => ("Right Hand", "id_right_dpi", "id_right_scroll", "id_right_scroll_speed"),
+    let (title, section_label, dpi_key, scroll_key, scroll_speed_key) = match side {
+        Side::Left => ("Left Hand", "Left Pointer", "id_left_dpi", "id_left_scroll", "id_left_scroll_speed"),
+        Side::Right => ("Right Hand", "Right Pointer", "id_right_dpi", "id_right_scroll", "id_right_scroll_speed"),
     };
     let (module, os_touchpad, module_badge) =
         hand_hardware_badge(props.pointing_hardware.as_ref(), side);
@@ -487,6 +617,19 @@ fn render_hand_card(
     let dpi_ctrl = find_control(menu, dpi_key);
     let scroll_speed_ctrl = find_control(menu, scroll_speed_key);
     let scroll_ctrl = find_control(menu, scroll_key);
+    let extra_controls: Vec<(&Value, ValueRef)> = find_section_by_label(menu, section_label)
+        .map(|sec| {
+            let mut all = Vec::new();
+            collect_controls(sec, &mut all);
+            all.into_iter()
+                .filter(|(item, r)| {
+                    !matches!(r.key.as_str(), k if k == dpi_key || k == scroll_key || k == scroll_speed_key)
+                        && !menus::is_link(item)
+                        && menus::is_shown(item, values)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
 
     html! {
         <div class="p-4 rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 space-y-3">
@@ -517,6 +660,14 @@ fn render_hand_card(
                 }
             }
 
+            { for extra_controls.into_iter().map(|(item, r)| render_control_with_opts(
+                item,
+                r,
+                values,
+                props,
+                ControlRenderOpts { force_disabled: os_touchpad, ..Default::default() },
+            ))}
+
             if os_touchpad {
                 <p class="text-xs text-gray-500">
                     {"Controlled by the OS (Precision Touchpad mode)."}
@@ -536,7 +687,8 @@ fn render_dpi_select(
 ) -> Html {
     let options = menus::dropdown_options(item);
     let filtered = filter_dpi_options(&options, module, props.feature_flags4);
-    let current = values.get(&r.key).copied().unwrap_or(0);
+    let stored = values.get(&r.key).copied().unwrap_or(0);
+    let current = effective_dpi_value(&filtered, stored);
     let disabled = os_touchpad || menus::is_disabled(item, values);
     let width = menus::byte_width(item);
     let on_change = props.on_change.clone();
@@ -620,7 +772,11 @@ fn render_hand_toggle(
 ) -> Html {
     let (off_val, on_val) = menus::toggle_values(item);
     let current = values.get(&r.key).copied().unwrap_or(0);
-    let checked = current == on_val;
+    let checked = if off_val == 0 && on_val == 1 {
+        current != 0
+    } else {
+        current == on_val
+    };
     let disabled = os_touchpad || menus::is_disabled(item, values);
     let width = menus::byte_width(item);
     let on_change = props.on_change.clone();
@@ -879,6 +1035,14 @@ fn render_scan_wait_control(
     }
 }
 
+#[derive(Default)]
+struct ControlRenderOpts {
+    label_override: Option<&'static str>,
+    desc_override: Option<&'static str>,
+    display_scale: u32,
+    force_disabled: bool,
+}
+
 fn render_dev_control(
     item: &Value,
     r: ValueRef,
@@ -886,11 +1050,18 @@ fn render_dev_control(
     props: &SvalSettingsProps,
 ) -> Html {
     let copy = developer_copy(&r.key);
-    let label_override = copy.as_ref().map(|c| c.label);
-    let desc_override = copy.as_ref().map(|c| c.description);
-    let display_scale = copy.as_ref().map(|c| c.display_scale).unwrap_or(1);
-
-    render_control_with_overrides(item, r, values, props, label_override, desc_override, display_scale, 0)
+    render_control_with_opts(
+        item,
+        r,
+        values,
+        props,
+        ControlRenderOpts {
+            label_override: copy.as_ref().map(|c| c.label),
+            desc_override: copy.as_ref().map(|c| c.description),
+            display_scale: copy.as_ref().map(|c| c.display_scale).unwrap_or(1),
+            force_disabled: false,
+        },
+    )
 }
 
 fn render_layer_colors(
@@ -1011,36 +1182,45 @@ fn render_items(items: &[&Value], values: &HashMap<String, u32>, props: &SvalSet
     }
 }
 
-fn format_range_value(key: &str, displayed: u32) -> String {
+pub fn format_range_value(key: &str, displayed: u32) -> String {
     if matches!(key, "id_pad_dead_zone" | "id_pad_scroll_start") {
         return format!("{:.2} mm", (displayed as f64) / 100.0);
     }
     if key == "id_automouse_decay" {
         return format!("{} ms", displayed * 10);
     }
+    if matches!(
+        key,
+        "id_automouse_timeout_ms"
+            | "id_pad_hold_ms"
+            | "id_pad_tap_ms"
+            | "id_scan_idle_after_ms"
+            | "id_scan_idle_period_ms"
+            | "id_scan_deep_after_s"
+            | "id_scan_deep_period_ms"
+    ) {
+        return format!("{displayed} ms");
+    }
     displayed.to_string()
 }
 
 fn render_control(item: &Value, r: ValueRef, values: &HashMap<String, u32>, props: &SvalSettingsProps) -> Html {
-    render_control_with_overrides(item, r, values, props, None, None, 1, 0)
+    render_control_with_opts(item, r, values, props, ControlRenderOpts::default())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn render_control_with_overrides(
+fn render_control_with_opts(
     item: &Value,
     r: ValueRef,
     values: &HashMap<String, u32>,
     props: &SvalSettingsProps,
-    label_override: Option<&str>,
-    desc_override: Option<&str>,
-    display_scale: u32,
-    _depth: usize,
+    opts: ControlRenderOpts,
 ) -> Html {
     let current = values.get(&r.key).copied().unwrap_or(0);
     let width = menus::byte_width(item);
-    let label = label_override.unwrap_or_else(|| menus::label(item)).to_string();
-    let desc = desc_override.or_else(|| menus::description(item)).map(|s| s.to_string());
-    let disabled = menus::is_disabled(item, values);
+    let label = opts.label_override.unwrap_or_else(|| menus::label(item)).to_string();
+    let desc = opts.desc_override.or_else(|| menus::description(item)).map(|s| s.to_string());
+    let disabled = opts.force_disabled || menus::is_disabled(item, values);
+    let display_scale = opts.display_scale;
     let key = r.key.clone();
 
     let emit = {
@@ -1075,17 +1255,24 @@ fn render_control_with_overrides(
             let d_step = raw_step.saturating_mul(scale);
             let d_current = current.saturating_mul(scale).clamp(d_min, d_max);
 
-            let onchange = Callback::from(move |e: Event| {
-                if let Some(i) = e.target().and_then(|t| t.dyn_into::<HtmlInputElement>().ok()) {
-                    let entered = i.value().parse::<u32>().unwrap_or(d_min).clamp(d_min, d_max);
-                    let raw = if scale > 1 {
-                        ((entered + scale / 2) / scale).clamp(raw_min, raw_max)
-                    } else {
-                        entered
-                    };
-                    emit(raw);
-                }
-            });
+            let make_onchange = || {
+                let emit = emit.clone();
+                Callback::from(move |e: Event| {
+                    if let Some(i) = e.target().and_then(|t| t.dyn_into::<HtmlInputElement>().ok()) {
+                        let entered = i.value().parse::<u32>().unwrap_or(d_min).clamp(d_min, d_max);
+                        let raw = if scale > 1 {
+                            ((entered + scale / 2) / scale).clamp(raw_min, raw_max)
+                        } else {
+                            entered
+                        };
+                        emit(raw);
+                    }
+                })
+            };
+            let direct_number = !matches!(
+                key.as_str(),
+                "id_pad_dead_zone" | "id_pad_scroll_start" | "id_automouse_decay"
+            );
             row(html! {
                 <>
                     <input
@@ -1095,16 +1282,32 @@ fn render_control_with_overrides(
                         step={d_step.to_string()}
                         value={d_current.to_string()}
                         disabled={disabled}
-                        class="w-40"
-                        onchange={onchange}
+                        class="w-36"
+                        onchange={make_onchange()}
                     />
-                    <span class="w-20 text-right font-mono text-xs">{format_range_value(&key, d_current)}</span>
+                    if direct_number {
+                        <input
+                            type="number"
+                            min={d_min.to_string()}
+                            max={d_max.to_string()}
+                            step={d_step.to_string()}
+                            value={d_current.to_string()}
+                            disabled={disabled}
+                            class="w-20 px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900 font-mono text-xs text-right"
+                            onchange={make_onchange()}
+                        />
+                    }
+                    <span class="w-16 text-right font-mono text-xs">{format_range_value(&key, d_current)}</span>
                 </>
             })
         }
         "toggle" => {
             let (off_val, on_val) = menus::toggle_values(item);
-            let checked = current == on_val;
+            let checked = if off_val == 0 && on_val == 1 {
+                current != 0
+            } else {
+                current == on_val
+            };
             let onchange = Callback::from(move |e: Event| {
                 if let Some(i) = e.target().and_then(|t| t.dyn_into::<HtmlInputElement>().ok()) {
                     emit(if i.checked() { on_val } else { off_val });
@@ -1231,5 +1434,93 @@ mod tests {
         assert_eq!(format_scan_period_hz(0), "Unlimited");
         assert_eq!(format_scan_period_hz(1000), "1000 Hz");
         assert_eq!(hz_to_period_us(500.0, 1, 50000), 2000);
+    }
+
+    #[test]
+    fn automouse_section_and_timeout_visibility() {
+        let menu: Value = serde_json::json!({
+            "label": "Pointing Device",
+            "content": [
+                {
+                    "label": "Auto Mouse",
+                    "content": [
+                        { "label": "Enable Auto Mouse", "type": "toggle", "content": ["id_automouse_enable", 2, 10] },
+                        {
+                            "showIf": "{id_automouse_enable} == 1",
+                            "content": [
+                                { "label": "Activation Threshold", "type": "range", "options": [0, 50], "content": ["id_automouse_threshold", 2, 11] },
+                                { "label": "Activation Decay (x10ms)", "type": "range", "options": [10, 200], "content": ["id_automouse_decay", 2, 12] },
+                                { "label": "No Layer Timeout", "type": "toggle", "content": ["id_automouse_no_timeout", 2, 13] },
+                                {
+                                    "showIf": "{id_automouse_no_timeout} == 0",
+                                    "content": [
+                                        { "label": "Layer Timeout (ms)", "type": "range", "options": [100, 5000], "content": ["id_automouse_timeout_ms", 2, 14] }
+                                    ]
+                                },
+                                { "label": "Left Pointer Activates", "type": "toggle", "content": ["id_left_automouse", 2, 15] },
+                                { "label": "Right Pointer Activates", "type": "toggle", "content": ["id_right_automouse", 2, 16] }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        let section = find_automouse_section(&menu).expect("Auto Mouse section");
+        let mut raw_controls = Vec::new();
+        collect_controls(section, &mut raw_controls);
+        let keys: Vec<String> = raw_controls
+            .into_iter()
+            .map(|(_, r)| r.key)
+            .collect();
+        for expected in [
+            "id_automouse_enable",
+            "id_automouse_no_timeout",
+            "id_automouse_timeout_ms",
+            "id_automouse_threshold",
+            "id_automouse_decay",
+            "id_left_automouse",
+            "id_right_automouse",
+        ] {
+            assert!(keys.contains(&expected.to_string()), "missing {expected}");
+        }
+
+        // Sub-controls remain editable while Auto Mouse is off; only Layer Timeout
+        // disables when No Layer Timeout is on.
+        assert_eq!(
+            automouse_control_state("id_automouse_no_timeout", false),
+            (false, None)
+        );
+        assert_eq!(
+            automouse_control_state("id_automouse_timeout_ms", true),
+            (true, Some("Disabled while No Layer Timeout is on."))
+        );
+        assert_eq!(
+            automouse_control_state("id_automouse_timeout_ms", false),
+            (false, None)
+        );
+        assert_eq!(format_range_value("id_automouse_timeout_ms", 750), "750 ms");
+    }
+
+    #[test]
+    fn effective_dpi_clamps_out_of_range_stored_index() {
+        let filtered = vec![("400", 0), ("800", 1), ("1200", 2), ("1600", 3), ("2000", 4)];
+        assert_eq!(effective_dpi_value(&filtered, 2), 2);
+        assert_eq!(effective_dpi_value(&filtered, 7), 4);
+    }
+
+    #[test]
+    fn is_automouse_menu_matches_top_level_and_key_based_sections() {
+        let by_label = serde_json::json!({ "label": "Auto Mouse", "content": [] });
+        let by_key = serde_json::json!({
+            "label": "Mouse Layer",
+            "content": [
+                { "label": "Timeout", "type": "range", "options": [100, 2000], "content": ["id_automouse_timeout_ms", 0, 49] }
+            ]
+        });
+        let unrelated = serde_json::json!({ "label": "Scroll Settings", "content": [] });
+        assert!(is_automouse_menu(&by_label));
+        assert!(is_automouse_menu(&by_key));
+        assert!(!is_automouse_menu(&unrelated));
     }
 }

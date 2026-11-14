@@ -911,7 +911,10 @@ impl Link {
                     back.resize(width, 0);
                     readbacks.push((r.clone(), back));
                 }
-                Err(_) => readbacks.push((r.clone(), data.clone())),
+                Err(e) => {
+                    log::warn!("Failed to read back custom value {}: {e}", r.key);
+                    readbacks.push((r.clone(), data.clone()));
+                }
             }
         }
         Ok(readbacks)
