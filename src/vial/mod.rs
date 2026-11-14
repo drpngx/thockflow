@@ -1120,7 +1120,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                     let ok = web_sys::window()
                         .and_then(|w| {
                             w.confirm_with_message(&format!(
-                                "The file also has {} QMK setting(s) and {} keyboard setting(s) that differ from the keyboard. Apply them to the keyboard now?",
+                                "The file also has {} QMK setting(s) and {} Svalboard setting(s) that differ from the keyboard. Apply them to the keyboard now?",
                                 settings_changes.len(),
                                 value_changes.len()
                             ))
@@ -1300,46 +1300,66 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
     let on_settings_reset = {
         let device = device.clone();
         let error = error.clone();
+        let qmk_settings = qmk_settings.clone();
         Callback::from(move |_: ()| {
             let device = device.clone();
             let error = error.clone();
+            let qmk_settings = qmk_settings.clone();
             spawn_local(async move {
                 if let Some(link) = (*device).as_ref() {
-                    if let Err(e) = link.reset_qmk_settings().await {
-                        error.set(Some(format!("Failed to reset: {e}")));
+                    match link.reset_qmk_settings().await {
+                        Ok(()) => {
+                            let reloaded = link.reload_qmk_settings().await;
+                            qmk_settings.set(reloaded);
+                        }
+                        Err(e) => error.set(Some(format!("Failed to reset: {e}"))),
                     }
                 }
             });
         })
     };
 
-    // -- Keyboard (VIA3 menu) settings, SVIL only ---------------------------
+    // -- Svalboard (VIA3 menu) settings, SVIL only --------------------------
     let on_sval_setting_change = {
         let device = device.clone();
         let error = error.clone();
         let svil_state = svil_state.clone();
-        Callback::from(move |(r, data): (vial_protocol::svil::menus::ValueRef, Vec<u8>)| {
+        Callback::from(move |writes: Vec<(vial_protocol::svil::menus::ValueRef, Vec<u8>)>| {
+            if writes.is_empty() {
+                return;
+            }
             let device = device.clone();
             let error = error.clone();
             let svil_state = svil_state.clone();
             spawn_local(async move {
                 let Some(link) = (*device).clone() else { return };
-                match link.set_custom_value(r.channel, r.value_id, &data).await {
-                    Ok(()) => {
+                let refresh_pointing_hw = writes.iter().any(|(r, _)| r.key == "id_pad_touchpad_mode");
+                match link.set_custom_values_and_readback(&writes).await {
+                    Ok(readbacks) => {
+                        let pointing_hw = if refresh_pointing_hw {
+                            Some(link.read_pointing_hardware().await)
+                        } else {
+                            None
+                        };
                         if let Some(mut st) = (*svil_state).clone() {
-                            match st.menu_values.iter_mut().find(|e| e.key == r.key) {
-                                Some(e) => e.data = data,
-                                None => st.menu_values.push(vial_protocol::svil::menus::CustomValueEntry {
-                                    key: r.key.clone(),
-                                    channel: r.channel,
-                                    value_id: r.value_id,
-                                    data,
-                                }),
+                            for (r, data) in readbacks {
+                                match st.menu_values.iter_mut().find(|e| e.key == r.key) {
+                                    Some(e) => e.data = data,
+                                    None => st.menu_values.push(vial_protocol::svil::menus::CustomValueEntry {
+                                        key: r.key,
+                                        channel: r.channel,
+                                        value_id: r.value_id,
+                                        data,
+                                    }),
+                                }
+                            }
+                            if let Some(hw) = pointing_hw {
+                                st.pointing_hardware = hw;
                             }
                             svil_state.set(Some(st));
                         }
                     }
-                    Err(e) => error.set(Some(format!("Failed to set {}: {e}", r.key))),
+                    Err(e) => error.set(Some(format!("Failed to update Svalboard setting: {e}"))),
                 }
             });
         })
@@ -1498,7 +1518,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                             <button class={tab_class(&VialTab::TestMatrix)} onclick={set_tab(VialTab::TestMatrix)}>{"Test Matrix"}</button>
                             <button class={tab_class(&VialTab::QmkSettings)} onclick={set_tab(VialTab::QmkSettings)}>{"QMK Settings"}</button>
                             if svil_state.as_ref().is_some_and(|st| st.menus.is_some()) {
-                                <button class={tab_class(&VialTab::SvalSettings)} onclick={set_tab(VialTab::SvalSettings)}>{"Sval Settings"}</button>
+                                <button class={tab_class(&VialTab::SvalSettings)} onclick={set_tab(VialTab::SvalSettings)}>{"Svalboard Settings"}</button>
                             }
                         </div>
 
@@ -1563,6 +1583,7 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                             VialTab::QmkSettings => html! {
                                 <QmkSettingsPanel
                                     settings={(*qmk_settings).clone()}
+                                    is_svil={is_svil}
                                     on_change={on_setting_change}
                                     on_reset={on_settings_reset}
                                     loading={*loading}
@@ -1574,6 +1595,10 @@ pub fn KeyboardHome(props: &KeyboardHomeProps) -> Html {
                                         menus={st.menus.clone().unwrap_or_default()}
                                         values={st.menu_values.clone()}
                                         names={st.keycode_names()}
+                                        pointing_hardware={st.pointing_hardware.clone()}
+                                        feature_flags3={st.info.feature_flags3}
+                                        feature_flags4={st.info.feature_flags4}
+                                        layer_names={(*layer_names).clone()}
                                         on_change={on_sval_setting_change}
                                     />
                                 },

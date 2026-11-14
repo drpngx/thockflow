@@ -130,6 +130,8 @@ pub struct SvilState {
     pub leader_count: usize,
     pub fragments: Option<Value>,
     pub composition: Option<Value>,
+    /// Detected pointing hardware from POINTING_HARDWARE (0x2C), if supported.
+    pub pointing_hardware: Option<svil::diagnostics::PointingHardware>,
 }
 
 impl SvilState {
@@ -615,7 +617,12 @@ async fn load_svil(link: &SvilLink) -> Result<LoadedKeyboard, String> {
         st.alt_repeat_key_count = n("alt_repeat_key");
         st.leader_count = n("leader");
     }
-    st.menus = json.get("menus").filter(|m| m.is_array()).cloned();
+    st.menus = json
+        .get("menus")
+        .filter(|m| m.is_array())
+        .cloned()
+        .map(|m| menus::with_touchpad_taps(m, st.info.feature_flags3, st.info.feature_flags4))
+        .map(|m| menus::with_scroll_speed(m, st.info.feature_flags4));
     st.fragments = json.get("fragments").cloned();
     st.composition = json.get("composition").cloned();
     register_custom_keycodes(&st.custom_keycodes);
@@ -644,7 +651,12 @@ async fn load_svil(link: &SvilLink) -> Result<LoadedKeyboard, String> {
     // 5. QMK settings
     kb.qmk_settings = load_svil_qmk_settings(link).await;
 
-    // 6. Keyboard settings (VIA3 menus)
+    // 6. Pointing hardware (0x2C) and Svalboard settings (VIA3 menus)
+    if svil::diagnostics::has_pointing_hardware(&st.info) {
+        if let Ok(reply) = link.svil(&svil::diagnostics::pointing_hardware_payload()).await {
+            st.pointing_hardware = svil::diagnostics::parse_pointing_hardware(&reply);
+        }
+    }
     if let Some(m) = &st.menus {
         st.menu_values = read_menu_values(link, m).await;
     }
@@ -832,7 +844,10 @@ impl Link {
                 let msg = vial_protocol::VialMessage::qmk_settings_set(qsid, value);
                 webhid::send_message(d, msg.as_bytes()).await.map(|_| ())
             }
-            Link::Svil(l) => l.svil(&svil::qmk_settings_set_payload(qsid, value)).await.map(|_| ()),
+            Link::Svil(l) => {
+                l.svil(&svil::qmk_settings_set_payload(qsid, value)).await?;
+                l.svil(&[SvilCommand::Save as u8]).await.map(|_| ())
+            }
         }
     }
 
@@ -841,16 +856,65 @@ impl Link {
             Link::Vial(d) => {
                 webhid::send_message(d, vial_protocol::VialMessage::qmk_settings_reset().as_bytes()).await.map(|_| ())
             }
-            Link::Svil(l) => l.svil(&[SvilCommand::QmkSettingsReset as u8]).await.map(|_| ()),
+            Link::Svil(l) => {
+                l.svil(&[SvilCommand::QmkSettingsReset as u8]).await?;
+                l.svil(&[SvilCommand::Save as u8]).await.map(|_| ())
+            }
         }
     }
 
-    /// Set a VIA custom value and save its channel (SVIL keyboard settings).
+    pub async fn reload_qmk_settings(&self) -> Vec<QmkSettingValue> {
+        match self {
+            Link::Vial(d) => load_vial_qmk_settings(d).await,
+            Link::Svil(l) => load_svil_qmk_settings(l).await,
+        }
+    }
+
+    /// Re-read POINTING_HARDWARE (0x2C) on SVIL (e.g., after changing Touchpad Mode).
+    pub async fn read_pointing_hardware(&self) -> Option<svil::diagnostics::PointingHardware> {
+        let Link::Svil(l) = self else { return None };
+        let reply = l.svil(&svil::diagnostics::pointing_hardware_payload()).await.ok()?;
+        svil::diagnostics::parse_pointing_hardware(&reply)
+    }
+
+    /// Set a VIA custom value and save its channel (SVIL Svalboard settings).
     pub async fn set_custom_value(&self, channel: u8, value_id: u8, data: &[u8]) -> Result<(), String> {
         let Link::Svil(l) = self else { return Err("Custom values need an SVIL keyboard".into()) };
         l.send(svil::VIA_PREFIX, &svil::custom_set_payload(channel, value_id, data), 1).await?;
         l.send(svil::VIA_PREFIX, &svil::custom_save_payload(channel), 1).await?;
         Ok(())
+    }
+
+    /// Set a batch of VIA custom values, save each touched channel once, and read
+    /// back each value so firmware clamping/rounding is reflected in the UI.
+    pub async fn set_custom_values_and_readback(
+        &self,
+        writes: &[(menus::ValueRef, Vec<u8>)],
+    ) -> Result<Vec<(menus::ValueRef, Vec<u8>)>, String> {
+        let Link::Svil(l) = self else { return Err("Custom values need an SVIL keyboard".into()) };
+        let mut saved_channels = Vec::new();
+        for (r, data) in writes {
+            l.send(svil::VIA_PREFIX, &svil::custom_set_payload(r.channel, r.value_id, data), 1).await?;
+            if !saved_channels.contains(&r.channel) {
+                saved_channels.push(r.channel);
+            }
+        }
+        for ch in saved_channels {
+            l.send(svil::VIA_PREFIX, &svil::custom_save_payload(ch), 1).await?;
+        }
+        let mut readbacks = Vec::with_capacity(writes.len());
+        for (r, data) in writes {
+            let width = data.len().max(1);
+            match l.send(svil::VIA_PREFIX, &svil::custom_get_payload(r.channel, r.value_id), 3).await {
+                Ok(reply) => {
+                    let mut back: Vec<u8> = reply.iter().skip(3).take(width).copied().collect();
+                    back.resize(width, 0);
+                    readbacks.push((r.clone(), back));
+                }
+                Err(_) => readbacks.push((r.clone(), data.clone())),
+            }
+        }
+        Ok(readbacks)
     }
 
     /// Everything for a `.svil` file: the editor's keymap, names and settings,

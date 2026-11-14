@@ -13,6 +13,7 @@ use vial_protocol::qmk_settings::{self as qs, FieldType, QmkSettingDef};
 #[derive(Properties, PartialEq)]
 pub struct QmkSettingsProps {
     pub settings: Vec<QmkSettingValue>,
+    pub is_svil: bool,
     pub on_change: Callback<(u16, Vec<u8>)>,
     pub on_reset: Callback<()>,
     pub loading: bool,
@@ -22,13 +23,13 @@ pub struct QmkSettingsProps {
 pub fn QmkSettingsPanel(props: &QmkSettingsProps) -> Html {
     // Which qsids does the keyboard actually support?
     let supported_qsids: Vec<u16> = props.settings.iter().map(|s| s.qsid).collect();
+    let defs = qs::definitions(props.is_svil);
 
     // Collect tabs that have at least one supported field.
-    let tabs: Vec<&str> = qs::tab_names()
+    let tabs: Vec<&str> = qs::tab_names_for(props.is_svil)
         .into_iter()
         .filter(|tab| {
-            qs::QMK_SETTINGS
-                .iter()
+            defs.iter()
                 .any(|d| d.tab == *tab && supported_qsids.contains(&d.qsid))
         })
         .collect();
@@ -55,7 +56,7 @@ pub fn QmkSettingsPanel(props: &QmkSettingsProps) -> Html {
             </div>
 
             { for tabs.iter().map(|&tab| {
-                render_tab(tab, &props.settings, &supported_qsids, &props.on_change)
+                render_tab(tab, props.is_svil, &props.settings, &supported_qsids, &props.on_change)
             })}
         </div>
     }
@@ -63,11 +64,12 @@ pub fn QmkSettingsPanel(props: &QmkSettingsProps) -> Html {
 
 fn render_tab(
     tab: &str,
+    is_svil: bool,
     settings: &[QmkSettingValue],
     supported_qsids: &[u16],
     on_change: &Callback<(u16, Vec<u8>)>,
 ) -> Html {
-    let fields: Vec<&QmkSettingDef> = qs::QMK_SETTINGS
+    let fields: Vec<&QmkSettingDef> = qs::definitions(is_svil)
         .iter()
         .filter(|d| d.tab == tab && supported_qsids.contains(&d.qsid))
         .collect();
@@ -129,7 +131,12 @@ fn render_field(
             let max_val = *max;
             html! {
                 <div class="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded">
-                    <label class="text-sm">{def.title}</label>
+                    <div>
+                        <label class="text-sm block">{def.title}</label>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                            {format!("Range: {min_val} – {max_val}")}
+                        </span>
+                    </div>
                     <input
                         type="number"
                         value={current.to_string()}

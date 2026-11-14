@@ -193,6 +193,63 @@ pub static QMK_SETTINGS: &[QmkSettingDef] = &[
         field_type: FieldType::Integer { min: 0, max: 100 },
         width: 1,
     },
+    QmkSettingDef {
+        qsid: 22,
+        tab: "Tap-Hold",
+        title: "Permissive Hold (new)",
+        field_type: FieldType::Boolean { bit: 0 },
+        width: 1,
+    },
+    QmkSettingDef {
+        qsid: 23,
+        tab: "Tap-Hold",
+        title: "Hold On Other Key Press",
+        field_type: FieldType::Boolean { bit: 0 },
+        width: 1,
+    },
+    QmkSettingDef {
+        qsid: 24,
+        tab: "Tap-Hold",
+        title: "Retro Tapping (new)",
+        field_type: FieldType::Boolean { bit: 0 },
+        width: 1,
+    },
+    QmkSettingDef {
+        qsid: 25,
+        tab: "Tap-Hold",
+        title: "Quick Tap Term",
+        field_type: FieldType::Integer { min: 0, max: 10000 },
+        width: 2,
+    },
+    QmkSettingDef {
+        qsid: 26,
+        tab: "Tap-Hold",
+        title: "Chordal Hold",
+        field_type: FieldType::Boolean { bit: 0 },
+        width: 1,
+    },
+    QmkSettingDef {
+        qsid: 27,
+        tab: "Tap-Hold",
+        title: "Flow Tap",
+        field_type: FieldType::Integer { min: 0, max: 10000 },
+        width: 2,
+    },
+    // ---- Leader Key ----
+    QmkSettingDef {
+        qsid: 28,
+        tab: "Leader Key",
+        title: "Leader timeout (ms)",
+        field_type: FieldType::Integer { min: 50, max: 5000 },
+        width: 2,
+    },
+    QmkSettingDef {
+        qsid: 29,
+        tab: "Leader Key",
+        title: "Per-key timing (reset timeout on each key)",
+        field_type: FieldType::Boolean { bit: 0 },
+        width: 1,
+    },
     // ---- Mouse Keys ----
     QmkSettingDef {
         qsid: 9,
@@ -507,6 +564,74 @@ pub static QMK_SETTINGS: &[QmkSettingDef] = &[
     },
 ];
 
+/// Static table of QMK settings for SVIL (Svalboard firmware 4.x+), matching
+/// Keybard's `src/constants/qmk-settings.ts` (including firmware variable limits
+/// and omitting hidden/non-configurable fields like QSID 11 Step size).
+pub static SVIL_QMK_SETTINGS: &[QmkSettingDef] = &[
+    // ---- Tap-Hold ----
+    QmkSettingDef { qsid: 7, tab: "Tap-Hold", title: "Tapping Term", field_type: FieldType::Integer { min: 50, max: 10000 }, width: 2 },
+    QmkSettingDef { qsid: 8, tab: "Tap-Hold", title: "Permissive Hold", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 8, tab: "Tap-Hold", title: "Ignore Mod Tap Interrupt", field_type: FieldType::Boolean { bit: 1 }, width: 1 },
+    QmkSettingDef { qsid: 8, tab: "Tap-Hold", title: "Tapping Force Hold", field_type: FieldType::Boolean { bit: 2 }, width: 1 },
+    QmkSettingDef { qsid: 8, tab: "Tap-Hold", title: "Retro Tapping", field_type: FieldType::Boolean { bit: 3 }, width: 1 },
+    QmkSettingDef { qsid: 22, tab: "Tap-Hold", title: "Permissive Hold (new)", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 23, tab: "Tap-Hold", title: "Hold On Other Key Press", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 24, tab: "Tap-Hold", title: "Retro Tapping (new)", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 25, tab: "Tap-Hold", title: "Quick Tap Term", field_type: FieldType::Integer { min: 0, max: 10000 }, width: 2 },
+    QmkSettingDef { qsid: 18, tab: "Tap-Hold", title: "Tap Code Delay", field_type: FieldType::Integer { min: 0, max: 1000 }, width: 2 },
+    QmkSettingDef { qsid: 19, tab: "Tap-Hold", title: "Tap Hold Caps Delay", field_type: FieldType::Integer { min: 0, max: 1000 }, width: 2 },
+    QmkSettingDef { qsid: 20, tab: "Tap-Hold", title: "Tapping Toggle", field_type: FieldType::Integer { min: 0, max: 15 }, width: 1 },
+    QmkSettingDef { qsid: 26, tab: "Tap-Hold", title: "Chordal Hold", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 27, tab: "Tap-Hold", title: "Flow Tap", field_type: FieldType::Integer { min: 0, max: 10000 }, width: 2 },
+    // ---- Auto Shift ----
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Enable", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Enable for modifiers", field_type: FieldType::Boolean { bit: 1 }, width: 1 },
+    QmkSettingDef { qsid: 4, tab: "Auto Shift", title: "Timeout", field_type: FieldType::Integer { min: 50, max: 1000 }, width: 2 },
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Do not Auto Shift special keys", field_type: FieldType::Boolean { bit: 2 }, width: 1 },
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Do not Auto Shift numeric keys", field_type: FieldType::Boolean { bit: 3 }, width: 1 },
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Do not Auto Shift alpha characters", field_type: FieldType::Boolean { bit: 4 }, width: 1 },
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Enable keyrepeat", field_type: FieldType::Boolean { bit: 5 }, width: 1 },
+    QmkSettingDef { qsid: 3, tab: "Auto Shift", title: "Disable keyrepeat when timeout is exceeded", field_type: FieldType::Boolean { bit: 6 }, width: 1 },
+    // ---- One Shot Keys ----
+    QmkSettingDef { qsid: 5, tab: "One Shot Keys", title: "Tapping this number of times holds the key until tapped once again", field_type: FieldType::Integer { min: 0, max: 15 }, width: 1 },
+    QmkSettingDef { qsid: 6, tab: "One Shot Keys", title: "Time (in ms) before the one shot key is released", field_type: FieldType::Integer { min: 0, max: 60000 }, width: 2 },
+    // ---- Combo ----
+    QmkSettingDef { qsid: 2, tab: "Combo", title: "Time out period for combos", field_type: FieldType::Integer { min: 10, max: 10000 }, width: 2 },
+    // ---- Leader Key ----
+    QmkSettingDef { qsid: 28, tab: "Leader Key", title: "Leader timeout (ms)", field_type: FieldType::Integer { min: 50, max: 5000 }, width: 2 },
+    QmkSettingDef { qsid: 29, tab: "Leader Key", title: "Per-key timing (reset timeout on each key)", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    // ---- Mouse keys ----
+    QmkSettingDef { qsid: 9, tab: "Mouse keys", title: "Delay between pressing a movement key and cursor movement", field_type: FieldType::Integer { min: 0, max: 2550 }, width: 2 },
+    QmkSettingDef { qsid: 10, tab: "Mouse keys", title: "Time between cursor movements in milliseconds", field_type: FieldType::Integer { min: 1, max: 255 }, width: 2 },
+    QmkSettingDef { qsid: 12, tab: "Mouse keys", title: "Maximum cursor speed at which acceleration stops", field_type: FieldType::Integer { min: 0, max: 255 }, width: 2 },
+    QmkSettingDef { qsid: 13, tab: "Mouse keys", title: "Time until maximum cursor speed is reached", field_type: FieldType::Integer { min: 0, max: 255 }, width: 2 },
+    QmkSettingDef { qsid: 14, tab: "Mouse keys", title: "Delay between pressing a wheel key and wheel movement", field_type: FieldType::Integer { min: 0, max: 2550 }, width: 2 },
+    QmkSettingDef { qsid: 15, tab: "Mouse keys", title: "Time between wheel movements", field_type: FieldType::Integer { min: 0, max: 255 }, width: 2 },
+    QmkSettingDef { qsid: 16, tab: "Mouse keys", title: "Maximum number of scroll steps per scroll action", field_type: FieldType::Integer { min: 0, max: 255 }, width: 2 },
+    QmkSettingDef { qsid: 17, tab: "Mouse keys", title: "Time until maximum scroll speed is reached", field_type: FieldType::Integer { min: 0, max: 255 }, width: 2 },
+    // ---- Magic ----
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap Caps Lock and Left Control", field_type: FieldType::Boolean { bit: 0 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Treat Caps Lock as Control", field_type: FieldType::Boolean { bit: 1 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap Left Alt and GUI", field_type: FieldType::Boolean { bit: 2 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap Right Alt and GUI", field_type: FieldType::Boolean { bit: 3 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Disable the GUI keys", field_type: FieldType::Boolean { bit: 4 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap ` and Escape", field_type: FieldType::Boolean { bit: 5 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap \\ and Backspace", field_type: FieldType::Boolean { bit: 6 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Enable N-key rollover", field_type: FieldType::Boolean { bit: 7 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap Left Control and GUI", field_type: FieldType::Boolean { bit: 8 }, width: 4 },
+    QmkSettingDef { qsid: 21, tab: "Magic", title: "Swap Right Control and GUI", field_type: FieldType::Boolean { bit: 9 }, width: 4 },
+    // ---- Grave Escape ----
+    QmkSettingDef { qsid: 1, tab: "Grave Escape", title: "Always send Escape if Alt is pressed", field_type: FieldType::Boolean { bit: 0 }, width: 1 },
+    QmkSettingDef { qsid: 1, tab: "Grave Escape", title: "Always send Escape if Control is pressed", field_type: FieldType::Boolean { bit: 1 }, width: 1 },
+    QmkSettingDef { qsid: 1, tab: "Grave Escape", title: "Always send Escape if GUI is pressed", field_type: FieldType::Boolean { bit: 2 }, width: 1 },
+    QmkSettingDef { qsid: 1, tab: "Grave Escape", title: "Always send Escape if Shift is pressed", field_type: FieldType::Boolean { bit: 3 }, width: 1 },
+];
+
+/// Return the QMK settings table for SVIL or Vial.
+pub fn definitions(is_svil: bool) -> &'static [QmkSettingDef] {
+    if is_svil { SVIL_QMK_SETTINGS } else { QMK_SETTINGS }
+}
+
 /// Find all field definitions for a given qsid.
 pub fn fields_for_qsid(qsid: u16) -> Vec<&'static QmkSettingDef> {
     QMK_SETTINGS.iter().filter(|d| d.qsid == qsid).collect()
@@ -517,15 +642,20 @@ pub fn is_qsid_supported(qsid: u16) -> bool {
     QMK_SETTINGS.iter().any(|d| d.qsid == qsid)
 }
 
-/// Get all unique tab names, in definition order.
-pub fn tab_names() -> Vec<&'static str> {
+/// Get all unique tab names for either SVIL or Vial, in definition order.
+pub fn tab_names_for(is_svil: bool) -> Vec<&'static str> {
     let mut tabs = Vec::new();
-    for def in QMK_SETTINGS {
+    for def in definitions(is_svil) {
         if !tabs.contains(&def.tab) {
             tabs.push(def.tab);
         }
     }
     tabs
+}
+
+/// Get all unique tab names, in definition order.
+pub fn tab_names() -> Vec<&'static str> {
+    tab_names_for(false)
 }
 
 /// Get the byte width for a qsid (all fields with the same qsid share the same width).
@@ -653,5 +783,18 @@ mod tests {
         let mut deduped = tabs.clone();
         deduped.dedup();
         assert_eq!(tabs.len(), deduped.len());
+    }
+
+    #[test]
+    fn svil_qmk_settings_include_22_through_29_and_omit_vial_sval() {
+        for qsid in 22..=29 {
+            assert!(is_qsid_supported(qsid), "missing qsid {qsid}");
+            assert!(SVIL_QMK_SETTINGS.iter().any(|d| d.qsid == qsid), "missing qsid {qsid} in SVIL_QMK_SETTINGS");
+        }
+        assert!(!SVIL_QMK_SETTINGS.iter().any(|d| d.qsid == 11 || d.qsid >= 500));
+        let svil_tabs = tab_names_for(true);
+        assert!(svil_tabs.contains(&"Leader Key"));
+        assert!(!svil_tabs.contains(&"Sval"));
+        assert!(!svil_tabs.contains(&"Sval Colors"));
     }
 }

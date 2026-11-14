@@ -29,6 +29,8 @@ pub const FLAG2_POINTING_CONTACTS: u8 = 0x20;
 pub const FLAG3_TYPING_PAUSE: u8 = 0x04;
 /// `feature_flags3`: the board answers FLICKER_LATCH (0x3D).
 pub const FLAG3_FLICKER_LATCH: u8 = 0x08;
+/// `feature_flags3`: the touchpad tap/hold settings exist (VIA values 51-54).
+pub const FLAG3_PAD_GESTURES: u8 = 0x10;
 /// `feature_flags3`: the touchpad tuning settings exist.
 pub const FLAG3_PAD_TUNING: u8 = 0x20;
 /// `feature_flags3`: the touch page of 0x2D (page 1).
@@ -43,6 +45,10 @@ pub const FLAG4_PAD_MODE: u8 = 0x02;
 pub const FLAG4_DEBUG_CONSOLE: u8 = 0x04;
 /// `feature_flags4`: the board answers POINTING_SENSOR (0x39).
 pub const FLAG4_POINTING_SENSOR: u8 = 0x08;
+/// `feature_flags4`: per-hand Scroll speed (VIA values 61-62).
+pub const FLAG4_SCROLL_SPEED: u8 = 0x20;
+/// `feature_flags4`: TrackPoint software speed scaling (DPI choices up to 3200).
+pub const FLAG4_TRACKPOINT_SPEED: u8 = 0x40;
 
 pub fn has_pointing_hardware(info: &SvilInfo) -> bool {
     info.feature_flags2 & FLAG2_POINTING_HARDWARE != 0
@@ -62,6 +68,9 @@ pub fn has_typing_pause(info: &SvilInfo) -> bool {
 /// FLICKER_LATCH also needs a report of at least [`FLICKER_MIN_REPORT`] bytes.
 pub fn has_flicker_latch(info: &SvilInfo, report_len: usize) -> bool {
     info.feature_flags3 & FLAG3_FLICKER_LATCH != 0 && report_len >= FLICKER_MIN_REPORT
+}
+pub fn has_pad_gestures(info: &SvilInfo) -> bool {
+    info.feature_flags3 & FLAG3_PAD_GESTURES != 0
 }
 pub fn has_pad_tuning(info: &SvilInfo) -> bool {
     info.feature_flags3 & FLAG3_PAD_TUNING != 0
@@ -83,6 +92,12 @@ pub fn has_debug_console(info: &SvilInfo) -> bool {
 }
 pub fn has_pointing_sensor(info: &SvilInfo) -> bool {
     info.feature_flags4 & FLAG4_POINTING_SENSOR != 0
+}
+pub fn has_scroll_speed(info: &SvilInfo) -> bool {
+    info.feature_flags4 & FLAG4_SCROLL_SPEED != 0
+}
+pub fn has_trackpoint_speed(info: &SvilInfo) -> bool {
+    info.feature_flags4 & FLAG4_TRACKPOINT_SPEED != 0
 }
 
 /// Which hand / half.
@@ -175,6 +190,38 @@ pub struct PointingHalf {
 pub struct PointingHardware {
     /// The halves that reported: the USB half first, then the other half.
     pub halves: Vec<PointingHalf>,
+}
+
+impl PointingHalf {
+    /// The detected module, or `built_for` when detection hasn't run yet.
+    pub fn effective_module(&self) -> Option<PointingModule> {
+        match self.detected {
+            Some(DetectedModule::Module(m)) => Some(m),
+            Some(DetectedModule::None | DetectedModule::Unknown) => None,
+            None => self.built_for,
+        }
+    }
+}
+
+impl PointingHardware {
+    /// Whether any half has a detected Azoteq touchpad.
+    pub fn has_touchpad(&self) -> bool {
+        self.halves.iter().any(|h| h.effective_module() == Some(PointingModule::Azoteq))
+    }
+
+    /// Whether every touchpad half is driven by the OS as a Precision Touchpad.
+    pub fn pads_in_touchpad_mode(&self) -> bool {
+        let mut any_pad = false;
+        for h in &self.halves {
+            if h.effective_module() == Some(PointingModule::Azoteq) {
+                any_pad = true;
+                if !h.os_touchpad {
+                    return false;
+                }
+            }
+        }
+        any_pad
+    }
 }
 
 /// `[0x2C]`.
